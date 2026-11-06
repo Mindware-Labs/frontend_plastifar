@@ -14,6 +14,7 @@ import {
 import { Button } from "../../components/ui/Button";
 import { ColumnPicker } from "../../components/ui/ColumnPicker";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
+import { Modal } from "../../components/ui/Modal";
 import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ClearFiltersButton, FilterDropdown } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
@@ -22,7 +23,7 @@ import { Spinner } from "../../components/ui/Spinner";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePermissions } from "../../hooks/usePermissions";
 import { useUrlState } from "../../hooks/useUrlState";
-import { flattenPermissions } from "../../lib/permissionCatalog";
+import { DEFAULT_PERMISSION_GROUPS, flattenPermissions } from "../../lib/permissionCatalog";
 import type { PermissionKey, PermissionMatrixResponse } from "../../types/permissions";
 import { PermissionMatrix } from "./PermissionMatrix";
 
@@ -35,6 +36,12 @@ type ChipKey = "todos" | "sinAsignar" | "conCambios";
  * cambios sin guardar no sobreviven a una recarga.
  */
 const CHIPS_FROM_URL: readonly ChipKey[] = ["todos", "sinAsignar"];
+
+const TICKETS_READ_ALL_LABEL =
+  DEFAULT_PERMISSION_GROUPS.flatMap((group) => group.permissions).find((p) => p.key === "tickets.read_all")
+    ?.label ?? "Ver los tickets de todos los departamentos";
+
+const PERMISSION_SCOPE_NOTE = `Un permiso concede la acción, pero solo sobre los recursos de los departamentos donde esa persona tiene el rol que lo otorga. La única excepción es «${TICKETS_READ_ALL_LABEL}», pensada para supervisión: amplía la lectura a todos los departamentos sin conceder escritura. Dentro de la matriz se navega con las flechas del teclado.`;
 
 /** Concesiones de un rol, siempre como lista nueva: nunca se muta el estado. */
 function withPermission(current: PermissionKey[], key: PermissionKey) {
@@ -66,6 +73,7 @@ export function PermissionsView({ headerExtra, title, onMatrixLoaded }: Permissi
   const [isRefetching, setIsRefetching] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+  const [scopeNoteOpen, setScopeNoteOpen] = useState(false);
 
   const debouncedSearch = useDebouncedValue(search).trim().toLowerCase();
 
@@ -328,7 +336,7 @@ export function PermissionsView({ headerExtra, title, onMatrixLoaded }: Permissi
   }
 
   return (
-    <div>
+    <div className="flex min-h-0 flex-1 flex-col">
       <ModuleHeader
         title={title ?? "Permisos"}
         summary={
@@ -401,6 +409,8 @@ export function PermissionsView({ headerExtra, title, onMatrixLoaded }: Permissi
             aria-label="Filtrar por módulo"
             value={module}
             onChange={setModule}
+            searchable
+            searchPlaceholder="Buscar módulo…"
             defaultIcon={<Layers className="h-3.5 w-3.5 text-zinc-500" />}
             options={[
               { value: "todos", label: "Todos los módulos" },
@@ -439,9 +449,9 @@ export function PermissionsView({ headerExtra, title, onMatrixLoaded }: Permissi
           `ListPanel`, porque la rejilla trae su propio desbordamiento en dos ejes
           con cabecera y columna congeladas, y meterla dentro de otro contenedor
           con scroll despega justamente eso. */}
-      <section className="overflow-hidden rounded-card border border-line bg-white shadow-card">
-      <div className="px-4 pt-3">
-      <p className="mb-3 text-[12.5px] leading-relaxed text-subtle">
+      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-line bg-white shadow-card">
+      <div className="flex min-h-0 flex-1 flex-col px-4 pt-3">
+      <p className="mb-3 shrink-0 text-[12.5px] leading-relaxed text-subtle">
         Las capacidades de tickets, tareas y formularios se configuran <span className="font-medium text-zinc-800">solo aquí</span>.
         Los cambios se aplican a cada rol y al personal cuando renueva sesión; no hace falta desplegar código.
       </p>
@@ -466,7 +476,7 @@ export function PermissionsView({ headerExtra, title, onMatrixLoaded }: Permissi
           />
         )
       ) : (
-        <div className={`transition-opacity ${isRefetching ? "opacity-60" : ""}`}>
+        <div className={`flex min-h-[min(420px,calc(100vh-18rem))] flex-1 flex-col transition-opacity ${isRefetching ? "opacity-60" : ""}`}>
           {/* Con una sola columna esto no es una tabulacion cruzada, y la
               pantalla se lee como si estuviera rota: media hoja en blanco al
               lado de una columna sola. Decirlo es mas honesto que dejar que
@@ -498,7 +508,7 @@ export function PermissionsView({ headerExtra, title, onMatrixLoaded }: Permissi
       {/* Leyenda: hasta ahora el punto ambar, el candado y el anillo de cambio
           no se explicaban en ninguna parte visible de la pantalla. Un simbolo
           que hay que adivinar no informa, decora. */}
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line px-4 py-2.5">
+      <div className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-2 border-t border-line px-4 py-2.5">
         <span className="flex items-center gap-1.5 text-[11.5px] text-faint">
           <span aria-hidden className="inline-flex h-4 w-4 items-center justify-center rounded-edge bg-brand-red/10 text-brand-red">
             <Check className="h-3 w-3" strokeWidth={3} />
@@ -542,13 +552,37 @@ export function PermissionsView({ headerExtra, title, onMatrixLoaded }: Permissi
       </div>
       </section>
 
-      <p className="mt-3 max-w-[76ch] text-[12px] leading-relaxed text-faint">
-        Un permiso concede la acción, pero solo sobre los recursos de los departamentos donde esa
-        persona tiene el rol que lo otorga. La única excepción es{" "}
-        <span className="font-mono text-[11px] text-subtle">tickets.read_all</span>, pensada para
-        supervisión: amplía la lectura a todos los departamentos sin conceder escritura. Dentro de la
-        matriz se navega con las flechas del teclado.
-      </p>
+      <button
+        type="button"
+        onClick={() => setScopeNoteOpen(true)}
+        className="mt-3 block w-full min-w-0 truncate text-left text-[12px] text-faint underline-offset-2 transition-colors hover:text-subtle hover:underline"
+        title="Ver alcance de los permisos"
+      >
+        {PERMISSION_SCOPE_NOTE}
+      </button>
+
+      {scopeNoteOpen && (
+        <Modal
+          title="Alcance de los permisos"
+          size="md"
+          onClose={() => setScopeNoteOpen(false)}
+          footer={
+            <Button size="sm" onClick={() => setScopeNoteOpen(false)}>
+              Entendido
+            </Button>
+          }
+        >
+          <p className="text-[13px] leading-relaxed text-subtle">
+            Un permiso concede la acción, pero solo sobre los recursos de los departamentos donde esa
+            persona tiene el rol que lo otorga. La única excepción es{" "}
+            <span className="font-medium text-ink">«{TICKETS_READ_ALL_LABEL}»</span>, pensada para
+            supervisión: amplía la lectura a todos los departamentos sin conceder escritura.
+          </p>
+          <p className="mt-3 text-[13px] leading-relaxed text-subtle">
+            Dentro de la matriz se navega con las flechas del teclado.
+          </p>
+        </Modal>
+      )}
 
       {confirmingDiscard && (
         <ConfirmDialog

@@ -1,9 +1,9 @@
 import { apiRequest, toQuery } from "./client";
 import type {
   CreateStaffRequest,
+  StaffActivityResponse,
   StaffListResponse,
   StaffResponse,
-  StaffSignatureResponse,
   UpdateStaffRequest,
 } from "../types/api";
 import type { StaffDetail } from "../types/permissions";
@@ -26,20 +26,14 @@ export interface StaffQuery {
   departmentId?: number;
   /** todos | activos | inactivos | administradores */
   status?: string;
+  /** Solo colaboradores marcados como vendedor (activos). */
+  salesRepOnly?: boolean;
   /** nombre | correo | departamento | rol | estado */
   sort?: string;
   dir?: "asc" | "desc";
 }
 
 export const staffApi = {
-  getSignature: () => apiRequest<StaffSignatureResponse>("/api/staff/me/signature"),
-
-  updateSignature: (signature: string) =>
-    apiRequest<StaffSignatureResponse>("/api/staff/me/signature", {
-      method: "PUT",
-      body: JSON.stringify({ signature }),
-    }),
-
   getById: (id: number) => apiRequest<StaffResponse>(`/api/staff/${id}`),
 
   list: (query: StaffQuery) => apiRequest<StaffListResponse>(`/api/staff${toQuery({ ...query })}`),
@@ -70,6 +64,12 @@ export const staffApi = {
   getDepartmentAccess: (id: number) =>
     apiRequest<StaffDetail>(`/api/staff/${id}/department-access`),
 
+  /** Historial cronológico unificado de actividad del colaborador en el sistema. */
+  getActivity: (
+    id: number,
+    query?: { page?: number; pageSize?: number; category?: string; search?: string },
+  ) => apiRequest<StaffActivityResponse>(`/api/staff/${id}/activity${toQuery(query ?? {})}`),
+
   grantDepartmentAccess: (id: number, data: GrantDepartmentAccessRequest) =>
     apiRequest<void>(`/api/staff/${id}/department-access`, {
       method: "POST",
@@ -84,4 +84,14 @@ export const staffApi = {
 
   revokeDepartmentAccess: (id: number, departmentId: number) =>
     apiRequest<void>(`/api/staff/${id}/department-access/${departmentId}`, { method: "DELETE" }),
+
+  /** Personaliza individualmente un permiso para este colaborador (conceder, revocar o restablecer). */
+  overridePermission: (id: number, permission: string, action: "grant" | "revoke" | "reset") =>
+    apiRequest<{ message: string; grantedPermissions: string[]; revokedPermissions: string[] }>(
+      `/api/staff/${id}/permissions/override`,
+      {
+        method: "POST",
+        body: JSON.stringify({ permission, action }),
+      },
+    ),
 };

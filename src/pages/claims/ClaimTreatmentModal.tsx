@@ -82,11 +82,7 @@ export function ClaimTreatmentModal({ claim, onClose, onSaved }: ClaimTreatmentM
   return (
     <Modal
       title={`Tratamiento de ${claim.ticketNumber}`}
-      description={
-        claim.status === "Registrada"
-          ? "Sección IV, uso exclusivo de Calidad. Al guardar por primera vez, la reclamación pasa a «En tratamiento»."
-          : "Sección IV, uso exclusivo de Calidad. Para cerrar hacen falta la primera respuesta, la decisión sobre la acción correctiva y la satisfacción del cliente."
-      }
+      description="Sección IV, uso exclusivo de Calidad. La reclamación sigue «Registrada» hasta el cierre; el avance de Calidad se refleja en el apartado IV."
       onClose={onClose}
       size="xl"
       footer={

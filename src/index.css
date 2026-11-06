@@ -717,6 +717,74 @@ input::-ms-clear {
   }
 }
 
+/* Animación de entrada limpia para tabs de formulario: sin sobreponer capas ni letras */
+@keyframes plf-form-in-forward {
+  from {
+    opacity: 0;
+    transform: translate3d(8px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes plf-form-in-backward {
+  from {
+    opacity: 0;
+    transform: translate3d(-8px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* Crossfade de formularios en ticket: entrada y salida a la vez, sin flash. */
+@keyframes plf-form-cross-in-forward {
+  from {
+    opacity: 0;
+    transform: translate3d(6px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes plf-form-cross-out-forward {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(-4px, 0, 0);
+  }
+}
+
+@keyframes plf-form-cross-in-backward {
+  from {
+    opacity: 0;
+    transform: translate3d(-6px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes plf-form-cross-out-backward {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(4px, 0, 0);
+  }
+}
+
 @keyframes plf-check-breathe {
   0%, 100% {
     transform: scale(1);
@@ -900,6 +968,31 @@ input::-ms-clear {
   will-change: transform, opacity, filter;
 }
 
+.animate-plf-form-in-forward {
+  animation: plf-form-in-forward 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+.animate-plf-form-in-backward {
+  animation: plf-form-in-backward 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+.animate-plf-form-cross-in-forward {
+  animation: plf-form-cross-in-forward 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+.animate-plf-form-cross-out-forward {
+  animation: plf-form-cross-out-forward 0.18s cubic-bezier(0.4, 0, 1, 1) both;
+  will-change: transform, opacity;
+}
+.animate-plf-form-cross-in-backward {
+  animation: plf-form-cross-in-backward 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+.animate-plf-form-cross-out-backward {
+  animation: plf-form-cross-out-backward 0.18s cubic-bezier(0.4, 0, 1, 1) both;
+  will-change: transform, opacity;
+}
+
 /* Alta y baja de un renglón de planilla. El alto vive en el grid (0fr ↔ 1fr)
    para que las filas de abajo se deslicen; el contenido llega con el mismo
    blur corto de los pasos de ticket. 480ms / 320ms tienen que coincidir con
@@ -960,6 +1053,27 @@ input::-ms-clear {
 }
 .plf-apple-row-shell[data-motion="idle"][data-collapsed="false"] > .plf-apple-row-clip {
   overflow: visible;
+}
+
+/* Tercer paso del asistente de ticket: ancho 0fr ↔ 1fr con la misma curva que las filas. */
+.plf-apple-col-shell {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+.plf-apple-col-shell[data-collapsed="true"] {
+  grid-template-columns: 0fr;
+  flex: 0 0 0 !important;
+}
+.plf-apple-col-shell[data-ready="true"] {
+  transition: grid-template-columns 480ms var(--ease-plf-spring), flex 480ms var(--ease-plf-spring);
+  will-change: grid-template-columns;
+}
+.plf-apple-col-shell[data-collapsed="true"][data-ready="true"] {
+  transition-duration: 320ms;
+}
+.plf-apple-col-shell > .plf-apple-row-clip {
+  min-width: 0;
+  overflow: hidden;
 }
 
 .animate-plf-apple-row-in {
@@ -1300,6 +1414,10 @@ input::-ms-clear {
   .animate-plf-check-stroke,
   .animate-plf-step-forward,
   .animate-plf-step-backward,
+  .animate-plf-form-cross-in-forward,
+  .animate-plf-form-cross-out-forward,
+  .animate-plf-form-cross-in-backward,
+  .animate-plf-form-cross-out-backward,
   .animate-plf-header-fade,
   .animate-plf-apple-pop,
   .animate-plf-apple-row-in,

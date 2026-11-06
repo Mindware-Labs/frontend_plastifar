@@ -15,10 +15,11 @@ import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
+import { useReceipts } from "../../context/useReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import type { Team } from "../../types/settings";
-import { freshCopy, staleClass } from "./catalogState";
+import { freshCopy } from "./catalogState";
 import { TeamModal } from "./TeamModal";
 
 type ChipKey = "todos" | "activos" | "inactivos";
@@ -28,6 +29,7 @@ export function TeamsSection() {
   const canWrite = can("settings.write");
 
   const [busyId, setBusyId] = useState<number | null>(null);
+  const receipts = useReceipts();
 
   const [search, setSearch] = useState("");
   const [chip, setChip] = useState<ChipKey>("todos");
@@ -57,7 +59,8 @@ export function TeamsSection() {
 
   useLoadErrorReceipt(error, "settings-teams-list", refresh);
 
-  const rows = data?.items ?? [];
+  const listLoading = data === null || isStale;
+  const rows = isStale ? [] : (data?.items ?? []);
   const counts = data?.counts;
   const isFiltering = debouncedSearch !== "" || chip !== "todos" || onlyWithoutMembers;
 
@@ -80,7 +83,14 @@ export function TeamsSection() {
         setBusyId(team.id);
         try {
           await settingsApi.teams.remove(team.id);
+          receipts.done({ action: "eliminar-equipo", title: "Equipo eliminado", detail: team.name });
           refresh();
+        } catch (err) {
+          receipts.failed({
+            action: "eliminar-equipo",
+            title: "No se pudo eliminar el equipo",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyId(null);
         }
@@ -113,7 +123,18 @@ export function TeamsSection() {
             plantId: current.plantId,
             isActive: !current.isActive,
           });
+          receipts.done({
+            action: current.isActive ? "reactivar-equipo" : "desactivar-equipo",
+            title: current.isActive ? "Equipo desactivado" : "Equipo reactivado",
+            detail: current.name,
+          });
           refresh();
+        } catch (err) {
+          receipts.failed({
+            action: "toggle-equipo",
+            title: team.isActive ? "No se pudo desactivar el equipo" : "No se pudo reactivar el equipo",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyId(null);
         }
@@ -213,6 +234,7 @@ export function TeamsSection() {
           data !== null &&
           data.total > 0 && (
             <Pagination
+              loading={listLoading}
               page={page}
               pageSize={pageSize}
               total={data.total}
@@ -224,7 +246,7 @@ export function TeamsSection() {
           )
         }
       >
-        {data === null ? (
+        {listLoading ? (
           error === null && <TableSkeleton rows={pageSize} columns={4} />
         ) : rows.length === 0 ? (
           <p className="py-14 text-center text-[13.5px] text-faint">
@@ -233,7 +255,7 @@ export function TeamsSection() {
               : "Todavía no hay ningún equipo registrado."}
           </p>
         ) : (
-          <div className={staleClass(isStale)}>
+          <div className="plf-results-in">
             <DataTable>
               <thead>
                 <HeadRow>
@@ -299,7 +321,15 @@ export function TeamsSection() {
         <TeamModal
           team={modal === "nuevo" ? undefined : modal}
           onClose={() => setModal(null)}
-          onSaved={refresh}
+          onSaved={(saved) => {
+            const isEdit = modal !== "nuevo";
+            receipts.done({
+              action: isEdit ? "editar-equipo" : "crear-equipo",
+              title: isEdit ? "Equipo actualizado" : "Equipo creado exitosamente",
+              detail: saved.name,
+            });
+            refresh();
+          }}
           onMembersChanged={refresh}
         />
       )}

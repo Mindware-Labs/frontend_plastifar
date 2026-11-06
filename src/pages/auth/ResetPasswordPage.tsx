@@ -1,19 +1,18 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Lock, LockKeyhole, Mail } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { ArrowLeft } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { authApi } from "../../api/auth";
 import { ApiError } from "../../api/client";
-import { AuthAlert } from "../../components/auth/AuthAlert";
-import { AuthButton, type AuthButtonTone } from "../../components/auth/AuthButton";
-import { AuthField, AuthPasswordField } from "../../components/auth/AuthField";
-import { AuthToast } from "../../components/auth/AuthToast";
+import { OtpCodeInput } from "../../components/auth/OtpCodeInput";
+import { Alert } from "../../components/ui/Alert";
+import { Button, type ButtonTone } from "../../components/ui/Button";
+import { PasswordField, TextField, type FieldState } from "../../components/ui/Field";
 import { PasswordStrength } from "../../components/ui/PasswordStrength";
 import { evaluatePassword, passwordSchema } from "../../lib/password";
-import { OtpCodeInput } from "../../components/auth/OtpCodeInput";
-import { AuthLayout } from "../../layouts/AuthLayout";
+import { AuthLayout, authBackLinkClass } from "../../layouts/AuthLayout";
 
 const codeSchema = z.object({
   email: z.string().min(1, "Ingresa tu correo").email("Correo inválido"),
@@ -21,7 +20,6 @@ const codeSchema = z.object({
 });
 type CodeFormValues = z.infer<typeof codeSchema>;
 
-// Reglas de contraseña centralizadas en lib/password.ts.
 const passwordFormSchema = z
   .object({
     newPassword: passwordSchema,
@@ -34,7 +32,6 @@ const passwordFormSchema = z
 type PasswordFormValues = z.infer<typeof passwordFormSchema>;
 
 type Step = "code" | "password" | "done";
-/** idle: listo para verificar. El resto describe por qué no prosperó el último envío. */
 type CodePhase = "idle" | "verified" | "wrong" | "limited" | "failed";
 
 const codeToneLabels: Record<Exclude<CodePhase, "idle">, string> = {
@@ -44,7 +41,6 @@ const codeToneLabels: Record<Exclude<CodePhase, "idle">, string> = {
   failed: "No se pudo verificar",
 };
 
-/** idle: listo para guardar. El resto describe por qué no prosperó el último envío. */
 type PasswordPhase = "idle" | "expired" | "limited" | "failed";
 
 const passwordToneLabels: Record<Exclude<PasswordPhase, "idle">, string> = {
@@ -54,33 +50,25 @@ const passwordToneLabels: Record<Exclude<PasswordPhase, "idle">, string> = {
 };
 
 const SETTLE_MS = 340;
-// Seis dígitos en cascada de 60 ms más la última confirmación de 420 ms.
 const CONFIRM_HOLD_MS = 760;
 type ToastState = { message: string; variant: "error" | "success" };
 
 const RESEND_COOLDOWN_SECONDS = 120;
-
-const backLinkClass =
-  "inline-flex items-center gap-1.5 rounded text-[13.5px] font-medium text-brand-gray transition-colors hover:text-brand-red focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red";
 
 export function ResetPasswordPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [step, setStep] = useState<Step>("code");
   const [toast, setToast] = useState<ToastState | null>(null);
-  // Solo se llena tras una verificación exitosa del código: es lo que habilita el paso 2.
   const [verified, setVerified] = useState<{ email: string; code: string } | null>(null);
-  // Arranca en 2 minutos: ya se envió un código al llegar a esta pantalla desde ForgotPasswordPage.
   const [resendCooldown, setResendCooldown] = useState(RESEND_COOLDOWN_SECONDS);
   const [isResending, setIsResending] = useState(false);
   const [codePhase, setCodePhase] = useState<CodePhase>("idle");
   const [codeAttempt, setCodeAttempt] = useState(0);
-  // Valores del último envío fallido: mientras no cambien, el botón sigue en tinta.
   const [staleCode, setStaleCode] = useState<CodeFormValues | null>(null);
   const [settle, setSettle] = useState(false);
   const [shakeKey, setShakeKey] = useState(0);
   const [announcement, setAnnouncement] = useState("");
-  const verifyButtonRef = useRef<HTMLButtonElement>(null);
   const [passwordPhase, setPasswordPhase] = useState<PasswordPhase>("idle");
   const [stalePassword, setStalePassword] = useState<PasswordFormValues | null>(null);
 
@@ -131,6 +119,12 @@ export function ResetPasswordPage() {
     return () => clearTimeout(timer);
   }, [step, resendCooldown]);
 
+  function codeFieldState(field: keyof CodeFormValues): FieldState {
+    const { errors, touchedFields } = codeForm.formState;
+    if (errors[field]) return "error";
+    return touchedFields[field] ? "valid" : "idle";
+  }
+
   async function handleResendCode() {
     const email = codeForm.getValues("email");
     if (!email) {
@@ -177,7 +171,6 @@ export function ResetPasswordPage() {
         setAnnouncement("No se pudo verificar el código. Revisa tu conexión y vuelve a intentarlo.");
         return;
       }
-      // El servidor no distingue incorrecto, vencido o bloqueado: la salida es siempre reenviar.
       const next = codeAttempt + 1;
       setCodeAttempt(next);
       setCodePhase("wrong");
@@ -191,7 +184,6 @@ export function ResetPasswordPage() {
     }
   }
 
-  /** Al primer cambio respecto al envío fallido el botón recupera el rojo. */
   function rechargeCode() {
     if (codePhase === "idle" || codePhase === "verified" || !staleCode) return;
     const { email, code } = codeForm.getValues();
@@ -227,7 +219,6 @@ export function ResetPasswordPage() {
     }
   }
 
-  /** Al primer cambio respecto al envío fallido el botón recupera el rojo. */
   function rechargePassword() {
     if (passwordPhase === "idle" || !stalePassword) return;
     const current = passwordForm.getValues();
@@ -241,8 +232,7 @@ export function ResetPasswordPage() {
     setAnnouncement("");
   }
 
-  // El botón dice lo que falta en vez de deshabilitarse: es el indicador de que aún no se puede guardar.
-  let passwordTone: AuthButtonTone = "primary";
+  let passwordTone: ButtonTone = "primary";
   let passwordToneLabel: string | undefined;
   if (passwordPhase !== "idle") {
     passwordTone = "ink";
@@ -258,14 +248,14 @@ export function ResetPasswordPage() {
   if (step === "done") {
     return (
       <AuthLayout title={isInvite ? "Cuenta activada" : "Contraseña actualizada"}>
-        <AuthAlert variant="success">
+        <Alert variant="success">
           {isInvite
             ? "Tu contraseña se configuró correctamente. Ya puedes iniciar sesión en el panel."
             : "Tu contraseña se actualizó correctamente. Ya puedes iniciar sesión."}
-        </AuthAlert>
-        <AuthButton className="mt-6" onClick={() => navigate("/login", { replace: true })}>
+        </Alert>
+        <Button className="mt-5 w-full" onClick={() => navigate("/login", { replace: true })}>
           Ir a iniciar sesión
-        </AuthButton>
+        </Button>
       </AuthLayout>
     );
   }
@@ -284,13 +274,13 @@ export function ResetPasswordPage() {
         <form
           onSubmit={passwordForm.handleSubmit(onSubmitPassword)}
           noValidate
-          className="flex flex-col gap-5"
+          className="flex flex-col gap-3.5"
         >
-          <AuthPasswordField
+          <PasswordField
             label={isInvite ? "Contraseña" : "Nueva contraseña"}
             autoComplete="new-password"
             autoFocus
-            icon={<Lock className="h-[18px] w-[18px]" />}
+            required
             error={passwordForm.formState.errors.newPassword?.message}
             {...passwordForm.register("newPassword")}
             onChange={(e) => {
@@ -298,12 +288,15 @@ export function ResetPasswordPage() {
               rechargePassword();
             }}
           />
-          <AuthPasswordField
+          <PasswordField
             label="Confirmar contraseña"
             autoComplete="new-password"
-            icon={<LockKeyhole className="h-[18px] w-[18px]" />}
-            error={passwordForm.formState.errors.confirmPassword?.message}
-            notice={passwordsMismatch ? "No coinciden" : undefined}
+            required
+            error={
+              passwordsMismatch
+                ? "Las contraseñas no coinciden"
+                : passwordForm.formState.errors.confirmPassword?.message
+            }
             {...passwordForm.register("confirmPassword")}
             onChange={(e) => {
               passwordForm.register("confirmPassword").onChange(e);
@@ -311,14 +304,14 @@ export function ResetPasswordPage() {
             }}
           />
 
-          <PasswordStrength value={newPassword} className="-mt-1" />
+          <PasswordStrength value={newPassword} className="-mt-0.5" />
 
-          <AuthButton
+          <Button
             type="submit"
             isLoading={passwordForm.formState.isSubmitting}
             tone={passwordTone}
             toneLabel={passwordToneLabel}
-            className="mt-1"
+            className="mt-1 w-full"
           >
             {passwordForm.formState.isSubmitting
               ? isInvite
@@ -327,14 +320,14 @@ export function ResetPasswordPage() {
               : isInvite
                 ? "Activar cuenta"
                 : "Actualizar contraseña"}
-          </AuthButton>
+          </Button>
 
           <p role="status" aria-live="polite" className="sr-only">
             {announcement}
           </p>
         </form>
 
-        <div className="mt-8 flex justify-center">
+        <div className="mt-7 flex justify-center border-t border-line pt-6">
           <button
             type="button"
             onClick={() => {
@@ -343,7 +336,7 @@ export function ResetPasswordPage() {
               setPasswordPhase("idle");
               setStep("code");
             }}
-            className={backLinkClass}
+            className={authBackLinkClass}
           >
             <ArrowLeft className="h-4 w-4" aria-hidden />
             Volver a ingresar el código
@@ -367,27 +360,25 @@ export function ResetPasswordPage() {
             : "Ingresa el código de 6 dígitos que recibiste por correo"
       }
     >
-      <AuthToast
-        message={toast?.message ?? null}
-        variant={toast?.variant}
-        onDismiss={() => setToast(null)}
-      />
+      {toast && (
+        <Alert variant={toast.variant === "success" ? "success" : "error"} className="mb-3.5">
+          {toast.message}
+        </Alert>
+      )}
 
-      <form
-        onSubmit={codeForm.handleSubmit(onSubmitCode)}
-        noValidate
-        className="-mt-3.5 flex flex-col gap-5"
-      >
+      <form onSubmit={codeForm.handleSubmit(onSubmitCode)} noValidate className="flex flex-col gap-3.5">
         {prefillEmail ? (
           <input type="hidden" {...codeForm.register("email")} />
         ) : (
-          <AuthField
+          <TextField
+            size="sm"
             label="Correo corporativo"
             placeholder="nombre@plastifar.com"
             type="email"
             inputMode="email"
             autoComplete="username"
-            icon={<Mail className="h-[18px] w-[18px]" />}
+            required
+            state={codeFieldState("email")}
             error={codeForm.formState.errors.email?.message}
             {...codeForm.register("email")}
             onChange={(e) => {
@@ -398,9 +389,7 @@ export function ResetPasswordPage() {
         )}
 
         <div>
-          <p className="mb-2.5 text-center text-[15px] font-semibold uppercase tracking-[0.08em] text-ink">
-            Código
-          </p>
+          <p className="mb-2 font-heading text-[11.5px] font-semibold text-faint">Código de verificación</p>
           <Controller
             control={codeForm.control}
             name="code"
@@ -420,12 +409,12 @@ export function ResetPasswordPage() {
             )}
           />
 
-          <div className="mt-3 text-center text-[13px] text-zinc-500">
+          <div className="mt-3 text-center text-[12.5px] text-subtle">
             <p>
               {resendCooldown > 0 ? (
                 <>
                   Reenviar código en{" "}
-                  <span className="font-medium tabular-nums text-brand-gray">
+                  <span className="font-medium tabular-nums text-ink">
                     {String(Math.floor(resendCooldown / 60)).padStart(2, "0")}:
                     {String(resendCooldown % 60).padStart(2, "0")}
                   </span>
@@ -437,7 +426,7 @@ export function ResetPasswordPage() {
                     type="button"
                     onClick={handleResendCode}
                     disabled={isResending}
-                    className="rounded font-medium text-brand-red underline-offset-4 transition-colors hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-md font-medium text-brand-red-dark underline-offset-2 transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isResending ? "Reenviando…" : "Reenviar código"}
                   </button>
@@ -447,28 +436,27 @@ export function ResetPasswordPage() {
           </div>
         </div>
 
-        <AuthButton
-          ref={verifyButtonRef}
+        <Button
           type="submit"
           isLoading={codeForm.formState.isSubmitting}
           tone={codePhase === "idle" ? "primary" : codePhase === "verified" ? "success" : "ink"}
           toneLabel={codePhase === "idle" ? undefined : codeToneLabels[codePhase]}
-          className="mt-1"
+          className="mt-1 w-full"
         >
           {codeForm.formState.isSubmitting
             ? "Verificando…"
             : isInvite
               ? "Verificar código y continuar"
               : "Verificar código"}
-        </AuthButton>
+        </Button>
 
         <p role="status" aria-live="polite" className="sr-only">
           {announcement}
         </p>
       </form>
 
-      <div className="mt-8 flex justify-center">
-        <Link to="/login" className={backLinkClass}>
+      <div className="mt-7 flex justify-center border-t border-line pt-6">
+        <Link to="/login" className={authBackLinkClass}>
           <ArrowLeft className="h-4 w-4" aria-hidden />
           Volver a iniciar sesión
         </Link>

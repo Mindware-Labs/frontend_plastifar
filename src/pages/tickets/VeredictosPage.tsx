@@ -42,7 +42,7 @@ export function VeredictosPage() {
 
   const debouncedSearch = useDebouncedValue(search, 300).trim();
 
-  const { data, error, setPage, refresh } = usePagedList<
+  const { data, isStale, error, setPage, refresh } = usePagedList<
     TicketVerdictQuery,
     TicketVerdictListResponse
   >({
@@ -54,7 +54,8 @@ export function VeredictosPage() {
   useLoadErrorReceipt(error, "veredictos-list", refresh);
   useActionErrorReceipt(actionError, "veredictos-action");
 
-  const rows = useMemo(() => data?.items ?? [], [data?.items]);
+  const listLoading = data === null || isStale;
+  const rows = useMemo(() => (isStale ? [] : (data?.items ?? [])), [data?.items, isStale]);
   const counts = data?.counts;
   const pageIds = useMemo(() => rows.map((row) => row.id), [rows]);
   const { selectedIds, pageState, togglePage, toggleSelect, clearSelection } = useTablePageSelection(pageIds);
@@ -86,29 +87,25 @@ export function VeredictosPage() {
     setConfirmation({
       tone: "warn",
       icon: CheckCircle2,
-      eyebrow: "Tickets · Veredictos",
       title: `Activar ${selectedIds.size} veredictos`,
       description: "Volverán a ofrecerse al marcar tickets como solucionados.",
       confirmLabel: "Activar",
-      onConfirm: () => {
-        setConfirmation(null);
-        void runBulk("activate");
-      },
+      onConfirm: () => runBulk("activate"),
     });
   }
 
   function askBulkDeactivate() {
     setConfirmation({
-      tone: "danger",
+      tone: "warn",
       icon: Ban,
-      eyebrow: "Tickets · Veredictos",
       title: `Desactivar ${selectedIds.size} veredictos`,
-      description: "Dejarán de ofrecerse en tickets nuevos. Los tickets que ya los usan no cambian.",
+      description: (
+        <>
+          Dejarán de ofrecerse en tickets nuevos. Los tickets que ya los usan no cambian.
+        </>
+      ),
       confirmLabel: "Desactivar",
-      onConfirm: () => {
-        setConfirmation(null);
-        void runBulk("deactivate");
-      },
+      onConfirm: () => runBulk("deactivate"),
     });
   }
 
@@ -116,15 +113,15 @@ export function VeredictosPage() {
     setConfirmation({
       tone: "danger",
       icon: Trash2,
-      eyebrow: "Tickets · Veredictos",
       title: `Eliminar ${selectedIds.size} veredictos`,
-      description:
-        "Solo se borran los que ningún ticket usa. El resto se omitirá y tendrás que desactivarlos.",
+      description: (
+        <>
+          Solo se borran los que ningún ticket usa. El resto se omitirá y tendrás que
+          desactivarlos.
+        </>
+      ),
       confirmLabel: "Eliminar",
-      onConfirm: () => {
-        setConfirmation(null);
-        void runBulk("delete");
-      },
+      onConfirm: () => runBulk("delete"),
     });
   }
 
@@ -145,9 +142,8 @@ export function VeredictosPage() {
   function askToggleActive(verdict: TicketVerdictResponse) {
     if (verdict.isActive) {
       setConfirmation({
-        tone: "danger",
+        tone: "warn",
         icon: Ban,
-        eyebrow: "Tickets · Veredictos",
         title: "Desactivar veredicto",
         description: (
           <>
@@ -168,7 +164,6 @@ export function VeredictosPage() {
     setConfirmation({
       tone: "danger",
       icon: Trash2,
-      eyebrow: "Tickets · Veredictos",
       title: "Eliminar veredicto",
       description: (
         <>
@@ -300,6 +295,7 @@ export function VeredictosPage() {
           footer={
             data !== null && data.total > 0 ? (
               <Pagination
+                loading={listLoading}
                 page={data.page}
                 pageSize={data.pageSize}
                 total={data.total}
@@ -311,7 +307,7 @@ export function VeredictosPage() {
             ) : undefined
           }
         >
-          {!data ? (
+          {listLoading ? (
             error === null && <TableSkeleton rows={pageSize} columns={isAdmin ? 6 : 5} />
           ) : rows.length === 0 ? (
             <ListEmptyState

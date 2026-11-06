@@ -1,15 +1,15 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Mail } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { authApi } from "../../api/auth";
 import { ApiError } from "../../api/client";
-import { AuthButton } from "../../components/auth/AuthButton";
-import { AuthField } from "../../components/auth/AuthField";
-import { AuthToast } from "../../components/auth/AuthToast";
-import { AuthLayout } from "../../layouts/AuthLayout";
+import { Alert } from "../../components/ui/Alert";
+import { Button } from "../../components/ui/Button";
+import { TextField, type FieldState } from "../../components/ui/Field";
+import { AuthLayout, authBackLinkClass } from "../../layouts/AuthLayout";
 
 const schema = z.object({
   email: z.string().min(1, "Ingresa tu correo").email("Correo inválido"),
@@ -21,17 +21,22 @@ export function ForgotPasswordPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [formError, setFormError] = useState<string | null>(null);
-  // El login manda el correo que no coincidió para no pedirlo dos veces.
   const prefilledEmail = (location.state as { email?: string } | null)?.email ?? "";
 
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors, touchedFields, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
+    mode: "onTouched",
     defaultValues: { email: prefilledEmail },
   });
+
+  function stateOf(field: keyof FormValues): FieldState {
+    if (errors[field]) return "error";
+    return touchedFields[field] ? "valid" : "idle";
+  }
 
   async function onSubmit(values: FormValues) {
     setFormError(null);
@@ -48,31 +53,30 @@ export function ForgotPasswordPage() {
       title="Recuperar contraseña"
       subtitle="Te enviaremos un código de 6 dígitos al correo asociado a tu cuenta"
     >
-      <AuthToast message={formError} onDismiss={() => setFormError(null)} />
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-3.5">
+        {formError && <Alert variant="error">{formError}</Alert>}
 
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-5">
-        <AuthField
+        <TextField
+          size="sm"
           label="Correo corporativo"
           placeholder="nombre@plastifar.com"
           type="email"
           inputMode="email"
           autoComplete="username"
           autoFocus
-          icon={<Mail className="h-[18px] w-[18px]" />}
+          required
+          state={stateOf("email")}
           error={errors.email?.message}
           {...register("email")}
         />
 
-        <AuthButton type="submit" isLoading={isSubmitting} className="mt-1">
+        <Button type="submit" isLoading={isSubmitting} className="mt-1 w-full">
           {isSubmitting ? "Enviando…" : "Enviar código"}
-        </AuthButton>
+        </Button>
       </form>
 
-      <div className="mt-8 flex justify-center">
-        <Link
-          to="/login"
-          className="inline-flex items-center gap-1.5 rounded text-[13.5px] font-medium text-brand-gray transition-colors hover:text-brand-red focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red"
-        >
+      <div className="mt-7 flex justify-center border-t border-line pt-6">
+        <Link to="/login" className={authBackLinkClass}>
           <ArrowLeft className="h-4 w-4" aria-hidden />
           Volver a iniciar sesión
         </Link>

@@ -5,14 +5,17 @@ import {
   FileSpreadsheet,
   FileText,
   Layers,
-  Plus,
+
   ShieldCheck,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { fetchAllPages } from "../../api/paging";
+import { productLinesApi } from "../../api/productLines";
 import { qualityApi } from "../../api/quality";
+import { settingsApi } from "../../api/settings";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
-import { Button } from "../../components/ui/Button";
+
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import {
@@ -33,16 +36,17 @@ import { TableSelectionBar, type TableSelectionAction } from "../../components/u
 import { useReceipts } from "../../context/useReceipts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
-import { usePermissions } from "../../hooks/usePermissions";
+
 import { useSort } from "../../hooks/useSort";
 import { useTablePageSelection } from "../../hooks/useTablePageSelection";
-import { usePlantsCatalog, useProductLinesCatalog } from "../../lib/catalogQueries";
+import { useEnterpriseListReturnRestore } from "../../hooks/useEnterpriseListReturnRestore";
+import { captureListScrollY } from "../../lib/enterpriseListReturn";
 import { formatDay } from "../../lib/dates";
 import { exportHcasListToExcel, exportHcasListToPdf } from "../../lib/hcaListExport";
 import { resolveClientLabel, searchClients } from "../../lib/lookups";
 import type { Plant, ProductLine } from "../../types/settings";
 import type { CorrectiveActionSheet, HcaQuery, SheetListResponse } from "../../types/quality";
-import { HcaFormModal } from "./HcaFormModal";
+
 import { HcaStatusBadge } from "./StatusBadges";
 import { HcaSummaryDrawer } from "./HcaSummaryDrawer";
 
@@ -54,17 +58,13 @@ type SortKey = "fecha" | "numero" | "cliente";
  * queda asentado permanentemente en el sistema con su estado completado y se consulta
  * de inmediato desde el drawer o la vista completa.
  */
-const EMPTY_PLANTS: Plant[] = [];
-const EMPTY_PRODUCT_LINES: ProductLine[] = [];
-
 export function HcasPage() {
   const navigate = useNavigate();
   const receipts = useReceipts();
-  const { can } = usePermissions();
 
-  // Catálogos compartidos con el formulario; si fallan, los filtros quedan vacíos como antes.
-  const plants = usePlantsCatalog().data ?? EMPTY_PLANTS;
-  const productLines = useProductLinesCatalog().data ?? EMPTY_PRODUCT_LINES;
+
+  const [plants, setPlants] = useState<Plant[]>([]);
+  const [productLines, setProductLines] = useState<ProductLine[]>([]);
 
   const [search, setSearch] = useState("");
   const [clientId, setClientId] = useState("todos");
@@ -72,18 +72,28 @@ export function HcasPage() {
   const [productLineId, setProductLineId] = useState("todas");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const { sort, sortOf } = useSort<SortKey>("fecha", "desc");
+  const { sort, sortOf, setSort } = useSort<SortKey>("fecha", "desc");
   const [pageSize, setPageSize] = useState(10);
 
   // Drawer de resumen ejecutivo (igual a Discrepancias)
   const [summarySheetId, setSummarySheetId] = useState<number | null>(null);
 
-  const [creating, setCreating] = useState(false);
+
   const [bulkBusy, setBulkBusy] = useState(false);
   const [selectionCache, setSelectionCache] = useState<Map<number, CorrectiveActionSheet>>(() => new Map());
 
   const debouncedSearch = useDebouncedValue(search).trim();
-  const canWrite = can("quality.write");
+
+
+  useEffect(() => {
+    fetchAllPages<Plant>((page, size) => settingsApi.plants.list({ page, pageSize: size }))
+      .then(setPlants)
+      .catch(() => setPlants([]));
+
+    fetchAllPages<ProductLine>((page, size) => productLinesApi.list({ page, pageSize: size }))
+      .then(setProductLines)
+      .catch(() => setProductLines([]));
+  }, []);
 
   const criteria: Omit<HcaQuery, "page"> = {
     pageSize,
@@ -97,14 +107,14 @@ export function HcasPage() {
     dir: sort.dir,
   };
 
-  const { data, error, setPage, refresh } = usePagedList<HcaQuery, SheetListResponse>({
-    queryKey: ["quality-sheets"],
+  const { data, isStale, error, page, setPage, refresh } = usePagedList<HcaQuery, SheetListResponse>({
     fetch: qualityApi.sheets.list,
     criteria,
     fallbackError: "No se pudieron cargar las HCA. Vuelve a intentarlo.",
   });
 
-  const rows = useMemo(() => data?.items ?? [], [data?.items]);
+  const listLoading = data === null || isStale;
+  const rows = useMemo(() => (isStale ? [] : (data?.items ?? [])), [data?.items, isStale]);
   const counts = data?.counts;
 
   useEffect(() => {
@@ -123,6 +133,67 @@ export function HcasPage() {
     () => Array.from(selectedIds).map((id) => selectionCache.get(id)).filter((item): item is CorrectiveActionSheet => item !== undefined),
     [selectedIds, selectionCache],
   );
+
+  const applyListState = useCallback(
+    (state: Record<string, unknown>) => {
+      if (typeof state.search === "string") setSearch(state.search);
+      if (typeof state.clientId === "string") setClientId(state.clientId);
+      if (typeof state.plantId === "string") setPlantId(state.plantId);
+      if (typeof state.productLineId === "string") setProductLineId(state.productLineId);
+      if (typeof state.from === "string") setFrom(state.from);
+      if (typeof state.to === "string") setTo(state.to);
+      if (typeof state.pageSize === "number") setPageSize(state.pageSize);
+      if (typeof state.sortKey === "string" && (state.sortDir === "asc" || state.sortDir === "desc")) {
+        setSort({ key: state.sortKey as SortKey, dir: state.sortDir });
+      }
+    },
+    [setSort],
+  );
+
+  const getReturnSnapshot = useCallback(() => {
+    if (summarySheetId === null) return null;
+    const row = selectionCache.get(summarySheetId) ?? rows.find((r) => r.id === summarySheetId);
+    return {
+      listPath: "/calidad/hca",
+      scrollY: captureListScrollY(),
+      bannerTitle: "Acciones correctivas (HCA)",
+      bannerDetail: row ? `${row.number} · ${row.clientName ?? "Sin cliente"}` : undefined,
+      listState: {
+        search,
+        clientId,
+        plantId,
+        productLineId,
+        from,
+        to,
+        pageSize,
+        page,
+        sortKey: sort.key,
+        sortDir: sort.dir,
+        summaryId: summarySheetId,
+      },
+    };
+  }, [
+    summarySheetId,
+    selectionCache,
+    rows,
+    search,
+    clientId,
+    plantId,
+    productLineId,
+    from,
+    to,
+    pageSize,
+    page,
+    sort.key,
+    sort.dir,
+  ]);
+
+  const { listEnterMotion } = useEnterpriseListReturnRestore({
+    applyListState,
+    setPage,
+    openSummary: setSummarySheetId,
+    listReady: !listLoading && data !== null,
+  });
 
   const plantOptions = useMemo(
     () => [
@@ -208,17 +279,13 @@ export function HcasPage() {
   ];
 
   return (
-    <div>
+    <div
+      className={`flex h-full min-h-0 flex-col ${
+        listEnterMotion === "back" ? "animate-plf-side-panel-back motion-reduce:animate-none" : ""
+      }`}
+    >
       <ModuleHeader
         title="Acciones Correctivas (HCA)"
-        action={
-          canWrite && (
-            <Button size="sm" onClick={() => setCreating(true)}>
-              <Plus className="h-3.5 w-3.5 mr-1" />
-              Nueva HCA
-            </Button>
-          )
-        }
         summary={
           counts ? (
             <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
@@ -322,6 +389,7 @@ export function HcasPage() {
         footer={
           data !== null && (
             <Pagination
+              loading={listLoading}
               page={data.page}
               pageSize={data.pageSize}
               total={data.total}
@@ -334,7 +402,7 @@ export function HcasPage() {
           )
         }
       >
-        {data === null ? (
+        {listLoading ? (
           error === null && <TableSkeleton rows={pageSize} columns={7} />
         ) : rows.length === 0 ? (
           <ListEmptyState
@@ -346,7 +414,7 @@ export function HcasPage() {
               clearNarrowFilters();
             }}
             emptyTitle="Todavía no hay acciones correctivas (HCA) registradas."
-            emptyDescription="Se pueden crear desde aquí con el botón 'Nueva HCA' o derivadas directamente desde un ticket o reclamación."
+            emptyDescription="Las acciones correctivas se generan y gestionan derivadas directamente desde un ticket o reclamación."
           />
         ) : (
           <div className="plf-results-in">
@@ -449,23 +517,8 @@ export function HcasPage() {
       {summarySheetId !== null && (
         <HcaSummaryDrawer
           sheetId={summarySheetId}
+          getReturnSnapshot={getReturnSnapshot}
           onClose={() => setSummarySheetId(null)}
-        />
-      )}
-
-      {creating && (
-        <HcaFormModal
-          productLines={productLines}
-          onClose={() => setCreating(false)}
-          onSaved={(newSheet) => {
-            setCreating(false);
-            receipts.done({
-              action: "crear-hca",
-              title: "HCA creada",
-              detail: `Se registró la hoja ${newSheet.number} exitosamente`,
-            });
-            navigate(`/calidad/hca/${newSheet.id}`);
-          }}
         />
       )}
     </div>

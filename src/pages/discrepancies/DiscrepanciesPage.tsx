@@ -1,6 +1,6 @@
-import { Building2, Eye, FileSpreadsheet, FileText, ShieldAlert, Truck } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Building2, Eye, FileSpreadsheet, FileText, ShieldAlert } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { discrepanciesApi, type DiscrepancyListResponse, type DiscrepancyQuery } from "../../api/discrepancies";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
@@ -8,7 +8,6 @@ import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import {
   ClearFiltersButton,
   DateRangeFilterDropdown,
-  InputFilterDropdown,
   LookupFilterDropdown,
 } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
@@ -26,6 +25,8 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { useSort } from "../../hooks/useSort";
 import { useTablePageSelection } from "../../hooks/useTablePageSelection";
+import { useEnterpriseListReturnRestore } from "../../hooks/useEnterpriseListReturnRestore";
+import { captureListScrollY } from "../../lib/enterpriseListReturn";
 import { exportDiscrepanciesListToExcel, exportDiscrepanciesListToPdf } from "../../lib/discrepancyListExport";
 import { formatDay } from "../../lib/dates";
 import { resolveClientLabel, searchClients } from "../../lib/lookups";
@@ -38,7 +39,7 @@ type SortKey = "fecha" | "numero" | "ticket" | "cliente";
 
 const CHIPS: { key: ChipKey; label: string; status?: string; countKey: "all" | "investigating" | "completed" | "approved" | "returned" | "withFinding" }[] = [
   { key: "todas", label: "Todas", countKey: "all" },
-  { key: "En investigación", label: "En investigación", status: "En investigación", countKey: "investigating" },
+  { key: "En investigación", label: "Registradas", status: "En investigación", countKey: "investigating" },
   { key: "Completada", label: "Completadas", status: "Completada", countKey: "completed" },
   { key: "Aprobada", label: "Aprobadas", status: "Aprobada", countKey: "approved" },
   { key: "Devuelta", label: "Devueltas", status: "Devuelta", countKey: "returned" },
@@ -47,28 +48,26 @@ const CHIPS: { key: ChipKey; label: string; status?: string; countKey: "all" | "
 
 /** RF-D9: listado paginado con selección múltiple, exportación y resumen en drawer. */
 export function DiscrepanciesPage() {
+  const navigate = useNavigate();
   const receipts = useReceipts();
 
   const [search, setSearch] = useState("");
   const [clientId, setClientId] = useState("todos");
-  const [dispatcher, setDispatcher] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [chip, setChip] = useState<ChipKey>("todas");
-  const { sort, sortOf } = useSort<SortKey>("fecha", "desc");
+  const { sort, sortOf, setSort } = useSort<SortKey>("fecha", "desc");
   const [pageSize, setPageSize] = useState(10);
   const [summaryId, setSummaryId] = useState<number | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [selectionCache, setSelectionCache] = useState<Map<number, DiscrepancySummary>>(() => new Map());
 
   const debouncedSearch = useDebouncedValue(search).trim();
-  const debouncedDispatcher = useDebouncedValue(dispatcher).trim();
 
   const criteria: Omit<DiscrepancyQuery, "page"> = {
     pageSize,
     search: debouncedSearch || undefined,
     clientId: clientId === "todos" ? undefined : Number(clientId),
-    dispatcher: debouncedDispatcher || undefined,
     from: from || undefined,
     to: to || undefined,
     status: CHIPS.find((c) => c.key === chip)?.status,
@@ -76,14 +75,14 @@ export function DiscrepanciesPage() {
     dir: sort.dir,
   };
 
-  const { data, error, setPage, refresh } = usePagedList<DiscrepancyQuery, DiscrepancyListResponse>({
-    queryKey: ["discrepancies"],
+  const { data, isStale, error, page, setPage, refresh } = usePagedList<DiscrepancyQuery, DiscrepancyListResponse>({
     fetch: discrepanciesApi.list,
     criteria,
     fallbackError: "No se pudieron cargar las investigaciones. Vuelve a intentarlo.",
   });
 
-  const rows = useMemo(() => data?.items ?? [], [data?.items]);
+  const listLoading = data === null || isStale;
+  const rows = useMemo(() => (isStale ? [] : (data?.items ?? [])), [data?.items, isStale]);
   const counts = data?.counts;
   const pageIds = useMemo(() => rows.map((r) => r.id), [rows]);
   const { selectedIds, pageState, togglePage, toggleSelect, clearSelection } = useTablePageSelection(pageIds);
@@ -109,12 +108,69 @@ export function DiscrepanciesPage() {
     [selectedIds, selectionCache],
   );
 
-  const filtrosPuestos = (clientId !== "todos" ? 1 : 0) + (dispatcher !== "" ? 1 : 0) + (from !== "" ? 1 : 0) + (to !== "" ? 1 : 0);
+  const applyListState = useCallback(
+    (state: Record<string, unknown>) => {
+      if (typeof state.search === "string") setSearch(state.search);
+      if (typeof state.clientId === "string") setClientId(state.clientId);
+      if (typeof state.from === "string") setFrom(state.from);
+      if (typeof state.to === "string") setTo(state.to);
+      if (typeof state.chip === "string") setChip(state.chip as ChipKey);
+      if (typeof state.pageSize === "number") setPageSize(state.pageSize);
+      if (typeof state.sortKey === "string" && (state.sortDir === "asc" || state.sortDir === "desc")) {
+        setSort({ key: state.sortKey as SortKey, dir: state.sortDir });
+      }
+    },
+    [setSort],
+  );
+
+  const getReturnSnapshot = useCallback(() => {
+    if (summaryId === null) return null;
+    const row = selectionCache.get(summaryId) ?? rows.find((r) => r.id === summaryId);
+    return {
+      listPath: "/discrepancias",
+      scrollY: captureListScrollY(),
+      bannerTitle: "Discrepancias",
+      bannerDetail: row ? `${row.number} · ${row.clientName}` : undefined,
+      listState: {
+        search,
+        clientId,
+        from,
+        to,
+        chip,
+        pageSize,
+        page,
+        sortKey: sort.key,
+        sortDir: sort.dir,
+        summaryId,
+      },
+    };
+  }, [
+    summaryId,
+    selectionCache,
+    rows,
+    search,
+    clientId,
+    from,
+    to,
+    chip,
+    pageSize,
+    page,
+    sort.key,
+    sort.dir,
+  ]);
+
+  const { listEnterMotion } = useEnterpriseListReturnRestore({
+    applyListState,
+    setPage,
+    openSummary: setSummaryId,
+    listReady: !listLoading && data !== null,
+  });
+
+  const filtrosPuestos = (clientId !== "todos" ? 1 : 0) + (from !== "" ? 1 : 0) + (to !== "" ? 1 : 0);
   const unfiltered = chip === "todas" && filtrosPuestos === 0 && !debouncedSearch;
 
   function clearNarrowFilters() {
     setClientId("todos");
-    setDispatcher("");
     setFrom("");
     setTo("");
     setPage(1);
@@ -172,7 +228,11 @@ export function DiscrepanciesPage() {
   ];
 
   return (
-    <div>
+    <div
+      className={`flex h-full min-h-0 flex-col ${
+        listEnterMotion === "back" ? "animate-plf-side-panel-back motion-reduce:animate-none" : ""
+      }`}
+    >
       <ModuleHeader
         title="Discrepancias"
         summary={
@@ -191,16 +251,16 @@ export function DiscrepanciesPage() {
               />
               <span aria-hidden className="text-zinc-300">·</span>
               <HeaderTag
-                label="en investigación"
+                label={counts.investigating === 1 ? "registrada" : "registradas"}
                 count={counts.investigating}
                 active={chip === "En investigación"}
                 onClick={() => {
                   setChip("En investigación");
                   setPage(1);
                 }}
-                tone="amber"
+                tone="blue"
                 dot
-                title="Filtrar por investigaciones en curso"
+                title="Filtrar por discrepancias registradas"
               />
               <span aria-hidden className="text-zinc-300">·</span>
               <HeaderTag
@@ -213,7 +273,7 @@ export function DiscrepanciesPage() {
                 }}
                 tone="blue"
                 dot
-                title="Filtrar por investigaciones completadas"
+                title="Filtrar por discrepancias completadas"
               />
               <span aria-hidden className="text-zinc-300">·</span>
               <HeaderTag
@@ -284,7 +344,7 @@ export function DiscrepanciesPage() {
               <SearchInput
                 value={search}
                 onChange={setSearch}
-                placeholder="Número, ticket, cliente, factura, despachador o producto…"
+                placeholder="Número, ticket, cliente, factura o producto…"
                 className="w-[300px]"
               />
 
@@ -298,17 +358,6 @@ export function DiscrepanciesPage() {
                 onChange={(value) => setClientId(value === "" ? "todos" : value)}
                 search={searchClients}
                 resolveSelectedLabel={resolveClientLabel}
-              />
-
-              <InputFilterDropdown
-                title="Filtrar por despachador"
-                aria-label="Filtrar por despachador"
-                placeholder="Todos los despachadores"
-                inputPlaceholder="Nombre del despachador…"
-                defaultIcon={<Truck className="h-3.5 w-3.5 text-zinc-500" />}
-                value={dispatcher}
-                onChange={setDispatcher}
-                formatActiveLabel={(val) => `Despachador: ${val}`}
               />
 
               <DateRangeFilterDropdown
@@ -333,6 +382,7 @@ export function DiscrepanciesPage() {
         footer={
           data !== null && (
             <Pagination
+              loading={listLoading}
               page={data.page}
               pageSize={data.pageSize}
               total={data.total}
@@ -345,7 +395,7 @@ export function DiscrepanciesPage() {
           )
         }
       >
-        {data === null ? (
+        {listLoading ? (
           error === null && <TableSkeleton rows={pageSize} columns={9} />
         ) : rows.length === 0 ? (
           <ListEmptyState
@@ -443,9 +493,9 @@ export function DiscrepanciesPage() {
                             onClick={() => setSummaryId(item.id)}
                           />
                           <RowAction
-                            label={`Imprimir ${item.number}`}
+                            label={`Documento oficial ${item.number}`}
                             icon={FileText}
-                            onClick={() => window.open(`/discrepancias/${item.id}/imprimir`, "_blank")}
+                            onClick={() => navigate(`/discrepancias/${item.id}`)}
                           />
                         </div>
                       </Td>
@@ -459,7 +509,11 @@ export function DiscrepanciesPage() {
       </ListPanel>
 
       {summaryId !== null && (
-        <DiscrepancySummaryDrawer discrepancyId={summaryId} onClose={() => setSummaryId(null)} />
+        <DiscrepancySummaryDrawer
+          discrepancyId={summaryId}
+          getReturnSnapshot={getReturnSnapshot}
+          onClose={() => setSummaryId(null)}
+        />
       )}
     </div>
   );

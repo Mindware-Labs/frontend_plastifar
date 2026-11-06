@@ -35,7 +35,9 @@ import {
   type ComponentType,
   type ReactNode,
 } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { ReturnToOriginBanner } from "../../components/app/ReturnToOriginBanner";
+import type { PlfListLocationState } from "../../lib/enterpriseListReturn";
 import { departmentsApi } from "../../api/departments";
 import { ticketsApi } from "../../api/tickets";
 import { ticketVerdictsApi } from "../../api/ticketVerdicts";
@@ -46,6 +48,7 @@ import {
 } from "../../components/app/ModuleHeader";
 import { TicketPendingFileList } from "../../components/app/TicketPendingFileList";
 import { SlaPolicyField } from "../../components/app/SlaPolicyField";
+import { TaskEvidenceUpload } from "../../components/app/TaskEvidenceUpload";
 import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
 import { TicketProductsField } from "../../components/app/TicketProductsField";
 import { Alert } from "../../components/ui/Alert";
@@ -53,7 +56,8 @@ import { AnimatedCheckIcon } from "../../components/ui/AnimatedCheckIcon";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { dialogHeaderStackClass } from "../../components/ui/dialogHeaderStyles";
-import { CheckboxField, SelectField, TEXTAREA_AUTO_GROW_CLASS, TextField } from "../../components/ui/Field";
+import { CheckboxField, SelectField, TextAreaField, TextField } from "../../components/ui/Field";
+import { FormDivider } from "../../components/ui/FormDivider";
 import { LazyBlockEditor } from "../../components/ui/LazyBlockEditor";
 import { Modal } from "../../components/ui/Modal";
 import { Spinner } from "../../components/ui/Spinner";
@@ -62,6 +66,8 @@ import { openOverlay } from "../../hooks/overlayStack";
 import { useSettle } from "../../hooks/useSettle";
 import { useSidePanelMotion } from "../../hooks/useSidePanelMotion";
 import { useUploadFeedback } from "../../hooks/useUploadFeedback";
+import { useModalAnimation } from "../../hooks/useModalAnimation";
+import { prefersReducedMotion } from "../../hooks/motion";
 import { useAuth } from "../../context/useAuth";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
 import { useEmailCounts } from "../../context/useEmailCounts";
@@ -99,6 +105,12 @@ import {
   useComposerSendCelebration,
   type ComposerSendCelebrationPayload,
 } from "../bandeja/useComposerSendCelebration";
+import {
+  TICKET_UPDATE_CELEBRATION_MS,
+  TicketStatusUpdateCelebration,
+} from "./detail/TicketStatusUpdateCelebration";
+import { NotifyClientCheckboxDescription } from "./detail/ticketNotifyClient";
+import { TicketUpdateStepNav } from "./detail/TicketUpdateStepNav";
 import { PriorityCell, SlaCell, StatusCell } from "./ticketCells";
 import { parseTicketDetailId } from "./ticketLegacy";
 import { TaskCommentsAside, type TaskCommentsAsideHandle } from "./TaskCommentsAside";
@@ -201,8 +213,8 @@ function getAvailableTransitions(status: string): StatusTransitionOption[] {
         {
           target: "Solucionado",
           category: "veredicto",
-          label: "Marcar veredicto",
-          description: "Cierra el caso como resuelto.",
+          label: "Completar ticket",
+          description: "Cierra el caso como resuelto con su veredicto correspondiente.",
           icon: Gavel,
         },
         CANCEL_TRANSITION,
@@ -223,8 +235,8 @@ function getAvailableTransitions(status: string): StatusTransitionOption[] {
         {
           target: "Solucionado",
           category: "veredicto",
-          label: "Marcar veredicto",
-          description: "Cierra el caso como resuelto.",
+          label: "Completar ticket",
+          description: "Cierra el caso como resuelto con su veredicto correspondiente.",
           icon: Gavel,
         },
         CANCEL_TRANSITION,
@@ -250,9 +262,6 @@ const textareaClass =
   "w-full resize-none rounded-lg border border-zinc-200/80 bg-white px-3 py-2 text-[12.5px] leading-relaxed " +
   "text-zinc-900 outline-none transition-all placeholder:text-zinc-400 hover:border-zinc-300 " +
   "focus:border-brand-red focus:ring-2 focus:ring-brand-red/15";
-
-/** Una línea con `py-2` y `text-[12.5px]`; crece con el texto sin scroll interno. */
-const TICKET_NOTE_TEXTAREA_MIN_PX = 40;
 
 const attachLabelClass =
   "inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-lg border border-zinc-200/80 bg-white px-2.5 " +
@@ -369,8 +378,20 @@ function CopyButton({ text, label = "Copiar" }: { text: string; label?: string }
 
 export function TicketDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const ticketId = parseTicketDetailId(id);
+  const [detailEnterMotion, setDetailEnterMotion] = useState(false);
+  const ticketEnterConsumedRef = useRef(false);
+
+  useLayoutEffect(() => {
+    if (ticketEnterConsumedRef.current) return;
+    const state = location.state as PlfListLocationState | null;
+    if (state?.plfTicketEnter !== "enterprise-list") return;
+    ticketEnterConsumedRef.current = true;
+    setDetailEnterMotion(true);
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+  }, [location.pathname, location.search, location.state, navigate]);
 
   const [ticket, setTicket] = useState<TicketDetailResponse | null>(null);
   const [loading, setLoading] = useState(ticketId != null);
@@ -522,28 +543,25 @@ export function TicketDetailPage() {
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [noteBody, setNoteBody] = useState("");
   const [noteAttachments, setNoteAttachments] = useState<File[]>([]);
-  const [isDraggingNote, setIsDraggingNote] = useState(false);
-  const {
-    isShowing: showNoteAttachedFeedback,
-    isExiting: noteAttachedExiting,
-    trigger: triggerNoteAttachedFeedback,
-  } = useUploadFeedback({ duration: 2200, exitDuration: 360 });
   const [noteSending, setNoteSending] = useState(false);
   const [noteSendError, setNoteSendError] = useState<string | null>(null);
-  const noteFileInputRef = useRef<HTMLInputElement>(null);
-  const noteTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const {
+    isExiting: noteModalExiting,
+    requestClose: requestNoteModalClose,
+    reset: resetNoteModalMotion,
+  } = useModalAnimation();
+  const noteTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     if (!showNoteModal) return;
-    const id = window.setTimeout(() => {
-      noteTextareaRef.current?.focus();
-      autoResizeTextarea(noteTextareaRef.current, TICKET_NOTE_TEXTAREA_MIN_PX);
-    }, 120);
-    return () => window.clearTimeout(id);
-  }, [showNoteModal]);
+    resetNoteModalMotion();
+    setNoteSendError(null);
+  }, [showNoteModal, resetNoteModalMotion]);
 
-  useLayoutEffect(() => {
-    if (showNoteModal) autoResizeTextarea(noteTextareaRef.current, TICKET_NOTE_TEXTAREA_MIN_PX);
+  useEffect(() => {
+    if (showNoteModal && noteTextareaRef.current) {
+      autoResizeTextarea(noteTextareaRef.current, 52);
+    }
   }, [showNoteModal, noteBody]);
 
   // Que adjunto se esta mirando y con que vecinos, para poder saltar entre ellos.
@@ -747,6 +765,7 @@ export function TicketDetailPage() {
       setNoteBody("");
       setNoteAttachments([]);
       setShowNoteModal(false);
+      resetNoteModalMotion();
       await refreshTicket();
       receipts.done({ action: "nota-ticket", title: "Nota interna guardada", detail: ticket?.number });
     } catch (err) {
@@ -778,12 +797,66 @@ export function TicketDetailPage() {
   } = useUploadFeedback({ duration: 2300, exitDuration: 360 });
   const verdictFileInputRef = useRef<HTMLInputElement>(null);
   const [updateSuccess, setUpdateSuccess] = useState(false);
+  const [showUpdateCelebration, setShowUpdateCelebration] = useState(false);
+  const [updateCelebrationExiting, setUpdateCelebrationExiting] = useState(false);
   const updateSuccessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const updateCelebrationDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showUpdateCelebrationRef = useRef(showUpdateCelebration);
+  showUpdateCelebrationRef.current = showUpdateCelebration;
   const step2EnteredAtRef = useRef<number>(0);
+  const {
+    isExiting: updateStatusModalExiting,
+    requestClose: requestUpdateStatusModalClose,
+    reset: resetUpdateStatusModalMotion,
+  } = useModalAnimation();
+
+  const finalizeUpdateStatusModal = useCallback(() => {
+    if (updateSuccessTimerRef.current) {
+      clearTimeout(updateSuccessTimerRef.current);
+      updateSuccessTimerRef.current = null;
+    }
+    if (updateCelebrationDismissTimerRef.current) {
+      clearTimeout(updateCelebrationDismissTimerRef.current);
+      updateCelebrationDismissTimerRef.current = null;
+    }
+    setShowUpdateStatusModal(false);
+    setUpdateSuccess(false);
+    setShowUpdateCelebration(false);
+    setUpdateCelebrationExiting(false);
+    resetUpdateStatusModalMotion();
+  }, [resetUpdateStatusModalMotion]);
+
+  const requestUpdateStatusModalDismiss = useCallback(() => {
+    if (updateSuccessTimerRef.current) {
+      clearTimeout(updateSuccessTimerRef.current);
+      updateSuccessTimerRef.current = null;
+    }
+    if (updateCelebrationDismissTimerRef.current) {
+      clearTimeout(updateCelebrationDismissTimerRef.current);
+      updateCelebrationDismissTimerRef.current = null;
+    }
+
+    if (showUpdateCelebrationRef.current && !prefersReducedMotion()) {
+      setUpdateCelebrationExiting(true);
+      updateCelebrationDismissTimerRef.current = setTimeout(() => {
+        updateCelebrationDismissTimerRef.current = null;
+        requestUpdateStatusModalClose();
+      }, 320);
+      return;
+    }
+    requestUpdateStatusModalClose();
+  }, [requestUpdateStatusModalClose]);
+
+  useEffect(() => {
+    if (!showUpdateStatusModal) return;
+    resetUpdateStatusModalMotion();
+    setUpdateCelebrationExiting(false);
+  }, [showUpdateStatusModal, resetUpdateStatusModalMotion]);
 
   useEffect(() => {
     return () => {
       if (updateSuccessTimerRef.current) clearTimeout(updateSuccessTimerRef.current);
+      if (updateCelebrationDismissTimerRef.current) clearTimeout(updateCelebrationDismissTimerRef.current);
     };
   }, []);
 
@@ -821,9 +894,16 @@ export function TicketDetailPage() {
     setVerdictAttachments([]);
     setIsDraggingVerdict(false);
     setUpdateSuccess(false);
+    setShowUpdateCelebration(false);
+    setUpdateCelebrationExiting(false);
+    resetUpdateStatusModalMotion();
     if (updateSuccessTimerRef.current) {
       clearTimeout(updateSuccessTimerRef.current);
       updateSuccessTimerRef.current = null;
+    }
+    if (updateCelebrationDismissTimerRef.current) {
+      clearTimeout(updateCelebrationDismissTimerRef.current);
+      updateCelebrationDismissTimerRef.current = null;
     }
     setTransitionError(null);
     step2EnteredAtRef.current = 0;
@@ -873,8 +953,8 @@ export function TicketDetailPage() {
       buildValidationItems([
         {
           id: "update-comment",
-          label: "Falta el comentario del veredicto",
-          short: "el comentario",
+          label: "Falta el comentario de cierre",
+          short: "el comentario de cierre",
           valid: updateComment.trim().length > 0,
         },
       ]),
@@ -882,15 +962,19 @@ export function TicketDetailPage() {
   );
 
   const updateStatusOtherStep2Missing = useMemo(() => {
-    if (updateCategory !== "cancelar" && updateCategory !== "pausar") return [];
+    if (updateCategory !== "cancelar" && updateCategory !== "pausar" && updateCategory !== "otro") {
+      return [];
+    }
     return buildValidationItems([
       {
         id: "update-comment",
         label:
           updateCategory === "cancelar"
             ? "Falta el motivo de cancelación"
-            : "Falta el motivo de la pausa",
-        short: "el motivo",
+            : updateCategory === "pausar"
+              ? "Falta el motivo de la pausa"
+              : "Falta el comentario de reapertura",
+        short: updateCategory === "otro" ? "el comentario" : "el motivo",
         valid: updateComment.trim().length > 0,
       },
     ]);
@@ -936,8 +1020,8 @@ export function TicketDetailPage() {
     triggerVerdictAttachedFeedback();
   };
 
-  const handleConfirmUpdateStatus = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const handleConfirmUpdateStatus = async (event?: React.FormEvent) => {
+    event?.preventDefault();
     if (ticketId == null) return;
     // Previene envíos accidentales disparados inmediatamente al avanzar de paso (doble clic o activación residual)
     if (Date.now() - step2EnteredAtRef.current < 400) {
@@ -953,6 +1037,11 @@ export function TicketDetailPage() {
       triggerUpdateSettle();
       return;
     }
+    if (updateCategory === "otro" && !updateComment.trim()) {
+      setTransitionError("Comentario de reapertura requerido");
+      triggerUpdateSettle();
+      return;
+    }
     if (updateCategory === "veredicto") {
       if (!updateVerdictId) {
         setTransitionError("Selecciona un veredicto");
@@ -960,7 +1049,7 @@ export function TicketDetailPage() {
         return;
       }
       if (!updateComment.trim()) {
-        setTransitionError("Comentario de veredicto requerido");
+        setTransitionError("Comentario de cierre requerido");
         triggerUpdateSettle();
         return;
       }
@@ -988,11 +1077,11 @@ export function TicketDetailPage() {
       receipts.done({ action: "estado-ticket", title: "Estado del ticket actualizado", detail: ticket?.number });
 
       setUpdateSuccess(true);
+      setShowUpdateCelebration(true);
       if (updateSuccessTimerRef.current) clearTimeout(updateSuccessTimerRef.current);
       updateSuccessTimerRef.current = setTimeout(() => {
-        setShowUpdateStatusModal(false);
-        setUpdateSuccess(false);
-      }, 2200);
+        requestUpdateStatusModalDismiss();
+      }, TICKET_UPDATE_CELEBRATION_MS);
     } catch (err) {
       setTransitionError(err instanceof Error ? err.message : "Error al actualizar");
       triggerUpdateSettle();
@@ -1289,7 +1378,11 @@ export function TicketDetailPage() {
   ];
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden print:block print:h-auto print:min-h-0 print:overflow-visible">
+    <div
+      className={`flex min-h-0 flex-1 flex-col overflow-hidden print:block print:h-auto print:min-h-0 print:overflow-visible ${
+        detailEnterMotion ? "animate-plf-side-panel-in motion-reduce:animate-none" : ""
+      }`}
+    >
       {viewingDocumentForm ? (
         <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden animate-plf-receipt-in print:block print:h-auto print:min-h-0 print:overflow-visible print:animate-none">
           <TicketFormDocumentView form={viewingDocumentForm} onBack={() => setViewingDocumentForm(null)} />
@@ -1989,9 +2082,7 @@ export function TicketDetailPage() {
 
                 {/* TAB: CONVERSACIÓN */}
                 {activeTab === "conversacion" && (
-                  <div
-                    className={`space-y-2.5 ${conversationReveal ? "animate-plf-receipt-in" : ""}`}
-                  >
+                  <div className="space-y-2.5">
                     {/* La accion encabeza el hilo; el editor se pide, no esta siempre puesto. */}
                     <div className="flex items-center gap-3">
                       <span className="shrink-0 font-heading text-[10px] font-bold uppercase tracking-[0.08em] tabular-nums text-zinc-400">
@@ -2303,6 +2394,7 @@ export function TicketDetailPage() {
       {/* Escribir una nota es un acto aparte: se pide, se escribe y se cierra. El borrador sobrevive si se cierra sin guardar. */}
       {showNoteModal && canEditTicket && (
         <Modal
+          maxWidth="max-w-xl"
           settle={noteSettle}
           eyebrow={ticket.number}
           title="Añadir nota interna"
@@ -2316,169 +2408,98 @@ export function TicketDetailPage() {
             </span>
           }
           onClose={() => {
-            if (!noteSending) setShowNoteModal(false);
+            if (!noteSending) {
+              setShowNoteModal(false);
+              resetNoteModalMotion();
+            }
           }}
+          isExiting={noteModalExiting}
+          onRequestClose={requestNoteModalClose}
           footer={
-            <>
-              <Button type="button" variant="secondary" disabled={noteSending} onClick={() => setShowNoteModal(false)}>
-                Cancelar
-              </Button>
-              <SubmitValidationButton
-                ready={noteBody.trim().length > 0}
-                busy={noteSending}
-                missingItems={buildValidationItems([
-                  {
-                    id: "ticket-note-body",
-                    label: "Falta el texto de la nota",
-                    short: "el texto de la nota",
-                    valid: noteBody.trim().length > 0,
-                  },
-                ])}
-                onSubmit={() => void saveNote()}
-                onFocusField={focusFormField}
-                tone={noteSendError ? "ink" : "primary"}
-                toneLabel={noteSendError}
-                hintText="Para guardar la nota interna, completa lo siguiente:"
-              >
-                Guardar nota
-              </SubmitValidationButton>
-            </>
+            <div className="flex w-full items-center justify-between gap-3">
+              <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
+                <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+                  Ctrl
+                </kbd>
+                <span>+</span>
+                <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+                  Enter
+                </kbd>
+                <span className="ml-0.5">para guardar</span>
+              </span>
+              <div className="flex items-center gap-2 ml-auto">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={noteSending}
+                  onClick={requestNoteModalClose}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  isLoading={noteSending}
+                  disabled={!noteBody.trim()}
+                  onClick={() => void saveNote()}
+                >
+                  Guardar nota
+                </Button>
+              </div>
+            </div>
           }
         >
-          <div className="space-y-3">
-            <textarea
-              ref={noteTextareaRef}
-              id="ticket-note-body"
+          <div className="flex flex-col gap-3 text-left">
+            {noteSendError && <Alert variant="error">{noteSendError}</Alert>}
+
+            <FormDivider title="Nota de seguimiento" />
+
+            <TextAreaField
+              label="Mensaje interno"
+              required
               autoFocus
               rows={1}
+              maxLength={4000}
               value={noteBody}
-              onChange={(event) => {
-                setNoteBody(event.target.value);
+              placeholder="Lo que el equipo debe saber sobre este caso…"
+              onChange={(e) => {
+                setNoteBody(e.target.value);
                 if (noteSendError) setNoteSendError(null);
-                autoResizeTextarea(event.target, TICKET_NOTE_TEXTAREA_MIN_PX);
+                autoResizeTextarea(e.target, 52);
               }}
-              onKeyDown={(event) => {
-                // Escribir y guardar sin soltar el teclado: es el gesto de cualquier campo de notas.
-                if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-                  event.preventDefault();
+              onKeyDown={(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                  e.preventDefault();
                   void saveNote();
                 }
               }}
-              placeholder="Lo que el equipo debe saber sobre este caso…"
-              className={`${textareaClass} ${TEXTAREA_AUTO_GROW_CLASS} ${
-                noteSendError ? "border-brand-red ring-3 ring-brand-red/10 focus:border-brand-red" : ""
-              }`}
-            />
-
-            {/* Carga de archivos adjuntos */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-heading text-[11px] font-semibold text-zinc-500">
-                  Archivos adjuntos (opcional)
-                </span>
-                <span className="text-[11px] text-zinc-400">Máx. 10 MB por archivo</span>
-              </div>
-
-              <input
-                ref={noteFileInputRef}
-                id="note-attachment-input"
-                type="file"
-                multiple
-                className="hidden"
-                onChange={(event) => {
-                  pickFiles(
-                    event.target,
-                    noteAttachments,
-                    setNoteAttachments,
-                    setNoteSendError,
-                    () => triggerNoteAttachedFeedback(),
-                  );
-                }}
-              />
-
-              <button
-                type="button"
-                onClick={() => noteFileInputRef.current?.click()}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setIsDraggingNote(true);
-                }}
-                onDragLeave={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setIsDraggingNote(false);
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setIsDraggingNote(false);
-                  if (e.dataTransfer.files) {
-                    const chosen = Array.from(e.dataTransfer.files);
-                    const problem = validateAttachments(chosen, noteAttachments);
-                    if (problem) {
-                      setNoteSendError(problem);
-                      return;
-                    }
-                    setNoteSendError(null);
-                    setNoteAttachments((prev) => [...prev, ...chosen]);
-                    triggerNoteAttachedFeedback();
-                  }
-                }}
-                className={`group relative flex h-[106px] min-h-[106px] w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-3 transition-colors duration-300 outline-none ${
-                  showNoteAttachedFeedback
-                    ? noteAttachedExiting
-                      ? "border-emerald-200 bg-emerald-50/25"
-                      : "border-emerald-400 bg-emerald-50/60 ring-2 ring-emerald-100/80"
-                    : isDraggingNote
-                      ? "border-brand-red bg-brand-red/5 ring-2 ring-brand-red/20"
-                      : "border-zinc-200 bg-zinc-50/50 hover:border-brand-red/40 hover:bg-brand-red/5"
-                }`}
-              >
-                {showNoteAttachedFeedback ? (
-                  <div
-                    className={`flex flex-col items-center justify-center text-center ${
-                      noteAttachedExiting ? "animate-plf-check-out" : "animate-plf-check-in"
+              className="min-h-0 resize-none overflow-hidden text-[12.5px] py-2 leading-relaxed [field-sizing:content]"
+              hint={
+                noteBody.length > 0 ? (
+                  <span
+                    className={`block text-right text-[11px] tabular-nums text-zinc-400 ${
+                      noteBody.length > 3800 ? "text-brand-red font-medium" : ""
                     }`}
                   >
-                    <div className="relative flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 ring-2 ring-emerald-200/70 shadow-3xs animate-plf-check-breathe">
-                      <AnimatedCheckIcon size={16} strokeWidth={2.8} />
-                    </div>
-                    <p className="mt-1.5 max-w-[360px] truncate font-heading text-[12px] font-bold text-emerald-700 leading-tight">
-                      ¡{noteAttachments.length === 1 ? "Archivo adjuntado correctamente" : `${noteAttachments.length} archivos adjuntados correctamente`}!
-                    </p>
-                    <p className="mt-0.5 max-w-[360px] truncate text-[11px] text-emerald-600/80 leading-tight">
-                      Haz clic o arrastra para añadir más si lo deseas
-                    </p>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center text-center transition-opacity duration-300">
-                    <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-500 transition-transform group-hover:scale-105">
-                      <Upload className="size-4" />
-                    </div>
-                    <p className="mt-1.5 max-w-[360px] truncate font-heading text-[12px] font-semibold text-zinc-700 leading-tight">
-                      Haz clic para adjuntar archivos a la nota
-                    </p>
-                    <p className="mt-0.5 max-w-[360px] truncate text-[11px] text-zinc-400 leading-tight">
-                      Imágenes (PNG, JPG), documentos PDF, hojas de Excel o reportes internos
-                    </p>
-                  </div>
-                )}
-              </button>
+                    {noteBody.length} / 4000
+                  </span>
+                ) : undefined
+              }
+              ref={(el) => {
+                noteTextareaRef.current = el;
+                if (el) autoResizeTextarea(el, 52);
+              }}
+            />
 
-              <div className="flex items-center justify-between pt-0.5">
-                <span className="text-[11px] text-zinc-400">{SAVE_SHORTCUT} para guardar</span>
-              </div>
-
-              <TicketPendingFileList
-                files={noteAttachments}
-                onChange={setNoteAttachments}
-                className="pt-1"
-                onRemove={() => {
-                  if (noteSendError) setNoteSendError(null);
-                }}
-              />
-            </div>
+            <TaskEvidenceUpload
+              files={noteAttachments}
+              onFilesChange={setNoteAttachments}
+              onReportError={setNoteSendError}
+              label="Adjuntos (opcional)"
+              dropzoneTitle="Adjuntar archivos"
+              dropzoneHint="Máx. 10 MB por archivo"
+            />
           </div>
         </Modal>
       )}
@@ -2490,11 +2511,7 @@ export function TicketDetailPage() {
           eyebrow={
             updateSuccess
               ? undefined
-              : updateCategory === "veredicto"
-                ? `${ticket.number} · Paso ${updateStep} de 3`
-                : updateStep === 2
-                  ? `${ticket.number} · Paso 2 de 2`
-                  : ticket.number
+              : `${ticket.number} · Paso ${updateStep} de ${updateCategory === "veredicto" ? 3 : 2}`
           }
           title={
             updateSuccess
@@ -2503,13 +2520,15 @@ export function TicketDetailPage() {
                 ? updateStep === 1
                   ? "Actualizar ticket"
                   : updateStep === 2
-                    ? "Marcar veredicto"
+                    ? "Completar ticket"
                     : "Resolución y evidencias"
                 : updateStep === 1
                   ? "Actualizar ticket"
                   : updateCategory === "cancelar"
                     ? "Cancelar ticket"
-                    : "Pausar ticket"
+                    : updateCategory === "pausar"
+                      ? "Pausar ticket"
+                      : "Confirmar acción"
           }
           description={
             updateSuccess
@@ -2518,23 +2537,22 @@ export function TicketDetailPage() {
                 ? updateStep === 1
                   ? "Elige qué hacer con este ticket."
                   : updateStep === 2
-                    ? "Selecciona el motivo y confirma si deseas notificar al cliente."
-                    : "Redacta el comentario del veredicto y adjunta archivos de soporte."
+                    ? "Selecciona el veredicto y confirma si deseas notificar al cliente."
+                    : "Redacta el comentario de cierre y adjunta archivos de soporte."
                 : updateStep === 1
                   ? "Elige qué hacer con este ticket."
-                  : "Completa los datos para confirmar."
+                  : updateCategory === "pausar"
+                    ? "Especifica el motivo de la pausa en la atención del ticket."
+                    : updateCategory === "cancelar"
+                      ? "Indica el motivo por el cual se cancela el ticket."
+                      : "Completa los datos para confirmar la actualización."
           }
-          maxWidth={updateCategory === "veredicto" && updateStep === 3 ? "max-w-lg" : "max-w-md"}
-          onClose={() => {
-            if (!transitioning) {
-              if (updateSuccessTimerRef.current) {
-                clearTimeout(updateSuccessTimerRef.current);
-                updateSuccessTimerRef.current = null;
-              }
-              setShowUpdateStatusModal(false);
-              setUpdateSuccess(false);
-            }
+          maxWidth="max-w-lg"
+          isExiting={updateStatusModalExiting}
+          onRequestClose={() => {
+            if (!transitioning) requestUpdateStatusModalDismiss();
           }}
+          onClose={finalizeUpdateStatusModal}
           footer={
             updateSuccess ? (
               <Button
@@ -2542,14 +2560,7 @@ export function TicketDetailPage() {
                 type="button"
                 size="sm"
                 variant="primary"
-                onClick={() => {
-                  if (updateSuccessTimerRef.current) {
-                    clearTimeout(updateSuccessTimerRef.current);
-                    updateSuccessTimerRef.current = null;
-                  }
-                  setShowUpdateStatusModal(false);
-                  setUpdateSuccess(false);
-                }}
+                onClick={requestUpdateStatusModalDismiss}
               >
                 Entendido
               </Button>
@@ -2560,7 +2571,7 @@ export function TicketDetailPage() {
                   type="button"
                   variant="secondary"
                   size="sm"
-                  onClick={() => setShowUpdateStatusModal(false)}
+                  onClick={requestUpdateStatusModalDismiss}
                 >
                   Cancelar
                 </Button>
@@ -2607,101 +2618,137 @@ export function TicketDetailPage() {
                 </SubmitValidationButton>
               </div>
             ) : updateStep === 3 && updateCategory === "veredicto" ? (
-              <div key="status-step-3-verdict" className="animate-plf-header-fade flex items-center justify-end gap-2">
-                <Button
-                  key="btn-status-back-2"
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  disabled={transitioning}
-                  onClick={() => {
-                    setTransitionError(null);
-                    setStepDirection("backward");
-                    setUpdateStep(2);
-                  }}
-                >
-                  Atrás
-                </Button>
-                <SubmitValidationButton
-                  key="btn-status-confirm-verdict"
-                  formId="update-status-form"
-                  ready={updateStatusVerdictStep3Missing.length === 0}
-                  busy={transitioning}
-                  missingItems={updateStatusVerdictStep3Missing}
-                  onFocusField={focusFormField}
-                  tone={transitionError ? "ink" : "primary"}
-                  toneLabel={transitionError}
-                  hintText="Para confirmar el veredicto, completa lo siguiente:"
-                  className={
-                    transitionError ? "" : "bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white"
-                  }
-                >
-                  <Gavel className="h-3.5 w-3.5" />
-                  Confirmar veredicto
-                </SubmitValidationButton>
+              <div key="status-step-3-verdict" className="animate-plf-header-fade flex w-full items-center justify-between gap-3">
+                <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
+                  <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+                    Ctrl
+                  </kbd>
+                  <span>+</span>
+                  <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+                    Enter
+                  </kbd>
+                  <span className="ml-0.5">para completar</span>
+                </span>
+                <div className="flex items-center gap-2 ml-auto">
+                  <Button
+                    key="btn-status-back-2"
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    disabled={transitioning}
+                    onClick={() => {
+                      setTransitionError(null);
+                      setStepDirection("backward");
+                      setUpdateStep(2);
+                    }}
+                  >
+                    Atrás
+                  </Button>
+                  <SubmitValidationButton
+                    key="btn-status-confirm-verdict"
+                    formId="update-status-form"
+                    ready={updateStatusVerdictStep3Missing.length === 0}
+                    busy={transitioning}
+                    missingItems={updateStatusVerdictStep3Missing}
+                    onFocusField={focusFormField}
+                    tone={transitionError ? "ink" : "primary"}
+                    toneLabel={transitionError}
+                    hintText="Para completar el ticket, completa lo siguiente:"
+                    className={
+                      transitionError ? "" : "bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white"
+                    }
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                    Completar ticket
+                  </SubmitValidationButton>
+                </div>
               </div>
             ) : (
-              <div key="status-step-2-other" className="animate-plf-header-fade flex items-center justify-end gap-2">
-                <Button
-                  key="btn-status-back-other"
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  disabled={transitioning}
-                  onClick={() => {
-                    setTransitionError(null);
-                    setStepDirection("backward");
-                    setUpdateStep(1);
-                  }}
-                >
-                  Atrás
-                </Button>
-                <SubmitValidationButton
-                  key="btn-status-confirm-other"
-                  formId="update-status-form"
-                  ready={updateStatusOtherStep2Missing.length === 0}
-                  busy={transitioning}
-                  missingItems={updateStatusOtherStep2Missing}
-                  onFocusField={focusFormField}
-                  variant={updateCategory === "cancelar" ? "danger" : "primary"}
-                  tone={transitionError ? "ink" : "primary"}
-                  toneLabel={transitionError}
-                  hintText="Para confirmar el cambio, completa lo siguiente:"
-                >
-                  {updateCategory === "cancelar" ? "Cancelar ticket" : "Confirmar"}
-                </SubmitValidationButton>
+              <div key="status-step-2-other" className="animate-plf-header-fade flex w-full items-center justify-between gap-3">
+                <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
+                  <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+                    Ctrl
+                  </kbd>
+                  <span>+</span>
+                  <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+                    Enter
+                  </kbd>
+                  <span className="ml-0.5">
+                    para {updateCategory === "cancelar" ? "cancelar" : updateCategory === "pausar" ? "pausar" : "confirmar"}
+                  </span>
+                </span>
+                <div className="flex items-center gap-2 ml-auto">
+                  <Button
+                    key="btn-status-back-other"
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    disabled={transitioning}
+                    onClick={() => {
+                      setTransitionError(null);
+                      setStepDirection("backward");
+                      setUpdateStep(1);
+                    }}
+                  >
+                    Atrás
+                  </Button>
+                  <SubmitValidationButton
+                    key="btn-status-confirm-other"
+                    formId="update-status-form"
+                    ready={updateStatusOtherStep2Missing.length === 0}
+                    busy={transitioning}
+                    missingItems={updateStatusOtherStep2Missing}
+                    onFocusField={focusFormField}
+                    variant={updateCategory === "cancelar" ? "danger" : "primary"}
+                    tone={transitionError ? "ink" : "primary"}
+                    toneLabel={transitionError}
+                    hintText="Para confirmar el cambio, completa lo siguiente:"
+                  >
+                    {updateCategory === "pausar" ? (
+                      <>
+                        <Clock className="h-3.5 w-3.5" />
+                        Pausar ticket
+                      </>
+                    ) : updateCategory === "cancelar" ? (
+                      <>
+                        <X className="h-3.5 w-3.5" />
+                        Cancelar ticket
+                      </>
+                    ) : (
+                      "Confirmar"
+                    )}
+                  </SubmitValidationButton>
+                </div>
               </div>
             )
           }
         >
-          {updateSuccess ? (
-            <div className="flex flex-col items-center justify-center py-6 text-center animate-plf-check-in">
-              <div className="relative mb-4 flex items-center justify-center">
-                <div className="absolute h-16 w-16 rounded-full bg-emerald-500/20 animate-ping opacity-60" />
-                <div className="animate-plf-check-in relative flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 ring-8 ring-emerald-50 shadow-xs animate-plf-check-breathe">
-                  <AnimatedCheckIcon size={32} strokeWidth={2.8} />
-                </div>
-              </div>
-              <h3 className="text-base font-bold text-zinc-900 font-heading">
-                El ticket se cerró correctamente
-              </h3>
-              <p className="mt-1.5 text-xs text-zinc-500 max-w-xs leading-relaxed">
-                {updateCategory === "veredicto"
-                  ? verdictAttachments.length > 0
-                    ? `Se registró el veredicto con ${verdictAttachments.length} ${
-                        verdictAttachments.length === 1
-                          ? "archivo de evidencia adjunto"
-                          : "archivos de evidencia adjuntos"
-                      }.`
-                    : "El veredicto fue registrado exitosamente."
-                  : "El ticket ha sido actualizado correctamente."}
-              </p>
-            </div>
-          ) : (
+          <div
+            className={`relative overflow-hidden ${showUpdateCelebration ? "min-h-[min(360px,52vh)]" : ""}`}
+          >
             <div
-              key={`status-step-${updateStep}`}
-              className={stepDirection === "forward" ? "animate-plf-step-forward" : "animate-plf-step-backward"}
+              className={`transition-[opacity,transform,filter] duration-[380ms] ease-plf-spring motion-reduce:transition-none ${
+                showUpdateCelebration
+                  ? "pointer-events-none absolute inset-0 opacity-0 scale-[0.985] blur-[1.5px] motion-reduce:blur-none motion-reduce:scale-100"
+                  : "relative opacity-100"
+              }`}
             >
+            <div>
+              <TicketUpdateStepNav
+                updateCategory={updateCategory}
+                updateStep={updateStep}
+                onStepClick={(step) => {
+                  setStepDirection("backward");
+                  setUpdateStep(step);
+                }}
+                onContinueFromStep1={handleContinueUpdateStatus}
+                onContinueToStep3={handleContinueToStep3}
+              />
+
+              <div
+                key={`status-step-${updateStep}`}
+                className={stepDirection === "forward" ? "animate-plf-step-forward" : "animate-plf-step-backward"}
+              >
               {updateStep === 1 && (
                 <div className="space-y-3">
                   <div
@@ -2768,7 +2815,8 @@ export function TicketDetailPage() {
                       label="Veredicto"
                       size="sm"
                       required
-                      placeholder={loadingVerdicts ? "Cargando…" : "Selecciona un veredicto"}
+                      searchable
+                      placeholder={loadingVerdicts ? "Cargando…" : "Buscar o seleccionar un veredicto"}
                       value={updateVerdictId}
                       onChange={(val) => {
                         setUpdateVerdictId(val);
@@ -2787,9 +2835,10 @@ export function TicketDetailPage() {
                     <CheckboxField
                       label="Notificar al cliente por correo"
                       description={
-                        recipientEmail
-                          ? `Se le avisará a ${recipientEmail}.`
-                          : "Este ticket no tiene un correo de contacto registrado."
+                        <NotifyClientCheckboxDescription
+                          recipientEmail={recipientEmail}
+                          ticketSubject={ticket?.subject}
+                        />
                       }
                       checked={updateNotifyClient}
                       disabled={!recipientEmail}
@@ -2800,28 +2849,30 @@ export function TicketDetailPage() {
 
                 {updateStep === 3 && updateCategory === "veredicto" && (
                   <form id="update-status-form" onSubmit={handleConfirmUpdateStatus} className="space-y-4">
-                    <div className="flex flex-col gap-1">
-                      <label htmlFor="update-comment" className={labelClass}>
-                        Comentario del veredicto
-                        <span className="ml-1 text-brand-red">*</span>
-                      </label>
-                      <textarea
-                        id="update-comment"
-                        rows={3}
-                        value={updateComment}
-                        onChange={(event) => {
-                          setUpdateComment(event.target.value);
-                          if (transitionError) setTransitionError(null);
-                        }}
-                        placeholder="Explica el veredicto y las conclusiones de la reclamación…"
-                        className={`${textareaClass} ${
-                          transitionError && !updateComment.trim()
-                            ? "border-brand-red ring-3 ring-brand-red/10 focus:border-brand-red"
-                            : ""
-                        }`}
-                        autoFocus
-                      />
-                    </div>
+                    <TextAreaField
+                      id="update-comment"
+                      label="Comentario de cierre"
+                      required
+                      autoGrow
+                      autoFocus
+                      value={updateComment}
+                      onChange={(event) => {
+                        setUpdateComment(event.target.value);
+                        if (transitionError) setTransitionError(null);
+                      }}
+                      onKeyDown={(event) => {
+                        if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                          event.preventDefault();
+                          void handleConfirmUpdateStatus();
+                        }
+                      }}
+                      placeholder="Explica el veredicto y las conclusiones de la reclamación…"
+                      className={`text-[12.5px] py-2 leading-relaxed shadow-2xs ${
+                        transitionError && !updateComment.trim()
+                          ? "border-brand-red ring-3 ring-brand-red/10 focus:border-brand-red"
+                          : ""
+                      }`}
+                    />
 
                     {/* Carga de evidencias con el mismo diseño que CompleteTaskModal */}
                     <div className="space-y-2">
@@ -2918,52 +2969,53 @@ export function TicketDetailPage() {
 
                 {updateStep === 2 && updateCategory !== "veredicto" && (
                   <form id="update-status-form" onSubmit={handleConfirmUpdateStatus} className="space-y-3">
-                    <div className="flex flex-col gap-1">
-                      <label htmlFor="update-comment" className={labelClass}>
-                        {updateCategory === "cancelar"
+                    <TextAreaField
+                      id="update-comment"
+                      label={
+                        updateCategory === "cancelar"
                           ? "Motivo de cancelación"
                           : updateCategory === "pausar"
                             ? "Motivo de la pausa"
-                            : "Comentario"}
-                        {updateCategory === "cancelar" || updateCategory === "pausar" ? (
-                          <span className="ml-1 text-brand-red">*</span>
-                        ) : (
-                          <span className="ml-1 font-normal text-zinc-400">(opcional)</span>
-                        )}
-                      </label>
-                      <textarea
-                        id="update-comment"
-                        rows={3}
-                        value={updateComment}
-                        onChange={(event) => {
-                          setUpdateComment(event.target.value);
-                          if (transitionError) setTransitionError(null);
-                        }}
-                        placeholder={
-                          updateCategory === "cancelar"
-                            ? "Explica la razón de anulación (creado por error, duplicado, prueba)…"
-                            : updateCategory === "pausar"
-                              ? "Explica por qué se pausa este ticket…"
-                              : "Contexto adicional para el historial del ticket…"
+                            : "Comentario de reapertura"
+                      }
+                      required
+                      autoGrow
+                      autoFocus
+                      value={updateComment}
+                      onChange={(event) => {
+                        setUpdateComment(event.target.value);
+                        if (transitionError) setTransitionError(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                          e.preventDefault();
+                          if (updateStatusOtherStep2Missing.length === 0 && !transitioning) {
+                            void handleConfirmUpdateStatus();
+                          }
                         }
-                        className={`${textareaClass} ${
-                          transitionError &&
-                          !updateComment.trim() &&
-                          (updateCategory === "cancelar" || updateCategory === "pausar")
-                            ? "border-brand-red ring-3 ring-brand-red/10 focus:border-brand-red"
-                            : ""
-                        }`}
-                        autoFocus
-                      />
-                    </div>
+                      }}
+                      placeholder={
+                        updateCategory === "cancelar"
+                          ? "Explica la razón de anulación (creado por error, duplicado, prueba)…"
+                          : updateCategory === "pausar"
+                            ? "Explica por qué se pausa este ticket…"
+                            : "Explica por qué se reabre o reanuda este ticket…"
+                      }
+                      className={`text-[12.5px] py-2 leading-relaxed shadow-2xs ${
+                        transitionError && !updateComment.trim()
+                          ? "border-brand-red ring-3 ring-brand-red/10 focus:border-brand-red"
+                          : ""
+                      }`}
+                    />
 
                     {updateCategory === "cancelar" && (
                       <CheckboxField
                         label="Notificar al cliente por correo"
                         description={
-                          recipientEmail
-                            ? `Se le avisará a ${recipientEmail}.`
-                            : "Este ticket no tiene un correo de contacto registrado."
+                          <NotifyClientCheckboxDescription
+                            recipientEmail={recipientEmail}
+                            ticketSubject={ticket?.subject}
+                          />
                         }
                         checked={updateNotifyClient}
                         disabled={!recipientEmail}
@@ -2973,7 +3025,19 @@ export function TicketDetailPage() {
                   </form>
                 )}
               </div>
-            )}
+            </div>
+            </div>
+            {showUpdateCelebration ? (
+              <TicketStatusUpdateCelebration
+                category={updateCategory}
+                recipientEmail={recipientEmail}
+                ticketSubject={ticket?.subject}
+                notifyClient={updateNotifyClient}
+                verdictAttachmentsCount={verdictAttachments.length}
+                exiting={updateCelebrationExiting}
+              />
+            ) : null}
+          </div>
         </Modal>
       )}
 
@@ -3230,6 +3294,8 @@ export function TicketDetailPage() {
           onSelectTab={setActiveTab}
         />
       )}
+
+      {ticketId != null && <ReturnToOriginBanner ticketId={ticketId} />}
     </div>
   );
 }

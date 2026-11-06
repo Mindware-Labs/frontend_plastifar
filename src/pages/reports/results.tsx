@@ -259,14 +259,11 @@ export function QualityResult({
 }
 
 export function ClientsResult({
-  report,
   data,
 }: {
   report: ReportDefinition;
   data: ClientsReport;
 }) {
-  const isTerritory = report.id === "cartera-por-territorio";
-
   return (
     <>
       <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -283,34 +280,7 @@ export function ClientsResult({
         />
       </div>
 
-      {isTerritory ? (
-        data.byTerritory.length === 0 ? (
-          <Empty>Ningún territorio tiene clientes con estos criterios.</Empty>
-        ) : (
-          <DataTable>
-            <thead>
-              <HeadRow>
-                <Th>Territorio</Th>
-                <Th className="text-right">Clientes</Th>
-                <Th className="text-right">Activos</Th>
-              </HeadRow>
-            </thead>
-            <tbody>
-              {data.byTerritory.map((entry) => (
-                <Row key={entry.territory}>
-                  <Td className="text-[12.5px] text-brand-gray">{entry.territory}</Td>
-                  <Td className="text-right text-[12.5px] tabular-nums text-brand-gray">
-                    {entry.total}
-                  </Td>
-                  <Td className="text-right text-[12.5px] tabular-nums text-brand-gray">
-                    {entry.active}
-                  </Td>
-                </Row>
-              ))}
-            </tbody>
-          </DataTable>
-        )
-      ) : data.bySalesRep.length === 0 ? (
+      {data.bySalesRep.length === 0 ? (
         <Empty>Ningún vendedor activo tiene cartera con estos criterios.</Empty>
       ) : (
         <DataTable>
@@ -377,10 +347,17 @@ export function AuditSliceResult({
               <Td className="whitespace-nowrap text-[12.5px] tabular-nums text-brand-gray">
                 {instantFormat.format(new Date(item.createdAt))}
               </Td>
-              <Td className="text-[12.5px] text-brand-gray">{item.actor}</Td>
+              <Td className="text-[12.5px] text-brand-gray">
+                {item.actor?.trim() ? item.actor : "Colaborador eliminado"}
+                <span className="font-mono text-[11px] text-faint"> #{item.actorId}</span>
+              </Td>
               <Td className="text-[12.5px] text-brand-gray">{item.action}</Td>
               <Td className="text-[12.5px] text-faint">
-                {item.entity} <span className="font-mono text-[11px]">{item.entityId}</span>
+                {item.entity}
+                {item.subjectLabel ? (
+                  <span className="text-brand-gray"> · {item.subjectLabel}</span>
+                ) : null}
+                <span className="font-mono text-[11px] text-faint"> #{item.entityId}</span>
               </Td>
             </Row>
           ))}

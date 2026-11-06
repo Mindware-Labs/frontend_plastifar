@@ -104,20 +104,34 @@ export function parseDueDateFromApi(iso: string | null): { date: string; time: s
   return { date: `${year}-${month}-${day}`, time: `${hours}:${minutes}` };
 }
 
-/** Verifica si una fecha y hora límite ya expiró con respecto al momento de referencia. */
-export function isPastDueDate(date: string, time?: string, referenceNow: Date = new Date()): boolean {
-  if (!date || date.trim() === "") return false;
-  const todayStr = `${referenceNow.getFullYear()}-${String(referenceNow.getMonth() + 1).padStart(2, "0")}-${String(referenceNow.getDate()).padStart(2, "0")}`;
-  if (date < todayStr) return true;
-  if (date > todayStr) return false;
-  const cleanTime = time?.trim();
-  if (cleanTime && /^\d{2}:\d{2}$/.test(cleanTime)) {
-    const [h, m] = cleanTime.split(":").map(Number);
-    const nowH = referenceNow.getHours();
-    const nowM = referenceNow.getMinutes();
-    if (h < nowH || (h === nowH && m < nowM)) {
-      return true;
-    }
+/**
+ * Misma regla que `TasksController.NormalizeDueDate`: medianoche UTC en el ISO
+ * significa fin de ese día civil UTC, no instante cero.
+ */
+export function effectiveDueInstant(date: string, time?: string): Date | null {
+  const iso = dueDateToApi(date, time?.trim() ? time : undefined);
+  if (!iso) return null;
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  const utcMidnight =
+    parsed.getUTCHours() === 0 &&
+    parsed.getUTCMinutes() === 0 &&
+    parsed.getUTCSeconds() === 0 &&
+    parsed.getUTCMilliseconds() === 0;
+
+  if (utcMidnight) {
+    return new Date(
+      Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate() + 1, 0, 0, 0) - 1,
+    );
   }
-  return false;
+
+  return parsed;
+}
+
+/** Verifica si el límite ya expiró (criterio del servidor al crear). */
+export function isPastDueDate(date: string, time?: string, referenceNow: Date = new Date()): boolean {
+  const due = effectiveDueInstant(date, time);
+  if (!due) return false;
+  return due.getTime() < referenceNow.getTime();
 }

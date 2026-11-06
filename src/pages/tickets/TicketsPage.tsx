@@ -1,21 +1,17 @@
 import {
   Building2,
   Check,
-  ChevronDown,
   Clock,
   Copy,
   Lock,
   Package,
   Plus,
-  SlidersHorizontal,
   Ticket as TicketIcon,
   X,
 } from "lucide-react";
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { animateCardGridPageTurn, consumePageDirection } from "../../hooks/motion";
-import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
-import { useMenuKeyboard } from "../../hooks/useMenuKeyboard";
+import { ListSortMenu } from "../../components/ui/ListSortMenu";
 import { useNavigate } from "react-router-dom";
 import { TicketFilterDropdown, type TicketFilterOption } from "./TicketFilterDropdown";
 import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
@@ -73,8 +69,6 @@ const filters: TicketFilter[] = [
   { key: "cerrados", label: "Cerrados", countKey: "closed" },
 ];
 
-const primaryFilters = filters.filter((f) => f.key === "todos" || f.key === "abiertos");
-
 // Múltiplos de 3 para mantener la simetría exacta de la cuadrícula 3×3 en escritorio.
 const CARD_PAGE_SIZES = [9, 18, 27, 45];
 
@@ -113,154 +107,6 @@ const priorityOptions = [
   { value: "Normal", label: "Normal" },
   { value: "Baja", label: "Baja" },
 ];
-
-const SORT_MENU_WIDTH = 248;
-
-interface TicketSortMenuProps {
-  sortValue: string;
-  sortOptions: TicketFilterOption[];
-  onSortChange: (value: string) => void;
-  hasOverdueTickets?: boolean;
-}
-
-/** Orden de las tarjetas (sin vistas duplicadas respecto a los filtros del encabezado). */
-function TicketSortMenu({ sortValue, sortOptions, onSortChange, hasOverdueTickets }: TicketSortMenuProps) {
-  const [open, setOpen] = useState(false);
-  const [anchor, setAnchor] = useState<{ top: number; left: number; originX: number } | null>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const panelId = useId();
-  const { mounted, exiting, ref: panelRef, snap } = useDisclosureMotion<HTMLDivElement>(open);
-  const handleMenuKeyDown = useMenuKeyboard(panelRef, open);
-
-  useEffect(() => {
-    if (!open) return;
-
-    function handlePointerDown(event: PointerEvent) {
-      const target = event.target as Node;
-      if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) return;
-      setOpen(false);
-    }
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setOpen(false);
-        triggerRef.current?.focus();
-      }
-    }
-    function handleViewportChange() {
-      setOpen(false);
-      snap();
-    }
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("scroll", handleViewportChange, true);
-    window.addEventListener("resize", handleViewportChange);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("scroll", handleViewportChange, true);
-      window.removeEventListener("resize", handleViewportChange);
-    };
-  }, [open, snap, panelRef]);
-
-  function toggle() {
-    if (open) {
-      setOpen(false);
-      return;
-    }
-    const rect = triggerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const left = Math.max(8, rect.right - SORT_MENU_WIDTH);
-    setAnchor({ top: rect.bottom + 6, left, originX: rect.left + rect.width / 2 - left });
-    setOpen(true);
-  }
-
-  const activeSort = sortOptions.find((option) => option.value === sortValue);
-  const menuLabel = activeSort?.label ?? "Ordenar por";
-
-  return (
-    <div className="relative shrink-0">
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={toggle}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={mounted ? panelId : undefined}
-        aria-label={`Ordenar por (activo: ${menuLabel})`}
-        title={`Orden: ${menuLabel}`}
-        className={`inline-flex h-7 w-[11rem] shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-[12.5px] font-medium transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
-          open
-            ? "border-zinc-200 bg-white text-zinc-900 shadow-2xs"
-            : "border-transparent text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
-        }`}
-      >
-        <SlidersHorizontal className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-        <span className="min-w-0 truncate">{menuLabel}</span>
-        {hasOverdueTickets && (
-          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-red" title="Hay tickets vencidos" />
-        )}
-        <ChevronDown
-          className={`h-3 w-3 text-zinc-400 transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${open ? "rotate-180 text-zinc-700" : ""}`}
-        />
-      </button>
-
-      {mounted &&
-        anchor &&
-        createPortal(
-          <div
-            ref={panelRef}
-            id={panelId}
-            role="menu"
-            aria-label="Ordenar tickets"
-            aria-hidden={exiting}
-            onKeyDown={handleMenuKeyDown}
-            style={{
-              position: "fixed",
-              top: anchor.top,
-              left: anchor.left,
-              width: SORT_MENU_WIDTH,
-              transformOrigin: `${anchor.originX}px top`,
-            }}
-            className={`z-[60] flex flex-col gap-0.5 rounded-lg border border-zinc-200/90
-              bg-white p-1 shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)] ${
-                exiting ? "pointer-events-none" : ""
-              }`}
-          >
-            <div data-motion-item className="select-none px-2.5 pt-1.5 pb-1 text-[11px] font-medium text-zinc-400">
-              Ordenar por
-            </div>
-            {sortOptions.map(({ value, label }) => {
-              const isActive = value === sortValue;
-              return (
-                <button
-                  key={value}
-                  data-motion-item
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={isActive}
-                  onClick={() => {
-                    onSortChange(value);
-                    setOpen(false);
-                    triggerRef.current?.focus();
-                  }}
-                  className={`flex items-center justify-between gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[12.5px] transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
-                    isActive
-                      ? "bg-zinc-100 font-semibold text-zinc-900"
-                      : "font-medium text-zinc-700 hover:bg-zinc-100/80 hover:text-zinc-900"
-                  }`}
-                >
-                  <span>{label}</span>
-                  {isActive ? <Check className="size-3.5 shrink-0 text-zinc-600" aria-hidden /> : null}
-                </button>
-              );
-            })}
-          </div>,
-          document.body,
-        )}
-    </div>
-  );
-}
 
 interface TicketCardProps {
   ticket: TicketListItemResponse;
@@ -915,45 +761,12 @@ export function TicketsPage({ origin = "plastifar" }: TicketsPageProps) {
                 )}
               </div>
 
-              {/* Vista rápida: Todos y Abiertos; orden en el menú contiguo. */}
-              <div
-                role="group"
-                aria-label="Vista de estado"
-                className="inline-flex h-8 items-center gap-0.5 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5"
-              >
-                {primaryFilters.map(({ key, label, countKey }) => {
-                  const isActive = filter === key;
-                  const count = counts?.[countKey] ?? 0;
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setFilter(key)}
-                      aria-pressed={isActive}
-                      className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[12.5px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
-                        isActive
-                          ? "border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
-                          : "border-transparent font-medium text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
-                      }`}
-                    >
-                      <span>{label}</span>
-                      <span
-                        className={`font-heading text-[10px] font-bold leading-none tabular-nums transition-colors ${
-                          isActive ? "text-zinc-900" : "text-zinc-400"
-                        }`}
-                      >
-                        {count}
-                      </span>
-                    </button>
-                  );
-                })}
-                <TicketSortMenu
-                  sortValue={sortValue}
-                  sortOptions={sortFilterOptions}
-                  onSortChange={handleSortChange}
-                  hasOverdueTickets={(counts?.overdue ?? 0) > 0}
-                />
-              </div>
+              <ListSortMenu
+                sortValue={sortValue}
+                sortOptions={sortFilterOptions}
+                onSortChange={handleSortChange}
+                menuAriaLabel="Ordenar tickets"
+              />
             </div>
           )}
 

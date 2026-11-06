@@ -16,6 +16,7 @@ import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
+import { useReceipts } from "../../context/useReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import {
@@ -25,7 +26,7 @@ import {
   type Product,
   type ProductLine,
 } from "../../types/settings";
-import { freshCopy, staleClass, useReferenceData } from "./catalogState";
+import { freshCopy, useReferenceData } from "./catalogState";
 import { ProductImportModal } from "./ProductImportModal";
 import { ProductModal } from "./ProductModal";
 
@@ -48,6 +49,7 @@ export function ProductsSection() {
   const canWrite = can("settings.write");
 
   const [busyId, setBusyId] = useState<number | null>(null);
+  const receipts = useReceipts();
 
   const [search, setSearch] = useState("");
   const [plantId, setPlantId] = useState(TODOS);
@@ -103,7 +105,8 @@ export function ProductsSection() {
     },
   );
 
-  const rows = data?.items ?? [];
+  const listLoading = data === null || isStale;
+  const rows = isStale ? [] : (data?.items ?? []);
   const counts = data?.counts;
   const isFiltering =
     debouncedSearch !== "" || chip !== "todos" || plantId !== TODOS || productLineId !== TODOS;
@@ -135,7 +138,18 @@ export function ProductsSection() {
             plantId: current.plantId,
             isActive: !current.isActive,
           });
+          receipts.done({
+            action: current.isActive ? "reactivar-producto" : "desactivar-producto",
+            title: current.isActive ? "Producto desactivado" : "Producto reactivado",
+            detail: `${current.code} · ${current.name}`,
+          });
           refresh();
+        } catch (err) {
+          receipts.failed({
+            action: "toggle-producto",
+            title: product.isActive ? "No se pudo desactivar el producto" : "No se pudo reactivar el producto",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyId(null);
         }
@@ -164,7 +178,14 @@ export function ProductsSection() {
         setBusyId(product.id);
         try {
           await settingsApi.products.remove(product.id);
+          receipts.done({ action: "eliminar-producto", title: "Producto eliminado", detail: `${product.code} · ${product.name}` });
           refresh();
+        } catch (err) {
+          receipts.failed({
+            action: "eliminar-producto",
+            title: "No se pudo eliminar el producto",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyId(null);
         }
@@ -297,6 +318,7 @@ export function ProductsSection() {
           data !== null &&
           data.total > 0 && (
             <Pagination
+              loading={listLoading}
               page={page}
               pageSize={pageSize}
               total={data.total}
@@ -308,7 +330,7 @@ export function ProductsSection() {
           )
         }
       >
-        {data === null ? (
+        {listLoading ? (
           error === null && <TableSkeleton rows={pageSize} columns={5} />
         ) : rows.length === 0 ? (
           <p className="py-14 text-center text-[13.5px] text-faint">
@@ -317,7 +339,7 @@ export function ProductsSection() {
               : "Todavía no hay ningún producto registrado. Crea uno o carga el catálogo desde un archivo."}
           </p>
         ) : (
-          <div className={staleClass(isStale)}>
+          <div className="plf-results-in">
             <DataTable>
               <thead>
                 <HeadRow>
@@ -394,7 +416,15 @@ export function ProductsSection() {
           plants={plantsRef.data}
           referencesFailed={referencesFailed}
           onClose={() => setModal(null)}
-          onSaved={refresh}
+          onSaved={(saved) => {
+            const isEdit = modal !== "nuevo";
+            receipts.done({
+              action: isEdit ? "editar-producto" : "crear-producto",
+              title: isEdit ? "Producto actualizado" : "Producto creado exitosamente",
+              detail: `${saved.code} · ${saved.name}`,
+            });
+            refresh();
+          }}
         />
       )}
 

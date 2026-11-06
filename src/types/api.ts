@@ -45,6 +45,7 @@ export interface StaffResponse {
   primaryDepartmentId: number;
   isAdmin: boolean;
   isActive: boolean;
+  isSalesRep: boolean;
   /** Usuario en el sistema anterior (RF-O9). Nulo cuando no lo tiene. */
   legacyUsername: string | null;
   primaryRoleId?: number | null;
@@ -71,6 +72,8 @@ export interface CreateStaffRequest {
   primaryRoleId?: number | null;
   /** Opcional; hasta 40 caracteres; único. Vacío = sin dato (docs/plan/01, sección 13). */
   legacyUsername?: string | null;
+  isSalesRep?: boolean;
+  assignClientId?: number | null;
 }
 
 export interface UpdateStaffRequest {
@@ -82,6 +85,8 @@ export interface UpdateStaffRequest {
   isActive: boolean;
   primaryRoleId?: number | null;
   legacyUsername?: string | null;
+  isSalesRep?: boolean;
+  assignClientId?: number | null;
 }
 
 export interface RoleResponse {
@@ -339,11 +344,6 @@ export interface EmailFolderCounts {
   sent: FolderCount;
   /** Asignadas a quien consulta y sin abrir desde entonces, en cualquier carpeta. */
   assignedUnseen: number;
-}
-
-/** La firma que se agrega al pie de los correos que envia esta persona. */
-export interface StaffSignatureResponse {
-  signature: string | null;
 }
 
 /** Aviso en vivo de un correo recibido: lo justo para sonar y avisar en el escritorio. */
@@ -957,3 +957,34 @@ export interface SaveTicketVerdictRequest {
   name: string;
   isActive?: boolean;
 }
+
+export interface StaffActivityItem {
+  id: string;
+  category: "tickets" | "tasks" | "forms" | "system";
+  action: string;
+  title: string;
+  description: string;
+  entityType?: "ticket" | "task" | "claim" | "discrepancy" | "withdrawal" | "hca" | "audit";
+  entityId?: string;
+  linkTo?: string | null;
+  timestamp: string;
+  details?: string | null;
+}
+
+export interface StaffActivityCounts {
+  all: number;
+  tickets: number;
+  tasks: number;
+  forms: number;
+  system: number;
+}
+
+export interface StaffActivityResponse {
+  items: StaffActivityItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  counts: StaffActivityCounts;
+}
+

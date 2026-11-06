@@ -11,6 +11,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { SelectField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
+import { useReceipts } from "../../context/useReceipts";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { departmentPathOptions } from "../../lib/departments";
 import type { DepartmentResponse, SaveTicketTopicRequest, TicketTopicResponse } from "../../types/api";
@@ -62,6 +63,7 @@ interface MotivoModalProps {
 
 export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModalProps) {
   const isEdit = topic !== undefined;
+  const receipts = useReceipts();
   const [formError, setFormError] = useState<string | null>(null);
   const { isExiting, requestClose } = useModalAnimation();
 
@@ -123,6 +125,11 @@ export function MotivoModal({ topic, departments, onClose, onSaved }: MotivoModa
       } else {
         await ticketTopicsApi.create(input);
       }
+      receipts.done({
+        action: isEdit ? "editar-motivo" : "crear-motivo",
+        title: isEdit ? "Motivo actualizado" : "Motivo creado exitosamente",
+        detail: input.name,
+      });
       onSaved();
       requestClose();
     } catch (err) {

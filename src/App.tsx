@@ -9,7 +9,6 @@ import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
 import { ClaimDetailPage } from "./pages/claims/ClaimDetailPage";
 import { TaskDetailPage } from "./pages/tasks/TaskDetailPage";
 import { TasksPage } from "./pages/tasks/TasksPage";
-import { ClaimPrintPage } from "./pages/claims/ClaimPrintPage";
 import { ClaimsPage } from "./pages/claims/ClaimsPage";
 import { ClientDetailPage } from "./pages/clients/ClientDetailPage";
 import { ClientsPage } from "./pages/clients/ClientsPage";
@@ -17,13 +16,10 @@ import { CXDashboard } from "./features/cx-dashboard";
 import { DashboardPage } from "./pages/dashboard/DashboardPage";
 import { DiscrepanciesPage } from "./pages/discrepancies/DiscrepanciesPage";
 import { DiscrepancyDetailPage } from "./pages/discrepancies/DiscrepancyDetailPage";
-import { DiscrepancyPrintPage } from "./pages/discrepancies/DiscrepancyPrintPage";
 import { WithdrawalDetailPage } from "./pages/withdrawals/WithdrawalDetailPage";
-import { WithdrawalPrintPage } from "./pages/withdrawals/WithdrawalPrintPage";
 import { WithdrawalsPage } from "./pages/withdrawals/WithdrawalsPage";
 import { HcasPage } from "./pages/quality/HcasPage";
 import { HcaDetailPage } from "./pages/quality/HcaDetailPage";
-import { HcaPrintPage } from "./pages/quality/HcaPrintPage";
 import { ReportsPage } from "./pages/reports/ReportsPage";
 import { DepartmentsPage } from "./pages/departments/DepartmentsPage";
 import { SedesPage } from "./pages/sedes/SedesPage";
@@ -37,7 +33,6 @@ import { ProductsSection } from "./pages/settings/ProductsSection";
 import { SlaSection } from "./pages/settings/SlaSection";
 import { TeamsSection } from "./pages/settings/TeamsSection";
 
-import { TerritoriesSection } from "./pages/settings/TerritoriesSection";
 import { StaffDetailPage } from "./pages/staff/StaffDetailPage";
 import { StaffPage } from "./pages/staff/StaffPage";
 import { RespuestasPage } from "./pages/respuestas/RespuestasPage";
@@ -45,6 +40,11 @@ import { NotificationsLabPage } from "./pages/dev/NotificationsLabPage";
 import { TicketDetailPage } from "./pages/tickets/TicketDetailPage";
 import { TicketsListLayout } from "./pages/tickets/TicketsListLayout";
 import { ticketDetailReservedRedirect } from "./pages/tickets/ticketLegacy";
+
+function RedirectToDocument({ basePath }: { basePath: string }) {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={`${basePath}/${id}?documento=1`} replace />;
+}
 
 function TicketDetailRoute() {
   const { id } = useParams<{ id: string }>();
@@ -120,6 +120,7 @@ export default function App() {
           <Route path="/staff" element={<StaffPage />} />
           <Route path="/staff/:id" element={<StaffDetailPage section="datos" />} />
           <Route path="/staff/:id/accesos" element={<StaffDetailPage section="accesos" />} />
+          <Route path="/staff/:id/actividad" element={<StaffDetailPage section="actividad" />} />
         </Route>
 
         <Route element={<PermissionRoute permission="roles.read"><Outlet /></PermissionRoute>}>
@@ -193,18 +194,6 @@ export default function App() {
             seccion 11): la parte del documento que no toca la Bandeja. */}
 
 
-        {/* Territorios y lineas de producto se mudaron al modulo que las usa:
-            el territorio es obligatorio al registrar un cliente y alimenta el
-            ranking por zona; la linea de producto es el eje por el que Calidad
-            sigue las reclamaciones. Ninguna de las dos es configuracion del
-            sistema, y en «Configuracion» solo estaban porque era el cajon. */}
-        <Route path="/clientes/territorios" element={<TerritoriesSection />} />
-
-        {/* Las rutas viejas siguen respondiendo. Estan en marcadores, en
-            correos y en la memoria de quien lleva un año usando el panel;
-            moverlas sin dejar el rastro convierte una reorganizacion del menu
-            en un enlace roto. */}
-        <Route path="/configuracion/territorios" element={<Navigate to="/clientes/territorios" replace />} />
 
         {/* El servidor ya exige reports.read en los tres endpoints; sin este
             guard la pantalla se pintaba entera y se llenaba de 403. */}
@@ -243,38 +232,10 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route
-          path="/reclamaciones/:id/imprimir"
-          element={
-            <PermissionRoute permission="claims.read">
-              <ClaimPrintPage />
-            </PermissionRoute>
-          }
-        />
-        <Route
-          path="/calidad/hca/:id/imprimir"
-          element={
-            <PermissionRoute permission="quality.read">
-              <HcaPrintPage />
-            </PermissionRoute>
-          }
-        />
-        <Route
-          path="/discrepancias/:id/imprimir"
-          element={
-            <PermissionRoute permission="discrepancies.read">
-              <DiscrepancyPrintPage />
-            </PermissionRoute>
-          }
-        />
-        <Route
-          path="/retiros/:id/imprimir"
-          element={
-            <PermissionRoute permission="withdrawals.read">
-              <WithdrawalPrintPage />
-            </PermissionRoute>
-          }
-        />
+        <Route path="/reclamaciones/:id/imprimir" element={<RedirectToDocument basePath="/reclamaciones" />} />
+        <Route path="/calidad/hca/:id/imprimir" element={<RedirectToDocument basePath="/calidad/hca" />} />
+        <Route path="/discrepancias/:id/imprimir" element={<RedirectToDocument basePath="/discrepancias" />} />
+        <Route path="/retiros/:id/imprimir" element={<RedirectToDocument basePath="/retiros" />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

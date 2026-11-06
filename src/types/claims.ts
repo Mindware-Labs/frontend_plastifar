@@ -78,6 +78,9 @@ export interface CustomerClaim {
   receivedAt: string;
   firstCustomerContactAt: string | null;
   status: ClaimStatus;
+  qualitySectionWaived: boolean;
+  /** pending | waived | in_progress | complete */
+  qualitySectionStatus: "pending" | "waived" | "in_progress" | "complete";
   // Sección IV: para uso exclusivo del Departamento de Calidad.
   firstResponseCorrection: string | null;
   requiresCorrectiveAction: boolean | null;

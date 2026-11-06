@@ -7,9 +7,12 @@ import {
   FileText,
   Tag,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { claimsApi, type ClaimListResponse, type ClaimQuery } from "../../api/claims";
+import { fetchAllPages } from "../../api/paging";
+import { settingsApi } from "../../api/settings";
+import { ticketTopicsApi } from "../../api/ticketTopics";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
@@ -34,8 +37,9 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { useSort } from "../../hooks/useSort";
 import { useTablePageSelection } from "../../hooks/useTablePageSelection";
+import { useEnterpriseListReturnRestore } from "../../hooks/useEnterpriseListReturnRestore";
+import { captureListScrollY } from "../../lib/enterpriseListReturn";
 import { exportClaimsListToExcel, exportClaimsListToPdf } from "../../lib/claimExcelExport";
-import { useActiveTicketTopicsCatalog, usePlantsCatalog } from "../../lib/catalogQueries";
 import { formatDay } from "../../lib/dates";
 import { resolveClientLabel, searchClients } from "../../lib/lookups";
 import { formatAmount } from "../../lib/numbers";
@@ -51,19 +55,15 @@ type SortKey = "fecha" | "cliente" | "total" | "ticket";
 const CHIPS: { key: ChipKey; label: string; status?: string; countKey: "all" | "registered" | "inTreatment" | "closed" }[] = [
   { key: "todas", label: "Todas", countKey: "all" },
   { key: "Registrada", label: "Registradas", status: "Registrada", countKey: "registered" },
-  { key: "En tratamiento", label: "En tratamiento", status: "En tratamiento", countKey: "inTreatment" },
   { key: "Cerrada", label: "Cerradas", status: "Cerrada", countKey: "closed" },
 ];
 
-const EMPTY_PLANTS: Plant[] = [];
-const EMPTY_TOPICS: TicketTopicResponse[] = [];
-
 /** RF-R8: listado paginado de reclamaciones con selección múltiple, exportación en común (... */
 export function ClaimsPage() {
+  const navigate = useNavigate();
   const receipts = useReceipts();
-  // Catálogos compartidos con el formulario: si fallan, el filtro queda vacío como antes.
-  const plants = usePlantsCatalog().data ?? EMPTY_PLANTS;
-  const topics = useActiveTicketTopicsCatalog().data ?? EMPTY_TOPICS;
+  const [plants, setPlants] = useState<Plant[]>([]);
+  const [topics, setTopics] = useState<TicketTopicResponse[]>([]);
 
   const [search, setSearch] = useState("");
   const [reason, setReason] = useState("todos");
@@ -72,7 +72,7 @@ export function ClaimsPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [chip, setChip] = useState<ChipKey>("todas");
-  const { sort, sortOf } = useSort<SortKey>("fecha", "desc");
+  const { sort, sortOf, setSort } = useSort<SortKey>("fecha", "desc");
   const [pageSize, setPageSize] = useState(10);
 
   // Resumen modal/drawer
@@ -82,6 +82,21 @@ export function ClaimsPage() {
   const [selectionCache, setSelectionCache] = useState<Map<number, ClaimSummary>>(() => new Map());
 
   const debouncedSearch = useDebouncedValue(search).trim();
+
+  // Las plantas son catálogo acotado: se recorren enteras para el filtro.
+  useEffect(() => {
+    fetchAllPages<Plant>((page, size) => settingsApi.plants.list({ page, pageSize: size }))
+      .then(setPlants)
+      .catch(() => setPlants([]));
+  }, []);
+
+  useEffect(() => {
+    fetchAllPages<TicketTopicResponse>((page, size) =>
+      ticketTopicsApi.list({ page, pageSize: size, status: "activos" }),
+    )
+      .then(setTopics)
+      .catch(() => setTopics([]));
+  }, []);
 
   const criteria: Omit<ClaimQuery, "page"> = {
     pageSize,
@@ -96,14 +111,14 @@ export function ClaimsPage() {
     dir: sort.dir,
   };
 
-  const { data, error, setPage, refresh } = usePagedList<ClaimQuery, ClaimListResponse>({
-    queryKey: ["claims"],
+  const { data, isStale, error, page, setPage, refresh } = usePagedList<ClaimQuery, ClaimListResponse>({
     fetch: claimsApi.list,
     criteria,
     fallbackError: "No se pudieron cargar las reclamaciones. Vuelve a intentarlo.",
   });
 
-  const rows = useMemo(() => data?.items ?? [], [data?.items]);
+  const listLoading = data === null || isStale;
+  const rows = useMemo(() => (isStale ? [] : (data?.items ?? [])), [data?.items, isStale]);
   const counts = data?.counts;
 
   // Multi-row selection
@@ -122,6 +137,70 @@ export function ClaimsPage() {
       return next;
     });
   }, [rows, selectedIds]);
+
+  const applyListState = useCallback(
+    (state: Record<string, unknown>) => {
+      if (typeof state.search === "string") setSearch(state.search);
+      if (typeof state.reason === "string") setReason(state.reason);
+      if (typeof state.plantId === "string") setPlantId(state.plantId);
+      if (typeof state.clientId === "string") setClientId(state.clientId);
+      if (typeof state.from === "string") setFrom(state.from);
+      if (typeof state.to === "string") setTo(state.to);
+      if (typeof state.chip === "string") setChip(state.chip as ChipKey);
+      if (typeof state.pageSize === "number") setPageSize(state.pageSize);
+      if (typeof state.sortKey === "string" && (state.sortDir === "asc" || state.sortDir === "desc")) {
+        setSort({ key: state.sortKey as SortKey, dir: state.sortDir });
+      }
+    },
+    [setSort],
+  );
+
+  const getReturnSnapshot = useCallback(() => {
+    if (summaryClaimId === null) return null;
+    const row = selectionCache.get(summaryClaimId) ?? rows.find((r) => r.id === summaryClaimId);
+    return {
+      listPath: "/reclamaciones",
+      scrollY: captureListScrollY(),
+      bannerTitle: "Reclamaciones",
+      bannerDetail: row ? `${row.ticketNumber} · ${row.clientName}` : undefined,
+      listState: {
+        search,
+        reason,
+        plantId,
+        clientId,
+        from,
+        to,
+        chip,
+        pageSize,
+        page,
+        sortKey: sort.key,
+        sortDir: sort.dir,
+        summaryId: summaryClaimId,
+      },
+    };
+  }, [
+    summaryClaimId,
+    selectionCache,
+    rows,
+    search,
+    reason,
+    plantId,
+    clientId,
+    from,
+    to,
+    chip,
+    pageSize,
+    page,
+    sort.key,
+    sort.dir,
+  ]);
+
+  const { listEnterMotion } = useEnterpriseListReturnRestore({
+    applyListState,
+    setPage,
+    openSummary: setSummaryClaimId,
+    listReady: !listLoading && data !== null,
+  });
 
   const selectedClaims = useMemo(
     () =>
@@ -208,7 +287,11 @@ export function ClaimsPage() {
   ];
 
   return (
-    <div>
+    <div
+      className={`flex h-full min-h-0 flex-col ${
+        listEnterMotion === "back" ? "animate-plf-side-panel-back motion-reduce:animate-none" : ""
+      }`}
+    >
       <ModuleHeader
         title="Reclamaciones"
         summary={
@@ -237,19 +320,6 @@ export function ClaimsPage() {
                 tone="blue"
                 dot
                 title="Filtrar por reclamaciones registradas"
-              />
-              <span aria-hidden className="text-zinc-300">·</span>
-              <HeaderTag
-                label="en tratamiento"
-                count={counts.inTreatment}
-                active={chip === "En tratamiento"}
-                onClick={() => {
-                  setChip("En tratamiento");
-                  setPage(1);
-                }}
-                tone="amber"
-                dot
-                title="Filtrar por reclamaciones en tratamiento"
               />
               <span aria-hidden className="text-zinc-300">·</span>
               <HeaderTag
@@ -303,6 +373,8 @@ export function ClaimsPage() {
                 aria-label="Filtrar por motivo del reclamo"
                 value={reason}
                 onChange={setReason}
+                searchable
+                searchPlaceholder="Buscar motivo…"
                 defaultIcon={<Tag className="h-3.5 w-3.5 text-zinc-500" />}
                 options={[
                   { value: "todos", label: "Todos los motivos" },
@@ -315,6 +387,8 @@ export function ClaimsPage() {
                 aria-label="Filtrar por planta involucrada"
                 value={plantId}
                 onChange={setPlantId}
+                searchable
+                searchPlaceholder="Buscar planta…"
                 defaultIcon={<Factory className="h-3.5 w-3.5 text-zinc-500" />}
                 options={[
                   { value: "todas", label: "Todas las plantas" },
@@ -356,6 +430,7 @@ export function ClaimsPage() {
         footer={
           data !== null && (
             <Pagination
+              loading={listLoading}
               page={data.page}
               pageSize={data.pageSize}
               total={data.total}
@@ -368,7 +443,7 @@ export function ClaimsPage() {
           )
         }
       >
-        {data === null ? (
+        {listLoading ? (
           error === null && <TableSkeleton rows={pageSize} columns={8} />
         ) : rows.length === 0 ? (
           <ListEmptyState
@@ -472,9 +547,9 @@ export function ClaimsPage() {
                             onClick={() => setSummaryClaimId(claim.id)}
                           />
                           <RowAction
-                            label={`Imprimir la reclamación de ${claim.ticketNumber}`}
+                            label={`Documento oficial de ${claim.ticketNumber}`}
                             icon={FileText}
-                            onClick={() => window.open(`/reclamaciones/${claim.id}/imprimir`, "_blank")}
+                            onClick={() => navigate(`/reclamaciones/${claim.id}`)}
                           />
                         </div>
                       </Td>
@@ -489,7 +564,11 @@ export function ClaimsPage() {
 
       {/** Drawer con el Resumen Ejecutivo al hacer clic */}
       {summaryClaimId !== null && (
-        <ClaimSummaryDrawer claimId={summaryClaimId} onClose={() => setSummaryClaimId(null)} />
+        <ClaimSummaryDrawer
+          claimId={summaryClaimId}
+          getReturnSnapshot={getReturnSnapshot}
+          onClose={() => setSummaryClaimId(null)}
+        />
       )}
     </div>
   );

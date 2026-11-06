@@ -4,7 +4,6 @@ import {
   KeyRound,
   LogOut,
   PanelLeft,
-  PenLine,
 } from "lucide-react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -25,7 +24,6 @@ import { SIDEBAR_NAV, type NavGroup } from "../../lib/navigation";
 import { Logo } from "../Logo";
 import { ChangePasswordModal } from "./ChangePasswordModal";
 import { NotificationsModal } from "./NotificationsModal";
-import { SignatureModal } from "./SignatureModal";
 
 /** Indicador único siempre visible: fondo + marca (sin duplicar en cada fila). */
 function sidebarIndicatorMotionClass(motion: SidebarIndicatorMotion, motionReady: boolean) {
@@ -182,7 +180,6 @@ export function Sidebar() {
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
-  const [editingSignature, setEditingSignature] = useState(false);
   const [editingAlerts, setEditingAlerts] = useState(false);
   const hasOpenedAlerts = useHasOpenedNotifications();
 
@@ -747,19 +744,6 @@ export function Sidebar() {
                   role="menuitem"
                   onClick={() => {
                     setMenuOpen(false);
-                    setEditingSignature(true);
-                  }}
-                  data-motion-item
-                  className="group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[12.5px] font-medium text-zinc-700 transition-colors outline-none hover:bg-zinc-100 hover:text-zinc-900 focus-visible:bg-zinc-100 focus-visible:text-zinc-900"
-                >
-                  <PenLine className="h-3.5 w-3.5 text-zinc-400 group-hover:text-zinc-700 transition-colors" />
-                  <span>Tu firma de correo</span>
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setMenuOpen(false);
                     setEditingAlerts(true);
                   }}
                   data-motion-item
@@ -879,7 +863,6 @@ export function Sidebar() {
       </div>
 
       {changingPassword && <ChangePasswordModal onClose={() => setChangingPassword(false)} />}
-      {editingSignature && <SignatureModal onClose={() => setEditingSignature(false)} />}
       {editingAlerts && <NotificationsModal onClose={() => setEditingAlerts(false)} />}
     </aside>
   );

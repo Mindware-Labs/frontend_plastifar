@@ -1,39 +1,34 @@
-import { KeyRound, Pencil, Plus, Star, Trash2 } from "lucide-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { Building2, KeyRound, Star, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
+import { departmentsApi } from "../../api/departments";
 import { permissionsApi } from "../../api/permissions";
 import { staffApi } from "../../api/staff";
 import { DetailLoadError } from "../../components/app/DetailLoadError";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
-import { Avatar } from "../../components/ui/Avatar";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
-import { DetailGroup, DetailRow, DetailTable } from "../../components/ui/DetailTable";
+import { DetailCard } from "../../components/ui/DetailCard";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
-import { PageSpinner } from "../../components/ui/PageSpinner";
+import { StaffDetailSkeleton } from "../../components/ui/Skeleton";
 import { RowAction } from "../../components/ui/RowAction";
-import { StatusDot } from "../../components/ui/StatusDot";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
+import { useReceipts } from "../../context/useReceipts";
+import { useConfigNoticeReceipt } from "../../hooks/useNoticeReceipts";
 import { usePermissions } from "../../hooks/usePermissions";
-import { catalogs } from "../../lib/catalogQueries";
 import { departmentPaths } from "../../lib/departments";
 import type { DepartmentResponse } from "../../types/api";
-import type {
-  DepartmentAccess,
-  PermissionMatrixResponse,
-  StaffDetail,
-} from "../../types/permissions";
-import { AccessModal } from "./AccessModal";
-
-const NO_DEPARTMENTS: DepartmentResponse[] = [];
+import type { DepartmentAccess, PermissionGroup, StaffDetail } from "../../types/permissions";
+import { StaffActivityTab } from "./StaffActivityTab";
+import { StaffEffectivePermissionsCard } from "./StaffEffectivePermissionsCard";
+import { StaffOverview } from "./StaffOverview";
 
 interface StaffDetailPageProps {
-  section: "datos" | "accesos";
+  section: "datos" | "accesos" | "actividad";
 }
 
 const dateFormat = new Intl.DateTimeFormat("es-DO", {
@@ -49,138 +44,80 @@ function formatDate(value: string | null) {
 
 export function StaffDetailPage({ section }: StaffDetailPageProps) {
   const { id } = useParams();
-  const { can, isAdmin } = usePermissions();
-  /**
-   * Las escrituras del personal son solo de administrador (AdminOnly en
-   * StaffController, como el listado en StaffPage). Con staff.write la ficha
-   * pintaba «Editar» y «Otorgar acceso» a quien el servidor responde 403.
-   */
+  const { isAdmin } = usePermissions();
   const canWrite = isAdmin;
-  /**
-   * Otorgar o cambiar un acceso necesita la lista de roles, y esa lista sale de
-   * GET /api/permissions/matrix, que exige roles.read. La ruta solo exige
-   * staff.read: quien no tenga los tres permisos ve la ficha completa —accesos y
-   * permiso efectivo, que es RF-P4— sin el boton que no podria usar.
-   */
-  const canManageAccess = canWrite && can("roles.read");
 
-  const staffId = Number(id);
-  const queryClient = useQueryClient();
-
-  // Cada colaborador tiene su clave: una respuesta del anterior ya no puede pisar la ficha.
-  const staffKey = ["staff", staffId, "department-access"] as const;
-  const staffQuery = useQuery({
-    queryKey: staffKey,
-    queryFn: () => staffApi.getDepartmentAccess(staffId),
-    enabled: Boolean(id),
-  });
-  const staff: StaffDetail | null = staffQuery.data ?? null;
-
-  /** Fallos de las acciones y de su refresco; el de la carga sale de la consulta. */
-  const [actionError, setError] = useState<string | null>(null);
-  const [errorStaffId, setErrorStaffId] = useState(staffId);
-  if (errorStaffId !== staffId) {
-    setErrorStaffId(staffId);
-    setError(null);
-  }
-  const loadError =
-    staffQuery.isError && !staffQuery.isFetching
-      ? staffQuery.error instanceof ApiError
-        ? staffQuery.error.message
-        : "No se pudo cargar la ficha del colaborador"
-      : null;
-  const error = actionError ?? loadError;
-
-  /** Los catalogos que solo alimentan el dialogo de accesos. */
-  const matrixQuery = useQuery({
-    queryKey: ["permissions", "matrix"],
-    queryFn: () => permissionsApi.matrix(),
-    enabled: canManageAccess,
-  });
-  const departmentsQuery = useQuery({ ...catalogs.departments(), enabled: canManageAccess });
-  // Como con el Promise.all de antes: si falta cualquiera de los dos, no se usa ninguno.
-  const referenceLoaded = matrixQuery.data !== undefined && departmentsQuery.data !== undefined;
-  const matrix: PermissionMatrixResponse | null = referenceLoaded ? matrixQuery.data! : null;
-  const departments: DepartmentResponse[] = referenceLoaded ? departmentsQuery.data! : NO_DEPARTMENTS;
-  /** Fallo de los catalogos de apoyo: degrada el alta, no tumba la ficha. */
-  const referenceError =
-    canManageAccess &&
-    (matrixQuery.isError || departmentsQuery.isError) &&
-    !matrixQuery.isFetching &&
-    !departmentsQuery.isFetching
-      ? "No se pudieron cargar los roles ni los departamentos: por ahora no se puede otorgar ni cambiar un acceso."
-      : null;
-  // Igual que en la ficha de cliente: mientras una accion sobre un acceso esta
-  // en vuelo su fila se atenua y sus controles no aceptan un segundo click, que
-  // es lo que provocaba dos PUT y dos recargas resolviendo en desorden.
+  const [staff, setStaff] = useState<StaffDetail | null>(null);
+  const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
+  const [catalogGroups, setCatalogGroups] = useState<PermissionGroup[]>([]);
+  const receipts = useReceipts();
+  const [error, setError] = useState<string | null>(null);
+  const [referenceError, setReferenceError] = useState<string | null>(null);
   const [busyDepartmentId, setBusyDepartmentId] = useState<number | null>(null);
-
-  const [modal, setModal] = useState<"nuevo" | DepartmentAccess | null>(null);
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(null);
 
-  /**
-   * Refresco tras una mutacion. Se lee directo y se escribe en la cache para que
-   * su fallo lo maneje quien llama (como antes) sin dejar la consulta en error.
-   */
-  function reload() {
-    return staffApi
-      .getDepartmentAccess(staffId)
-      .then((data) => {
-        queryClient.setQueryData(staffKey, data);
-      });
-  }
+  const staffId = Number(id);
 
-  /** Refresco tras una mutacion: el fallo se dice, no se pierde en la consola. */
-  function reloadOrReport() {
-    return reload().catch((err) => {
-      setError(
-        err instanceof ApiError ? err.message : "No se pudo actualizar la ficha del colaborador",
-      );
-    });
+  function reload() {
+    return staffApi.getDepartmentAccess(staffId).then(setStaff);
   }
 
   function load() {
     setError(null);
-    return staffQuery.refetch();
+    return staffApi
+      .getDepartmentAccess(staffId)
+      .then(setStaff)
+      .catch((err) => {
+        setError(
+          err instanceof ApiError ? err.message : "No se pudo cargar la ficha del colaborador",
+        );
+      });
   }
 
-  /**
-   * Los catalogos que solo alimentan el dialogo de accesos viajan aparte de la
-   * ficha: un 403 de la matriz —que exige roles.read, un permiso que esta ruta
-   * no pide— no debe dejar la ficha en su estado de error, sin datos, sin
-   * accesos y sin permiso efectivo.
-   */
-  function loadReferenceData() {
-    return Promise.all([matrixQuery.refetch(), departmentsQuery.refetch()]);
+  function loadDepartments() {
+    setReferenceError(null);
+    departmentsApi
+      .list()
+      .then(setDepartments)
+      .catch(() => {
+        setReferenceError(
+          "No se pudieron cargar los departamentos completos para resolver sus rutas jerárquicas.",
+        );
+      });
   }
+
+  function loadCatalog() {
+    permissionsApi
+      .catalog()
+      .then(setCatalogGroups)
+      .catch(() => {
+        // En caso de fallo de red, StaffEffectivePermissionsCard utilizará el catálogo canónico por defecto.
+      });
+  }
+
+  useEffect(() => {
+    if (!id) return;
+    void load();
+    void loadDepartments();
+    void loadCatalog();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   const fullName = staff ? `${staff.firstName} ${staff.lastName}` : "";
   useDynamicBreadcrumb(staff ? fullName : null);
+
+  // Notificación tipo toast al entrar a accesos si el colaborador es administrador
+  useConfigNoticeReceipt(
+    Boolean(staff?.isAdmin && section === "accesos"),
+    "Perfil de administrador",
+    "Es administrador del sistema",
+    "Tiene todos los permisos en todos los departamentos. Los accesos asignados indican dónde trabaja.",
+  );
+
   const primary = staff?.accesses.find((access) => access.isPrimary) ?? null;
-  /* Dos departamentos pueden llamarse igual bajo padres distintos, así que un
-     acceso se rotula con el camino. La lista solo se carga para quien administra
-     accesos; sin ella queda el nombre que mandó el servidor. */
   const departmentPathById = departmentPaths(departments);
   const departmentLabel = (access: { departmentId: number; departmentName: string }) =>
     departmentPathById.get(access.departmentId) ?? access.departmentName;
-  const effective = staff?.effectivePermissions ?? [];
-
-  /** RF-P2/RF-P3: el POST solo sirve para un departamento nuevo; editar uno ya
-   * concedido — rol o principal — pasa por el PUT (ver seccion 6.5). */
-  async function saveAccess(value: { departmentId: number; roleId: number; isPrimary: boolean }) {
-    const isEdit = staff?.accesses.some((access) => access.departmentId === value.departmentId) ?? false;
-    if (isEdit) {
-      await staffApi.updateDepartmentAccess(staffId, value.departmentId, {
-        roleId: value.roleId,
-        isPrimary: value.isPrimary,
-      });
-    } else {
-      await staffApi.grantDepartmentAccess(staffId, value);
-    }
-    // El refresco no viaja al diálogo: la escritura ya salió bien y decir "no se
-    // pudo otorgar el acceso" por un GET fallido sería mentir sobre lo ocurrido.
-    await reloadOrReport();
-  }
 
   async function makePrimary(access: DepartmentAccess) {
     setBusyDepartmentId(access.departmentId);
@@ -191,8 +128,15 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
         isPrimary: true,
       });
       await reload();
+      receipts.done({
+        action: "departamento-principal",
+        title: "Departamento principal actualizado",
+        detail: departmentLabel(access),
+      });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo cambiar el departamento principal");
+      const message = err instanceof ApiError ? err.message : "No se pudo cambiar el departamento principal";
+      setError(message);
+      receipts.failed({ action: "departamento-principal", title: "No se pudo cambiar el departamento principal", detail: message });
     } finally {
       setBusyDepartmentId(null);
     }
@@ -219,6 +163,13 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
         try {
           await staffApi.revokeDepartmentAccess(staffId, access.departmentId);
           await reload();
+          receipts.done({ action: "revocar-acceso", title: "Acceso revocado", detail: departmentLabel(access) });
+        } catch (err) {
+          receipts.failed({
+            action: "revocar-acceso",
+            title: "No se pudo revocar el acceso",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyDepartmentId(null);
         }
@@ -229,10 +180,9 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
   const sections = [
     { label: "Datos", to: `/staff/${id}` },
     { label: "Accesos", to: `/staff/${id}/accesos` },
+    { label: "Actividad", to: `/staff/${id}/actividad` },
   ];
 
-  // Solo es fatal si no hay ficha que mostrar; con la ficha cargada el fallo de
-  // una mutacion se dice sobre la propia pagina.
   if (error !== null && staff === null) {
     return (
       <DetailLoadError title="Colaborador" sections={sections} onRetry={() => void load()}>
@@ -242,277 +192,173 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
   }
 
   if (staff === null) {
-    return (
-      <PageSpinner />
-    );
+    return <StaffDetailSkeleton section={section} />;
   }
 
   return (
-    /* En «Datos» la ficha se acota a la medida de lectura y la tira de secciones
-       se acota con ella: el filete que cierra la tira llegaba 210 px mas alla
-       del panel que encabeza, y una linea que no termina donde termina lo que
-       nombra no separa nada. «Accesos» es una matriz y se queda a todo el ancho. */
-    <div className={section === "datos" ? "max-w-[880px]" : undefined}>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <ModuleHeader
+        backTo="/staff"
+        backLabel="Volver al listado de personal"
         title={fullName}
         summary={`${staff.email} · ${primary ? primary.departmentName : "Sin departamento principal"}`}
         sections={sections}
-        action={
-          section === "accesos" && canManageAccess && matrix !== null && (
-            <Button size="sm" onClick={() => setModal("nuevo")}>
-              <Plus className="h-[15px] w-[15px]" />
-              Otorgar acceso
-            </Button>
-          )
-        }
       />
 
-      {error !== null && (
-        <ErrorRetry className="mb-3" onRetry={() => void load()}>{error}</ErrorRetry>
-      )}
+      <div className="min-h-0 flex-1 overflow-y-auto pb-8 pr-0.5">
+        <div className="mx-auto mt-3.5 max-w-6xl px-3 lg:px-4">
+          {error !== null && (
+            <ErrorRetry className="mb-3.5" onRetry={() => void load()}>
+              {error}
+            </ErrorRetry>
+          )}
 
-      {section === "accesos" && referenceError !== null && (
-        <ErrorRetry className="mb-3" onRetry={() => void loadReferenceData()}>{referenceError}</ErrorRetry>
-      )}
+          {referenceError !== null && (
+            <ErrorRetry className="mb-3.5" onRetry={() => void loadDepartments()}>
+              {referenceError}
+            </ErrorRetry>
+          )}
 
-      {/* RF-P7: la instalación no puede quedarse sin ningún administrador
-          activo. Se avisa donde se toma la decisión, no solo con un 409 después. */}
-      {staff.isLastAdmin && (
-        <div className="mb-3">
-          <Alert variant="info">
-            Es el único administrador activo del sistema. Hasta que exista otro, no se le puede
-            quitar el perfil de administrador ni desactivar: quedarían todos fuera de la
-            administración del panel.
-          </Alert>
-        </div>
-      )}
-
-      {section === "datos" ? (
-        <DetailTable>
-          <DetailGroup title="Persona">
-            <DetailRow label="Nombre">
-              <span className="flex items-center gap-2.5">
-                <Avatar name={fullName} seed={staff.id} />
-                <span className="text-[13px] font-medium text-ink">{fullName}</span>
-              </span>
-            </DetailRow>
-            <DetailRow label="Correo">{staff.email}</DetailRow>
-            <DetailRow label="Extensión">{staff.phoneExt ?? "—"}</DetailRow>
-            {/* RF-O9: solo cuando existe. Es un dato heredado para emparejar la
-                carga, no un usuario con el que se inicie sesión. */}
-            {staff.legacyUsername && (
-              <DetailRow label="Usuario anterior">
-                <span className="font-mono text-[12px]">{staff.legacyUsername}</span>
-              </DetailRow>
-            )}
-          </DetailGroup>
-
-          <DetailGroup title="Puesto">
-            <DetailRow label="Departamento principal">
-              {primary ? departmentLabel(primary) : "—"}
-            </DetailRow>
-            <DetailRow label="Perfil">
-              {staff.isAdmin ? <Badge tone="red">Administrador</Badge> : <Badge>Staff</Badge>}
-            </DetailRow>
-          </DetailGroup>
-
-          <DetailGroup title="Cuenta" hint="Qué puede hacer hoy en el panel.">
-            <DetailRow label="Estado">
-              <StatusDot active={staff.isActive} />
-            </DetailRow>
-            <DetailRow label="Último acceso">{formatDate(staff.lastLoginAt)}</DetailRow>
-          </DetailGroup>
-        </DetailTable>
-      ) : (
-        <>
-          {staff.isAdmin && (
-            <div className="mb-3">
+          {staff.isLastAdmin && (
+            <div className="mb-3.5">
               <Alert variant="info">
-                Es administrador: tiene todos los permisos en todos los departamentos. Los accesos de
-                abajo no limitan lo que puede hacer, solo indican dónde trabaja.
+                Es el único administrador activo del sistema. Hasta que exista otro, no se le puede
+                quitar el perfil de administrador ni desactivar: quedarían todos fuera de la
+                administración del panel.
               </Alert>
             </div>
           )}
 
-          {/* Tabla sin criterios ni paginacion: DataTable ya provee el contenedor de tarjeta blanca. */}
-          {staff.accesses.length === 0 ? (
-            <section className="rounded-card border border-line bg-white p-5 shadow-card">
-              <div className="py-12 text-center">
-                <p className="text-[13.5px] text-faint">
-                  Todavía no tiene acceso a ningún departamento: entra al sistema pero no ve nada.
-                </p>
-                {canManageAccess && matrix !== null && (
-                  <div className="mt-3 flex justify-center">
-                    <Button size="sm" onClick={() => setModal("nuevo")}>
-                      <Plus className="h-[15px] w-[15px]" />
-                      Otorgar el primero
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </section>
-          ) : (
-            <DataTable>
-              <thead>
-                <HeadRow>
-                  <Th>Departamento</Th>
-                  <Th>Rol</Th>
-                  <Th>Principal</Th>
-                  <Th>Otorgado por</Th>
-                  <Th>Desde</Th>
-                  <Th className="w-24 text-right">Acciones</Th>
-                </HeadRow>
-              </thead>
-
-              <tbody>
-                {staff.accesses.map((access) => (
-                  <Row key={access.departmentId} busy={busyDepartmentId === access.departmentId}>
-                    <Td className="text-[13px] font-medium text-ink">{departmentLabel(access)}</Td>
-                    <Td>
-                      <Badge>{access.roleName}</Badge>
-                    </Td>
-                    <Td>
-                      {access.isPrimary ? (
-                        // Gris, no rojo: marcar el registro designado no es ni la accion
-                        // primaria ni el estado activo, los dos unicos usos del 185 C.
-                        <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px] font-medium text-ink">
-                          <Star aria-hidden className="h-3.5 w-3.5 fill-brand-gray text-brand-gray" />
-                          Principal
-                        </span>
-                      ) : !canWrite ? (
-                        <span className="text-[12.5px] text-faint">—</span>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="-mx-3.5"
-                          onClick={() => makePrimary(access)}
-                          disabled={busyDepartmentId === access.departmentId}
-                        >
-                          Hacer principal
-                        </Button>
-                      )}
-                    </Td>
-                    <Td className="text-[12.5px] text-brand-gray">{access.grantedByName ?? "—"}</Td>
-                    <Td className="text-[12.5px] text-brand-gray">{formatDate(access.grantedAt)}</Td>
-                    <Td>
-                      <div className="flex items-center justify-end gap-1">
-                        {!canWrite && <span className="text-[12.5px] text-faint">—</span>}
-                        {/* Cambiar el rol necesita la lista de roles; revocar no. */}
-                        {canManageAccess && matrix !== null && (
-                          <RowAction
-                            label={`Cambiar el rol en ${departmentLabel(access)}`}
-                            icon={Pencil}
-                            onClick={() => setModal(access)}
-                            disabled={busyDepartmentId === access.departmentId}
-                          />
-                        )}
-                        {canWrite && (
-                          <>
-                            <RowAction
-                              label={
-                                access.isPrimary
-                                  ? "El acceso principal no se revoca: marca otro como principal primero"
-                                  : `Revocar el acceso a ${departmentLabel(access)}`
-                              }
-                              icon={Trash2}
-                              onClick={() => askRevoke(access)}
-                              disabled={access.isPrimary || busyDepartmentId === access.departmentId}
-                              danger
-                            />
-                          </>
-                        )}
-                      </div>
-                    </Td>
-                  </Row>
-                ))}
-              </tbody>
-            </DataTable>
-          )}
-
-          {/* Cabecera de grupo, no un titulo de pagina: la rampa solo tiene
-              versalita de 10 px para nombrar un bloque dentro de una vista. */}
-          <h2 className="mb-1 mt-9 font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint">
-            Permiso efectivo
-          </h2>
-          <p className="mb-3 max-w-[76ch] text-[12.5px] leading-relaxed text-subtle">
-            Lo que esta persona puede hacer hoy, resultado de sumar los permisos de los roles que
-            tiene en cada departamento. No se edita aquí: se cambia el rol arriba, o los permisos del
-            rol en la matriz.
-          </p>
-
-          {effective.length === 0 ? (
-            <section className="rounded-card border border-line bg-white p-5 shadow-card">
-              {/* Una lista derivada se queda vacia por dos motivos distintos, y la
-                  accion que corresponde a cada uno tambien lo es: otorgar un acceso,
-                  o revisar los permisos de los roles ya otorgados. */}
-              <p className="py-12 text-center text-[13.5px] text-faint">
-                {staff.accesses.length === 0
-                  ? "Sin accesos no hay permisos: hoy esta persona no puede hacer nada dentro del panel."
-                  : "Tiene accesos, pero ninguno de sus roles concede todavía un permiso: revisa esos roles en la matriz."}
-              </p>
-            </section>
-          ) : (
-            <DataTable>
-              <thead>
-                <HeadRow>
-                  <Th className="sm:w-[360px]">Puede</Th>
-                  <Th className="sm:w-[160px]">Módulo</Th>
-                  <Th>Dónde aplica</Th>
-                </HeadRow>
-              </thead>
-
-              <tbody>
-                {effective.map(({ permission, module, departments, scope }) => (
-                  <Row key={permission.key}>
-                    <Td>
-                      <span className="flex flex-col gap-0.5">
-                        <span className="text-[13px] font-medium leading-tight text-ink">
-                          {permission.label}
-                        </span>
-                        <span className="font-mono text-[10.5px] leading-tight text-faint">
-                          {permission.key}
-                        </span>
+          <div key={section} className="animate-plf-apple-tab">
+            {section === "datos" ? (
+              <StaffOverview
+                staff={staff}
+                fullName={fullName}
+                departmentLabel={departmentLabel}
+                formatDate={formatDate}
+                accessesTo={`/staff/${id}/accesos`}
+              />
+            ) : section === "accesos" ? (
+              <div className="space-y-3.5">
+                {/* Tarjeta 1: Departamentos con acceso */}
+                <DetailCard
+                  icon={Building2}
+                  title={`Departamentos y roles asignados (${staff.accesses.length})`}
+                  aside={
+                    primary ? (
+                      <span className="inline-flex items-center gap-1.5 text-[11.5px] font-medium text-zinc-500">
+                        <Star className="size-3.5 fill-brand-gray text-brand-gray" />
+                        <span>Principal: {departmentLabel(primary)}</span>
                       </span>
-                    </Td>
-                    <Td className="text-[12.5px] text-brand-gray">{module}</Td>
-                    <Td className="text-[12.5px] text-brand-gray">
-                      {scope === "todos" ? (
-                        <span className="inline-flex items-center gap-1.5">
-                          <Badge tone="green">Todos los departamentos</Badge>
-                        </span>
-                      ) : (
-                        departments.join(", ")
-                      )}
-                    </Td>
-                  </Row>
-                ))}
-              </tbody>
-            </DataTable>
-          )}
-        </>
-      )}
+                    ) : null
+                  }
+                >
+                  {staff.accesses.length === 0 ? (
+                    <div className="py-10 text-center">
+                      <Building2 className="mx-auto h-8 w-8 text-zinc-300" />
+                      <p className="mt-2 text-[13px] font-medium text-zinc-700">
+                        Sin departamentos asignados
+                      </p>
+                      <p className="mt-0.5 text-[12px] text-zinc-400">
+                        Este colaborador no tiene acceso configurado a ningún departamento.
+                      </p>
+                    </div>
+                  ) : (
+                    <DataTable bare>
+                      <thead>
+                        <HeadRow>
+                          <Th>Departamento</Th>
+                          <Th>Rol</Th>
+                          <Th>Principal</Th>
+                          <Th>Otorgado por</Th>
+                          <Th>Desde</Th>
+                          {canWrite && <Th className="w-24 text-right">Acciones</Th>}
+                        </HeadRow>
+                      </thead>
+                      <tbody>
+                        {staff.accesses.map((access) => (
+                          <Row key={access.departmentId} busy={busyDepartmentId === access.departmentId}>
+                            <Td className="text-[13px] font-medium text-ink">
+                              <span className="flex items-center gap-2">
+                                <span
+                                  aria-hidden
+                                  className="flex size-6 shrink-0 items-center justify-center rounded-md bg-zinc-100 text-zinc-500"
+                                >
+                                  {access.isPrimary ? (
+                                    <Star className="size-3.5 fill-brand-gray text-brand-gray" />
+                                  ) : (
+                                    <Building2 className="size-3.5" strokeWidth={2.25} />
+                                  )}
+                                </span>
+                                <span>{departmentLabel(access)}</span>
+                              </span>
+                            </Td>
+                            <Td>
+                              <Badge>{access.roleName}</Badge>
+                            </Td>
+                            <Td>
+                              {access.isPrimary ? (
+                                <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px] font-medium text-ink">
+                                  <Star aria-hidden className="h-3.5 w-3.5 fill-brand-gray text-brand-gray" />
+                                  Principal
+                                </span>
+                              ) : !canWrite ? (
+                                <span className="text-[12.5px] text-faint">—</span>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="-mx-3.5"
+                                  onClick={() => makePrimary(access)}
+                                  disabled={busyDepartmentId === access.departmentId}
+                                >
+                                  Hacer principal
+                                </Button>
+                              )}
+                            </Td>
+                            <Td className="text-[12.5px] text-brand-gray">{access.grantedByName ?? "—"}</Td>
+                            <Td className="text-[12.5px] font-mono tabular-nums text-brand-gray">
+                              {formatDate(access.grantedAt)}
+                            </Td>
+                            {canWrite && (
+                              <Td>
+                                <div className="flex items-center justify-end">
+                                  <RowAction
+                                    label={
+                                      access.isPrimary
+                                        ? "El acceso principal no se revoca: marca otro como principal primero"
+                                        : `Revocar el acceso a ${departmentLabel(access)}`
+                                    }
+                                    icon={Trash2}
+                                    onClick={() => askRevoke(access)}
+                                    disabled={access.isPrimary || busyDepartmentId === access.departmentId}
+                                    danger
+                                  />
+                                </div>
+                              </Td>
+                            )}
+                          </Row>
+                        ))}
+                      </tbody>
+                    </DataTable>
+                  )}
+                </DetailCard>
 
-      {modal !== null && matrix !== null && (
-        <AccessModal
-          staffName={fullName}
-          access={modal === "nuevo" ? undefined : modal}
-          departments={departments}
-          roles={matrix.roles}
-          taken={staff.accesses.map((access) => access.departmentId)}
-          isFirst={staff.accesses.length === 0}
-          onClose={() => setModal(null)}
-          onSave={saveAccess}
-        />
-      )}
+                {/* Tarjeta 2: Permisos efectivos y restricciones */}
+                <StaffEffectivePermissionsCard
+                  staff={staff}
+                  catalogGroups={catalogGroups}
+                  onReload={reload}
+                />
+              </div>
+            ) : (
+              <StaffActivityTab staffId={staffId} staffName={fullName} />
+            )}
+          </div>
+        </div>
+      </div>
 
       {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
     </div>
   );
 }
-
-/**
- * Fila de la ficha: etiqueta a la izquierda, valor a la derecha, sin tarjeta.
- * La etiqueta es la cabecera de su fila, no una celda mas: sin `th scope="row"`
- * un lector de pantalla recita los valores sin decir de que son.
- */

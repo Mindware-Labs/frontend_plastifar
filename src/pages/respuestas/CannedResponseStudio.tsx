@@ -20,6 +20,7 @@ import { dialogHeaderShellClass, dialogHeaderStackClass } from "../../components
 import { Button } from "../../components/ui/Button";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { useAuth } from "../../context/useAuth";
+import { useReceipts } from "../../context/useReceipts";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
 import {
   applyCannedVariables,
@@ -58,6 +59,7 @@ interface CannedResponseStudioProps {
 
 export function CannedResponseStudio({ item, initialData, onClose, onSaved }: CannedResponseStudioProps) {
   const isEdit = item !== undefined;
+  const receipts = useReceipts();
   const { user } = useAuth();
   const { isExiting, requestClose, scrimRef, panelRef } = useDialogMotion(onClose, { variant: "drawer" });
 
@@ -174,6 +176,11 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
       } else {
         await cannedApi.create(finalTitle, finalBody, selectedCategoryId);
       }
+      receipts.done({
+        action: isEdit ? "editar-plantilla" : "crear-plantilla",
+        title: isEdit ? "Plantilla actualizada" : "Plantilla creada exitosamente",
+        detail: finalTitle,
+      });
       onSaved();
       requestClose();
     } catch (err) {
@@ -181,7 +188,7 @@ export function CannedResponseStudio({ item, initialData, onClose, onSaved }: Ca
     } finally {
       setIsSubmitting(false);
     }
-  }, [title, body, suggestedSubject, categoryName, selectedCategoryId, isEdit, item, onSaved, requestClose]);
+  }, [title, body, suggestedSubject, categoryName, selectedCategoryId, isEdit, item, onSaved, requestClose, receipts]);
 
   // Cerrar con Escape y atajo para guardar
   useEffect(() => {

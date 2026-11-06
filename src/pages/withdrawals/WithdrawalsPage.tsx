@@ -1,6 +1,6 @@
 import { Building2, Eye, FileSpreadsheet, FileText, PackageMinus, Tag, UserCheck } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { withdrawalsApi, type WithdrawalCounts, type WithdrawalListResponse, type WithdrawalQuery } from "../../api/withdrawals";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
@@ -25,6 +25,8 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { useSort } from "../../hooks/useSort";
 import { useTablePageSelection } from "../../hooks/useTablePageSelection";
+import { useEnterpriseListReturnRestore } from "../../hooks/useEnterpriseListReturnRestore";
+import { captureListScrollY } from "../../lib/enterpriseListReturn";
 import { formatDay } from "../../lib/dates";
 import { resolveClientLabel, resolveStaffLabel, searchClients, searchStaff } from "../../lib/lookups";
 import { formatAmount } from "../../lib/numbers";
@@ -38,7 +40,7 @@ type SortKey = "fecha" | "numero" | "cliente" | "valor";
 
 const CHIPS: { key: ChipKey; label: string; status?: string; countKey: keyof WithdrawalCounts }[] = [
   { key: "todas", label: "Todas", countKey: "all" },
-  { key: "Solicitado", label: "Solicitadas", status: "Solicitado", countKey: "requested" },
+  { key: "Solicitado", label: "Registradas", status: "Solicitado", countKey: "requested" },
   { key: "Aprobado", label: "Aprobadas", status: "Aprobado", countKey: "approved" },
   { key: "Retirado", label: "Retiradas", status: "Retirado", countKey: "withdrawn" },
   { key: "Rechazado", label: "Rechazadas", status: "Rechazado", countKey: "rejected" },
@@ -51,6 +53,7 @@ const searchSellers = searchStaff();
 
 /** RF-W6: listado paginado con selección múltiple, exportación y resumen en drawer. */
 export function WithdrawalsPage() {
+  const navigate = useNavigate();
   const receipts = useReceipts();
 
   const [search, setSearch] = useState("");
@@ -60,7 +63,7 @@ export function WithdrawalsPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [chip, setChip] = useState<ChipKey>("todas");
-  const { sort, sortOf } = useSort<SortKey>("fecha", "desc");
+  const { sort, sortOf, setSort } = useSort<SortKey>("fecha", "desc");
   const [pageSize, setPageSize] = useState(10);
   const [summaryId, setSummaryId] = useState<number | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -81,14 +84,14 @@ export function WithdrawalsPage() {
     dir: sort.dir,
   };
 
-  const { data, error, setPage, refresh } = usePagedList<WithdrawalQuery, WithdrawalListResponse>({
-    queryKey: ["withdrawals"],
+  const { data, isStale, error, page, setPage, refresh } = usePagedList<WithdrawalQuery, WithdrawalListResponse>({
     fetch: withdrawalsApi.list,
     criteria,
     fallbackError: "No se pudieron cargar las solicitudes de retiro. Vuelve a intentarlo.",
   });
 
-  const rows = useMemo(() => data?.items ?? [], [data?.items]);
+  const listLoading = data === null || isStale;
+  const rows = useMemo(() => (isStale ? [] : (data?.items ?? [])), [data?.items, isStale]);
   const counts = data?.counts;
   const pageIds = useMemo(() => rows.map((r) => r.id), [rows]);
   const { selectedIds, pageState, togglePage, toggleSelect, clearSelection } = useTablePageSelection(pageIds);
@@ -113,6 +116,70 @@ export function WithdrawalsPage() {
         .filter((item): item is WithdrawalSummary => item !== undefined),
     [selectedIds, selectionCache],
   );
+
+  const applyListState = useCallback(
+    (state: Record<string, unknown>) => {
+      if (typeof state.search === "string") setSearch(state.search);
+      if (typeof state.clientId === "string") setClientId(state.clientId);
+      if (typeof state.sellerId === "string") setSellerId(state.sellerId);
+      if (typeof state.reason === "string") setReason(state.reason);
+      if (typeof state.from === "string") setFrom(state.from);
+      if (typeof state.to === "string") setTo(state.to);
+      if (typeof state.chip === "string") setChip(state.chip as ChipKey);
+      if (typeof state.pageSize === "number") setPageSize(state.pageSize);
+      if (typeof state.sortKey === "string" && (state.sortDir === "asc" || state.sortDir === "desc")) {
+        setSort({ key: state.sortKey as SortKey, dir: state.sortDir });
+      }
+    },
+    [setSort],
+  );
+
+  const getReturnSnapshot = useCallback(() => {
+    if (summaryId === null) return null;
+    const row = selectionCache.get(summaryId) ?? rows.find((r) => r.id === summaryId);
+    return {
+      listPath: "/retiros",
+      scrollY: captureListScrollY(),
+      bannerTitle: "Retiros de mercancía",
+      bannerDetail: row ? `${row.number} · ${row.clientName}` : undefined,
+      listState: {
+        search,
+        clientId,
+        sellerId,
+        reason,
+        from,
+        to,
+        chip,
+        pageSize,
+        page,
+        sortKey: sort.key,
+        sortDir: sort.dir,
+        summaryId,
+      },
+    };
+  }, [
+    summaryId,
+    selectionCache,
+    rows,
+    search,
+    clientId,
+    sellerId,
+    reason,
+    from,
+    to,
+    chip,
+    pageSize,
+    page,
+    sort.key,
+    sort.dir,
+  ]);
+
+  const { listEnterMotion } = useEnterpriseListReturnRestore({
+    applyListState,
+    setPage,
+    openSummary: setSummaryId,
+    listReady: !listLoading && data !== null,
+  });
 
   const filtrosPuestos = [clientId, sellerId, reason, from, to].filter((value) => value !== "").length;
   const unfiltered = chip === "todas" && filtrosPuestos === 0 && !debouncedSearch;
@@ -178,7 +245,11 @@ export function WithdrawalsPage() {
   ];
 
   return (
-    <div>
+    <div
+      className={`flex h-full min-h-0 flex-col ${
+        listEnterMotion === "back" ? "animate-plf-side-panel-back motion-reduce:animate-none" : ""
+      }`}
+    >
       <ModuleHeader
         title="Retiros"
         summary={
@@ -197,16 +268,16 @@ export function WithdrawalsPage() {
               />
               <span aria-hidden className="text-zinc-300">·</span>
               <HeaderTag
-                label={counts.requested === 1 ? "solicitada" : "solicitadas"}
+                label={counts.requested === 1 ? "registrada" : "registradas"}
                 count={counts.requested}
                 active={chip === "Solicitado"}
                 onClick={() => {
                   setChip("Solicitado");
                   setPage(1);
                 }}
-                tone="amber"
+                tone="blue"
                 dot
-                title="Filtrar por solicitudes pendientes"
+                title="Filtrar por solicitudes registradas"
               />
               <span aria-hidden className="text-zinc-300">·</span>
               <HeaderTag
@@ -306,9 +377,9 @@ export function WithdrawalsPage() {
               />
 
               <LookupFilterDropdown
-                title="Seleccionar vendedor"
-                aria-label="Filtrar por vendedor"
-                placeholder="Todos los vendedores"
+                title="Filtrar por autor"
+                aria-label="Filtrar por autor que registró"
+                placeholder="Registrado por (todos)"
                 searchPlaceholder="Buscar colaborador…"
                 defaultIcon={<UserCheck className="h-3.5 w-3.5 text-zinc-500" />}
                 value={sellerId}
@@ -348,6 +419,7 @@ export function WithdrawalsPage() {
         footer={
           data !== null && (
             <Pagination
+              loading={listLoading}
               page={data.page}
               pageSize={data.pageSize}
               total={data.total}
@@ -360,7 +432,7 @@ export function WithdrawalsPage() {
           )
         }
       >
-        {data === null ? (
+        {listLoading ? (
           error === null && <TableSkeleton rows={pageSize} columns={9} />
         ) : rows.length === 0 ? (
           <ListEmptyState
@@ -390,7 +462,7 @@ export function WithdrawalsPage() {
                   <Th sort={sortOf("cliente")}>Cliente</Th>
                   <Th sort={sortOf("fecha")}>Fecha</Th>
                   <Th>Motivo</Th>
-                  <Th>Vendedor</Th>
+                  <Th>Registrado por</Th>
                   <Th sort={sortOf("valor")} className="text-right">
                     Valor
                   </Th>
@@ -451,9 +523,9 @@ export function WithdrawalsPage() {
                             onClick={() => setSummaryId(item.id)}
                           />
                           <RowAction
-                            label={`Imprimir ${item.number}`}
+                            label={`Documento oficial ${item.number}`}
                             icon={FileText}
-                            onClick={() => window.open(`/retiros/${item.id}/imprimir?mode=pdf`, "_blank")}
+                            onClick={() => navigate(`/retiros/${item.id}`)}
                           />
                         </div>
                       </Td>
@@ -467,7 +539,11 @@ export function WithdrawalsPage() {
       </ListPanel>
 
       {summaryId !== null && (
-        <WithdrawalSummaryDrawer withdrawalId={summaryId} onClose={() => setSummaryId(null)} />
+        <WithdrawalSummaryDrawer
+          withdrawalId={summaryId}
+          getReturnSnapshot={getReturnSnapshot}
+          onClose={() => setSummaryId(null)}
+        />
       )}
     </div>
   );

@@ -1,7 +1,7 @@
 import { Building2, LogOut, Pencil, Plus, Trash2, UserCheck, UserX } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { departmentsApi } from "../../api/departments";
 import { staffApi, type StaffQuery } from "../../api/staff";
 import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
@@ -22,19 +22,17 @@ import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useReceipts } from "../../context/useReceipts";
 import { useActionErrorReceipt, useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { useSort } from "../../hooks/useSort";
 import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import { idParam } from "../../lib/idParam";
-import { catalogs } from "../../lib/catalogQueries";
 import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
 import { departmentPath } from "../../lib/departments";
 import type { DepartmentResponse, StaffListResponse, StaffResponse } from "../../types/api";
 import { StaffModal } from "./StaffModal";
 import { PAGE_SIZES } from "../../lib/pageSizes";
-
-const NO_DEPARTMENTS: DepartmentResponse[] = [];
 
 type FilterKey = "todos" | "activos" | "inactivos" | "administradores";
 type SortKey = "nombre" | "correo" | "departamento" | "rol" | "estado";
@@ -65,10 +63,9 @@ export function StaffPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = Boolean(user?.isAdmin);
+  const receipts = useReceipts();
 
-  const departmentsQuery = useQuery(catalogs.departments());
-  // Si fallan, el filtro y los nombres quedan vacios, como antes.
-  const departments: DepartmentResponse[] = departmentsQuery.isError ? NO_DEPARTMENTS : (departmentsQuery.data ?? NO_DEPARTMENTS);
+  const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
   const [busyId, setBusyId] = useState<number | null>(null);
   // Confirmacion propia del panel; null = ninguna pendiente.
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(
@@ -90,8 +87,14 @@ export function StaffPage() {
   /** Lo que falló en una acción en lote, dicho por nombre y no por conteo. */
   const [bulkError, setBulkError] = useState<string | null>(null);
 
-  const { data, error, setPage, refresh } = usePagedList<StaffQuery, StaffListResponse>({
-    queryKey: ["staff"],
+  useEffect(() => {
+    departmentsApi
+      .list()
+      .then(setDepartments)
+      .catch(() => setDepartments([]));
+  }, []);
+
+  const { data, isStale, error, setPage, refresh } = usePagedList<StaffQuery, StaffListResponse>({
     fetch: staffApi.list,
     criteria: {
       pageSize,
@@ -108,7 +111,8 @@ export function StaffPage() {
   useLoadErrorReceipt(error, "staff-list", refresh);
   useActionErrorReceipt(bulkError, "staff-bulk");
 
-  const rows = data?.items ?? [];
+  const listLoading = data === null || isStale;
+  const rows = isStale ? [] : (data?.items ?? []);
   const counts = data?.counts;
   const unfiltered = filter === "todos" && departmentId === "todos" && !debouncedSearch;
 
@@ -270,12 +274,40 @@ export function StaffPage() {
     });
   }
 
-  /** El error sube al dialogo, que lo muestra sin cerrarse. */
-  async function runOnRow(id: number, action: () => Promise<void>) {
+  interface RowReceipt {
+    action: string;
+    doneTitle: string;
+    doneDetail?: string;
+    failedTitle: string;
+  }
+
+  /** Recibo de éxito o fallo; sin recibo, el error sube al diálogo de confirmación. */
+  async function runOnRow(
+    id: number,
+    action: () => Promise<void>,
+    receipt?: RowReceipt,
+  ) {
     setBusyId(id);
     try {
       await action();
+      if (receipt) {
+        receipts.done({
+          action: receipt.action,
+          title: receipt.doneTitle,
+          detail: receipt.doneDetail,
+        });
+      }
       refresh();
+    } catch (err) {
+      if (receipt) {
+        receipts.failed({
+          action: receipt.action,
+          title: receipt.failedTitle,
+          detail: err instanceof Error ? err.message : undefined,
+        });
+      } else {
+        throw err;
+      }
     } finally {
       setBusyId(null);
     }
@@ -294,7 +326,13 @@ export function StaffPage() {
         </>
       ),
       confirmLabel: "Desactivar",
-      onConfirm: () => runOnRow(member.id, () => staffApi.deactivate(member.id)),
+      onConfirm: () =>
+        runOnRow(member.id, () => staffApi.deactivate(member.id), {
+          action: "desactivar-staff",
+          doneTitle: "Colaborador desactivado",
+          doneDetail: fullName(member),
+          failedTitle: "No se pudo desactivar el colaborador",
+        }),
     });
   }
 
@@ -311,7 +349,13 @@ export function StaffPage() {
         </>
       ),
       confirmLabel: "Reactivar",
-      onConfirm: () => runOnRow(member.id, () => staffApi.activate(member.id)),
+      onConfirm: () =>
+        runOnRow(member.id, () => staffApi.activate(member.id), {
+          action: "reactivar-staff",
+          doneTitle: "Colaborador reactivado",
+          doneDetail: fullName(member),
+          failedTitle: "No se pudo reactivar el colaborador",
+        }),
     });
   }
 
@@ -328,7 +372,13 @@ export function StaffPage() {
         </>
       ),
       confirmLabel: "Cerrar sesiones",
-      onConfirm: () => runOnRow(member.id, () => staffApi.revokeSessions(member.id)),
+      onConfirm: () =>
+        runOnRow(member.id, () => staffApi.revokeSessions(member.id), {
+          action: "revocar-sesiones-staff",
+          doneTitle: "Sesiones cerradas",
+          doneDetail: fullName(member),
+          failedTitle: "No se pudieron cerrar las sesiones",
+        }),
     });
   }
 
@@ -339,13 +389,19 @@ export function StaffPage() {
       title: "Eliminar colaborador",
       description: (
         <>
-          Se eliminará permanentemente a{" "}
-          <strong className="font-semibold text-ink">{fullName(member)}</strong>. Esta acción no se
-          puede deshacer. Si ya tiene actividad registrada en el sistema, desactívalo en su lugar.
+          Se quitará del directorio a{" "}
+          <strong className="font-semibold text-ink">{fullName(member)}</strong>. Sus tickets,
+          correos e historial se conservan; ya no podrá iniciar sesión.
         </>
       ),
       confirmLabel: "Eliminar",
-      onConfirm: () => runOnRow(member.id, () => staffApi.remove(member.id)),
+      onConfirm: () =>
+        runOnRow(member.id, () => staffApi.remove(member.id), {
+          action: "eliminar-staff",
+          doneTitle: "Colaborador eliminado",
+          doneDetail: fullName(member),
+          failedTitle: "No se pudo eliminar el colaborador",
+        }),
     });
   }
 
@@ -483,13 +539,14 @@ export function StaffPage() {
           footer={
             <ServerPagination
               data={data}
+              loading={listLoading}
               onPageChange={setPage}
               onPageSizeChange={setPageSize}
               noun="colaboradores"
             />
           }
         >
-          {data === null ? (
+          {listLoading ? (
             error === null && <TableSkeleton rows={pageSize} columns={8} />
           ) : rows.length === 0 ? (
             <EmptyResult

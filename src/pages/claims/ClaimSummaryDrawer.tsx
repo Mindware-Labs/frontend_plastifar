@@ -1,31 +1,54 @@
 import { ArrowUpRight, Printer } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  navigateToTicketFullView,
+  type EnterpriseListReturnRecord,
+} from "../../lib/enterpriseListReturn";
 import { claimsApi } from "../../api/claims";
 import { Button } from "../../components/ui/Button";
 import { Drawer } from "../../components/ui/Drawer";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
-import { Spinner } from "../../components/ui/Spinner";
+import { EnterpriseFormExecutiveSummarySkeleton } from "../../components/ui/Skeleton";
+import type { ClaimDetail } from "../../types/claims";
 import { ClaimExecutiveSummary } from "./ClaimExecutiveSummary";
 
 interface ClaimSummaryDrawerProps {
   claimId: number;
   onClose: () => void;
+  getReturnSnapshot?: () => Omit<EnterpriseListReturnRecord, "ticketId"> | null;
 }
 
-export function ClaimSummaryDrawer({ claimId, onClose }: ClaimSummaryDrawerProps) {
+export function ClaimSummaryDrawer({ claimId, onClose, getReturnSnapshot }: ClaimSummaryDrawerProps) {
   const navigate = useNavigate();
-  const query = useQuery({ queryKey: ["claims", claimId], queryFn: () => claimsApi.get(claimId) });
-  // El reintento mostraba su propio texto de error; se conserva.
-  const [retriedId, setRetriedId] = useState<number | null>(null);
-  const detail = query.data ?? null;
-  const loading = query.isPending || (query.isError && query.isFetching);
-  const error = query.isError
-    ? retriedId === claimId
-      ? "Error al cargar."
-      : "No se pudo cargar el resumen de la reclamación."
-    : null;
+  const [detail, setDetail] = useState<ClaimDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError(null);
+
+    claimsApi
+      .get(claimId)
+      .then((data) => {
+        if (!active) return;
+        setDetail(data);
+      })
+      .catch(() => {
+        if (!active) return;
+        setError("No se pudo cargar el resumen de la reclamación.");
+      })
+      .finally(() => {
+        if (!active) return;
+        setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [claimId]);
 
   return (
     <Drawer
@@ -43,7 +66,10 @@ export function ClaimSummaryDrawer({ claimId, onClose }: ClaimSummaryDrawerProps
           <Button
             size="sm"
             variant="secondary"
-            onClick={() => window.open(`/reclamaciones/${claimId}/imprimir`, "_blank")}
+            onClick={() => {
+              onClose();
+              navigate(`/reclamaciones/${claimId}?documento=1`);
+            }}
           >
             <Printer className="h-3.5 w-3.5 mr-1" />
             Imprimir
@@ -56,9 +82,17 @@ export function ClaimSummaryDrawer({ claimId, onClose }: ClaimSummaryDrawerProps
             <Button
               size="sm"
               variant="primary"
+              disabled={!detail}
               onClick={() => {
+                if (!detail) return;
+                const url = `/tickets/${detail.claim.ticketId}?tab=formularios&form=claim-${detail.claim.id}&openForm=1`;
+                const snapshot = getReturnSnapshot?.() ?? null;
                 onClose();
-                navigate(`/reclamaciones/${claimId}`);
+                if (snapshot) {
+                  navigateToTicketFullView(navigate, url, detail.claim.ticketId, snapshot);
+                } else {
+                  navigate(url);
+                }
               }}
             >
               <span>Ver ficha completa</span>
@@ -69,14 +103,12 @@ export function ClaimSummaryDrawer({ claimId, onClose }: ClaimSummaryDrawerProps
       )}
     >
       {loading ? (
-        <div className="flex h-64 flex-col items-center justify-center gap-3">
-          <Spinner size="md" />
-          <p className="text-xs text-zinc-500 font-medium">Cargando resumen de la reclamación...</p>
-        </div>
+        <EnterpriseFormExecutiveSummarySkeleton />
       ) : error ? (
         <ErrorRetry onRetry={() => {
-          setRetriedId(claimId);
-          void query.refetch();
+          setLoading(true);
+          setError(null);
+          claimsApi.get(claimId).then(setDetail).catch(() => setError("Error al cargar.")).finally(() => setLoading(false));
         }}>
           {error}
         </ErrorRetry>

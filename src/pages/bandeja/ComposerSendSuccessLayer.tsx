@@ -235,7 +235,7 @@ export function ComposerSendSuccessLayer({
                 <span aria-hidden className="text-zinc-300">
                   ·
                 </span>
-                <span className="font-medium text-subtle">{secondaryText}</span>
+                <span className="font-semibold text-ink">{secondaryText}</span>
               </>
             )}
 

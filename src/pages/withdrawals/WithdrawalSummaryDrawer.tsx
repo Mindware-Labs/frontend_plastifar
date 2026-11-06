@@ -1,31 +1,55 @@
 import { ArrowUpRight, Printer } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  navigateToTicketFullView,
+  type EnterpriseListReturnRecord,
+} from "../../lib/enterpriseListReturn";
 import { withdrawalsApi } from "../../api/withdrawals";
 import { Button } from "../../components/ui/Button";
 import { Drawer } from "../../components/ui/Drawer";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
-import { Spinner } from "../../components/ui/Spinner";
+import { EnterpriseFormExecutiveSummarySkeleton } from "../../components/ui/Skeleton";
+import type { WithdrawalDetail } from "../../types/withdrawals";
 import { WithdrawalExecutiveSummary } from "./WithdrawalExecutiveSummary";
+import { normalizeWithdrawalStatus } from "./WithdrawalStatusBadge";
 
 interface WithdrawalSummaryDrawerProps {
   withdrawalId: number;
   onClose: () => void;
+  getReturnSnapshot?: () => Omit<EnterpriseListReturnRecord, "ticketId"> | null;
 }
 
-export function WithdrawalSummaryDrawer({ withdrawalId, onClose }: WithdrawalSummaryDrawerProps) {
+export function WithdrawalSummaryDrawer({ withdrawalId, onClose, getReturnSnapshot }: WithdrawalSummaryDrawerProps) {
   const navigate = useNavigate();
-  const query = useQuery({ queryKey: ["withdrawals", withdrawalId], queryFn: () => withdrawalsApi.get(withdrawalId) });
-  // El reintento mostraba su propio texto de error; se conserva.
-  const [retriedId, setRetriedId] = useState<number | null>(null);
-  const detail = query.data ?? null;
-  const loading = query.isPending || (query.isError && query.isFetching);
-  const error = query.isError
-    ? retriedId === withdrawalId
-      ? "Error al cargar."
-      : "No se pudo cargar el resumen de la solicitud."
-    : null;
+  const [detail, setDetail] = useState<WithdrawalDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError(null);
+
+    withdrawalsApi
+      .get(withdrawalId)
+      .then((data) => {
+        if (!active) return;
+        setDetail(data);
+      })
+      .catch(() => {
+        if (!active) return;
+        setError("No se pudo cargar el resumen de la solicitud.");
+      })
+      .finally(() => {
+        if (!active) return;
+        setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [withdrawalId]);
 
   return (
     <Drawer
@@ -33,7 +57,7 @@ export function WithdrawalSummaryDrawer({ withdrawalId, onClose }: WithdrawalSum
       eyebrow="PF-FOR-068 · Retiro de mercancía"
       description={
         detail
-          ? `${detail.withdrawal.clientName} · ${detail.withdrawal.status}`
+          ? `${detail.withdrawal.clientName} · ${normalizeWithdrawalStatus(detail.withdrawal.status)}`
           : "Cargando datos del formulario…"
       }
       maxWidth="max-w-[760px]"
@@ -43,7 +67,10 @@ export function WithdrawalSummaryDrawer({ withdrawalId, onClose }: WithdrawalSum
           <Button
             size="sm"
             variant="secondary"
-            onClick={() => window.open(`/retiros/${withdrawalId}/imprimir?mode=pdf`, "_blank")}
+            onClick={() => {
+              onClose();
+              navigate(`/retiros/${withdrawalId}?documento=1`);
+            }}
           >
             <Printer className="mr-1 h-3.5 w-3.5" />
             Imprimir
@@ -58,10 +85,14 @@ export function WithdrawalSummaryDrawer({ withdrawalId, onClose }: WithdrawalSum
               disabled={!detail}
               onClick={() => {
                 if (!detail) return;
+                const url = `/tickets/${detail.withdrawal.ticketId}?tab=formularios&form=withdrawal-${detail.withdrawal.id}&openForm=1`;
+                const snapshot = getReturnSnapshot?.() ?? null;
                 onClose();
-                navigate(
-                  `/tickets/${detail.withdrawal.ticketId}?tab=formularios&form=withdrawal-${detail.withdrawal.id}`,
-                );
+                if (snapshot) {
+                  navigateToTicketFullView(navigate, url, detail.withdrawal.ticketId, snapshot);
+                } else {
+                  navigate(url);
+                }
               }}
             >
               <span>Ver ficha completa</span>
@@ -72,15 +103,17 @@ export function WithdrawalSummaryDrawer({ withdrawalId, onClose }: WithdrawalSum
       )}
     >
       {loading ? (
-        <div className="flex h-64 flex-col items-center justify-center gap-3">
-          <Spinner size="md" />
-          <p className="text-xs font-medium text-zinc-500">Cargando resumen…</p>
-        </div>
+        <EnterpriseFormExecutiveSummarySkeleton />
       ) : error ? (
         <ErrorRetry
           onRetry={() => {
-            setRetriedId(withdrawalId);
-            void query.refetch();
+            setLoading(true);
+            setError(null);
+            withdrawalsApi
+              .get(withdrawalId)
+              .then(setDetail)
+              .catch(() => setError("Error al cargar."))
+              .finally(() => setLoading(false));
           }}
         >
           {error}

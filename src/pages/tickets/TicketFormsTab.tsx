@@ -55,15 +55,17 @@ import type { ActionPlanItem, CorrectiveActionSheet } from "../../types/quality"
 import type { ProductLine } from "../../types/settings";
 import type { MerchandiseWithdrawal } from "../../types/withdrawals";
 import { ClaimFormModal } from "../claims/ClaimFormModal";
-import { ClaimStatusBadge } from "../claims/ClaimStatusBadge";
+import { claimQualitySectionTone, getClaimQualitySectionLabel } from "../../lib/claimQualitySection";
+import { ClaimStatusBadge, normalizeClaimStatus } from "../claims/ClaimStatusBadge";
 import { DiscrepancyFormModal } from "../discrepancies/DiscrepancyFormModal";
-import { DiscrepancyStatusBadge } from "../discrepancies/DiscrepancyStatusBadge";
+import { DiscrepancyStatusBadge, normalizeDiscrepancyStatus } from "../discrepancies/DiscrepancyStatusBadge";
 import { HcaModal } from "../quality/HcaModal";
 import { HcaStatusBadge, PlanItemStatusBadge } from "../quality/StatusBadges";
 import { WithdrawalFormModal } from "../withdrawals/WithdrawalFormModal";
-import { WithdrawalStatusBadge } from "../withdrawals/WithdrawalStatusBadge";
+import { WithdrawalStatusBadge, normalizeWithdrawalStatus } from "../withdrawals/WithdrawalStatusBadge";
 import { FormLineTabStrip, formLineTabIndexAttr } from "../../components/ui/FormLineTabStrip";
 import { TaskFormHostLinkSubtitle, TaskScopeCodeKpi } from "../../lib/taskFormPresentation";
+import { RegisteredFormCrossfadeShell } from "./RegisteredFormCrossfadeShell";
 
 export type EnterpriseFormType = "reclamacion" | "retiro" | "discrepancia" | "hca";
 
@@ -383,6 +385,20 @@ export function TicketFormsTab({
       setSheets(foundSheets);
       setHcaPlanBySheetId({});
 
+      // Precargar plan items de HCA en segundo plano para transiciones de tabs instantáneas
+      if (foundSheets.length > 0) {
+        foundSheets.forEach((s) => {
+          qualityApi.planItems
+            .list(s.id, { page: 1, pageSize: 50 })
+            .then((res) => {
+              setHcaPlanBySheetId((prev) => ({ ...prev, [s.id]: res.items }));
+            })
+            .catch(() => {
+              setHcaPlanBySheetId((prev) => ({ ...prev, [s.id]: [] }));
+            });
+        });
+      }
+
       const hasAny = Boolean(foundClaim || foundWith.length > 0 || foundDisc.length > 0 || foundSheets.length > 0);
       onHasFormsChanged?.(hasAny);
     } catch (err) {
@@ -419,7 +435,7 @@ export function TicketFormsTab({
         type: "reclamacion",
         code: "PF-FOR-034",
         title: "Reclamación de Clientes",
-        badgeText: claim.status,
+        badgeText: normalizeClaimStatus(claim.status),
         data: claim,
       });
     }
@@ -430,7 +446,7 @@ export function TicketFormsTab({
         type: "retiro",
         code: "PF-FOR-068",
         title: `Retiro ${w.number}`,
-        badgeText: w.status,
+        badgeText: normalizeWithdrawalStatus(w.status),
         data: w,
       });
     });
@@ -441,7 +457,7 @@ export function TicketFormsTab({
         type: "discrepancia",
         code: "PF-FOR-291",
         title: `Discrepancia ${d.discrepancy.number}`,
-        badgeText: d.discrepancy.status,
+        badgeText: normalizeDiscrepancyStatus(d.discrepancy.status),
         data: d,
       });
     });
@@ -474,11 +490,28 @@ export function TicketFormsTab({
   useEffect(() => {
     const formKey = searchParams.get("form");
     if (!formKey || registeredForms.length === 0) return;
-    if (!registeredForms.some((f) => f.key === formKey)) return;
+    const targetForm = registeredForms.find((f) => f.key === formKey);
+    if (!targetForm) return;
     setSelectedSubTabKey(formKey);
+    const shouldOpenEditor = searchParams.get("openForm") === "1";
     const next = new URLSearchParams(searchParams);
     next.delete("form");
+    next.delete("openForm");
     setSearchParams(next, { replace: true });
+    if (!shouldOpenEditor) return;
+    if (targetForm.type === "reclamacion") {
+      setEditingClaim(targetForm.data as CustomerClaim);
+      setClaimModalOpen(true);
+    } else if (targetForm.type === "retiro") {
+      setEditingWithdrawal(targetForm.data as MerchandiseWithdrawal);
+      setWithdrawalModalOpen(true);
+    } else if (targetForm.type === "discrepancia") {
+      setEditingDiscrepancy((targetForm.data as DiscrepancyDetail).discrepancy);
+      setDiscrepancyModalOpen(true);
+    } else if (targetForm.type === "hca") {
+      setEditingHca(targetForm.data as CorrectiveActionSheet);
+      setHcaModalOpen(true);
+    }
   }, [searchParams, registeredForms, setSearchParams]);
 
   const activeForm = useMemo(() => {
@@ -492,6 +525,19 @@ export function TicketFormsTab({
       registeredForms.findIndex((f) => f.key === activeForm?.key)
     );
   }, [registeredForms, activeForm?.key]);
+
+  const [formSwitchDirection, setFormSwitchDirection] = useState<"forward" | "backward">("forward");
+
+  const selectRegisteredForm = (key: string) => {
+    if (activeForm && key !== activeForm.key && registeredForms.length > 1) {
+      const currentIndex = registeredForms.findIndex((f) => f.key === activeForm.key);
+      const nextIndex = registeredForms.findIndex((f) => f.key === key);
+      if (currentIndex >= 0 && nextIndex >= 0 && nextIndex !== currentIndex) {
+        setFormSwitchDirection(nextIndex > currentIndex ? "forward" : "backward");
+      }
+    }
+    setSelectedSubTabKey(key);
+  };
 
   useEffect(() => {
     if (activeForm?.type !== "hca") return;
@@ -1060,8 +1106,8 @@ export function TicketFormsTab({
                       key={item.key}
                       type="button"
                       {...formLineTabIndexAttr(idx)}
-                      onClick={() => setSelectedSubTabKey(item.key)}
-                      className={`inline-flex shrink-0 whitespace-nowrap items-center gap-2 rounded-lg px-2.5 py-1 text-xs font-medium transition-all cursor-pointer ${
+                      onClick={() => selectRegisteredForm(item.key)}
+                      className={`inline-flex shrink-0 whitespace-nowrap items-center gap-2 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors duration-150 cursor-pointer ${
                         isSelected
                           ? "bg-brand-red/10 border border-brand-red/30 text-brand-red shadow-2xs font-semibold"
                           : "bg-white text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 border border-zinc-200"
@@ -1083,7 +1129,16 @@ export function TicketFormsTab({
 
           {/* ACTIVE FORM DETAILS */}
           {activeForm && (
-            <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-2xs">
+            <RegisteredFormCrossfadeShell
+              activeKey={activeForm.key}
+              direction={formSwitchDirection}
+              enabled={registeredForms.length > 1}
+              forms={registeredForms}
+            >
+              {(form) => {
+                const activeForm = form;
+                return (
+              <>
               {/* Form Card Header */}
               <div className="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-100 pb-4">
                 <div>
@@ -1094,7 +1149,26 @@ export function TicketFormsTab({
                     <h3 className="text-sm font-semibold text-zinc-900">{activeForm.title}</h3>
 
                     {activeForm.type === "reclamacion" && (
-                      <ClaimStatusBadge status={(activeForm.data as CustomerClaim).status} />
+                      <>
+                        <ClaimStatusBadge status={(activeForm.data as CustomerClaim).status} />
+                        {(() => {
+                          const q = (activeForm.data as CustomerClaim).qualitySectionStatus;
+                          const tone = claimQualitySectionTone(q);
+                          return (
+                            <span
+                              className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold ${
+                                tone === "emerald"
+                                  ? "border-emerald-200/80 bg-emerald-50 text-emerald-800"
+                                  : tone === "slate"
+                                    ? "border-zinc-200 bg-zinc-100 text-zinc-600"
+                                    : "border-amber-200/80 bg-amber-50 text-amber-900"
+                              }`}
+                            >
+                              {getClaimQualitySectionLabel(q)}
+                            </span>
+                          );
+                        })()}
+                      </>
                     )}
                     {activeForm.type === "retiro" && (
                       <WithdrawalStatusBadge status={(activeForm.data as MerchandiseWithdrawal).status} />
@@ -1239,12 +1313,26 @@ export function TicketFormsTab({
                               <span>Editar HCA</span>
                             </span>
                           </button>
+                        ) : activeForm.type === "reclamacion" ? (
+                          <button
+                            type="button"
+                            data-motion-item
+                            onClick={() => {
+                              setActionsMenuOpen(false);
+                              setEditingClaim(activeForm.data as CustomerClaim);
+                              setClaimModalOpen(true);
+                            }}
+                            className="flex w-full items-center justify-between px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 transition-colors cursor-pointer text-left"
+                          >
+                            <span className="flex items-center gap-2.5">
+                              <ArrowUpRight className="size-3.5 text-zinc-500" />
+                              <span>Ver ficha completa</span>
+                            </span>
+                          </button>
                         ) : (
                           <Link
                             to={
-                              activeForm.type === "reclamacion"
-                                ? `/reclamaciones/${(activeForm.data as CustomerClaim).id}`
-                                : activeForm.type === "retiro"
+                              activeForm.type === "retiro"
                                 ? `/retiros/${(activeForm.data as MerchandiseWithdrawal).id}`
                                 : `/discrepancias/${(activeForm.data as DiscrepancyDetail).discrepancy.id}`
                             }
@@ -1424,7 +1512,7 @@ export function TicketFormsTab({
 
                         <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5">
                           <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                            Vendedor & origen
+                            Registrado por & origen
                           </span>
                           <p className="mt-1 truncate text-sm font-semibold text-zinc-900">{w.requestedByName}</p>
                           <span className="text-[10.5px] text-zinc-500">
@@ -1499,7 +1587,7 @@ export function TicketFormsTab({
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div className="rounded-xl border border-zinc-200 bg-white p-3.5">
                           <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                            Firma Vendedor
+                            Firma Autor / Registrado por
                           </span>
                           <p className="mt-1 text-xs font-semibold text-zinc-900">{w.requestedByName || "—"}</p>
                         </div>
@@ -2002,7 +2090,10 @@ export function TicketFormsTab({
                   );
                 })()}
               </div>
-            </div>
+              </>
+                );
+              }}
+            </RegisteredFormCrossfadeShell>
           )}
         </div>
       )}

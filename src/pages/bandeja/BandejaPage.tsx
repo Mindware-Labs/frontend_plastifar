@@ -114,7 +114,9 @@ function EmailFilterMenu({
         triggerRef.current?.focus();
       }
     }
-    function handleViewportChange() {
+    function handleViewportChange(event: Event) {
+      const target = event.target;
+      if (target instanceof Node && panelRef.current?.contains(target)) return;
       setOpen(false);
       snap();
     }
@@ -658,6 +660,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
     }
 
     setConfirmation({
+      tone: "danger",
       eyebrow: "Papelera",
       title: "Eliminar definitivamente",
       description: (
@@ -679,6 +682,7 @@ export function BandejaPage({ folder }: BandejaPageProps) {
     const total = counts?.trash.total ?? data?.total ?? 0;
 
     setConfirmation({
+      tone: "danger",
       eyebrow: "Papelera",
       title: "Vaciar la papelera",
       description: (
@@ -910,12 +914,12 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                 <div className="flex shrink-0 flex-col gap-2.5 px-3.5 pt-3 pb-2.5">
                   <Skeleton className="h-8 w-full rounded-lg" />
                 </div>
-                <ScrollArea className="min-h-0 flex-1">
+                <div className="min-h-0 flex-1 overflow-hidden">
                   <InboxListSkeleton rows={9} />
-                </ScrollArea>
+                </div>
               </ResizablePanel>
               <ResizableHandle withHandle className="bg-zinc-200/80" />
-              <ResizablePanel minSize="35%" className="flex flex-col">
+              <ResizablePanel minSize="35%" className="flex flex-col overflow-hidden">
                 <MailReadingPaneSkeleton />
               </ResizablePanel>
             </ResizablePanelGroup>
@@ -1025,12 +1029,13 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                   </div>
                 </div>
 
-                <ScrollArea className="min-h-0 flex-1">
-                  {listLoading ? (
-                    <div className="p-3 pt-0">
-                      <InboxListSkeleton rows={pageSize} />
-                    </div>
-                  ) : rows.length === 0 ? (
+                {listLoading ? (
+                  <div className="min-h-0 flex-1 overflow-hidden">
+                    <InboxListSkeleton rows={pageSize} />
+                  </div>
+                ) : (
+                  <ScrollArea className="min-h-0 flex-1">
+                    {rows.length === 0 ? (
                     <ListEmptyState
                       icon={Inbox}
                       isFiltered={!unfiltered}
@@ -1060,7 +1065,8 @@ export function BandejaPage({ folder }: BandejaPageProps) {
                       ))}
                     </div>
                   )}
-                </ScrollArea>
+                  </ScrollArea>
+                )}
 
                 {data !== null && data.total > 0 && (
                   <div className="shrink-0 border-t border-zinc-200/80 bg-zinc-50 px-3">

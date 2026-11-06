@@ -1,14 +1,14 @@
-import { Ban, Building2, CheckCircle2, MapPin, Pencil, Plus, Trash2, UserCheck, UserCog, Users } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { Ban, Building2, CheckCircle2, Pencil, Plus, Ticket, Trash2, UserCheck, UserCog, Users } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { clientsApi, type ClientQuery } from "../../api/clients";
+import { fetchAllPages } from "../../api/paging";
+import { staffApi } from "../../api/staff";
 import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Avatar } from "../../components/ui/Avatar";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { ColumnPicker, type ColumnOption } from "../../components/ui/ColumnPicker";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
@@ -28,39 +28,55 @@ import { useUrlNumber, useUrlState } from "../../hooks/useUrlState";
 import { usePermissions } from "../../hooks/usePermissions";
 import { useReceipts } from "../../context/useReceipts";
 import { useSort } from "../../hooks/useSort";
-import { catalogs, useTerritoriesCatalog } from "../../lib/catalogQueries";
 import { idParam } from "../../lib/idParam";
 import {
   resolveStaffLabel,
-  resolveTerritoryLabel,
-  searchActiveStaff,
-  searchTerritories,
+  searchSalesRepStaff,
 } from "../../lib/lookups";
-import type { Client, ClientListResponse, Territory } from "../../types/clients";
+import type { Client, ClientListResponse } from "../../types/clients";
 import { BulkReassignSalesRepModal } from "./BulkReassignSalesRepModal";
 import { ClientModal } from "./ClientModal";
+import { ClientViewMenu } from "./ClientViewMenu";
 import { ReassignSalesRepModal } from "./ReassignSalesRepModal";
 import { PAGE_SIZES } from "../../lib/pageSizes";
 
 type ChipKey = "todos" | "activos" | "inactivos" | "sinVendedor";
 
-/**
- * Exactamente las cuatro claves que ClientsController sabe ordenar —`nombre`
- * por defecto, mas `codigo`, `territorio` y `estado`—. No se ofrece cabecera
- * clicable para tipo, vendedor ni contactos: el servidor ignoraria el parametro
- * y la tabla se quedaria igual despues de pulsarla, que es peor que no poder.
- */
-type SortKey = "nombre" | "codigo" | "territorio" | "estado" | "fecha";
+/** Claves que ClientsController ordena en servidor. */
+type SortKey = "nombre" | "codigo" | "estado" | "fecha" | "actividad" | "tickets" | "contactos" | "tipo";
 
-const COLUMNS: ColumnOption[] = [
-  { id: "cliente", label: "Cliente", locked: true },
-  { id: "codigo", label: "Código" },
-  { id: "tipo", label: "Tipo" },
-  { id: "territorio", label: "Territorio" },
-  { id: "vendedor", label: "Vendedor" },
-  { id: "contactos", label: "Contactos" },
-  { id: "estado", label: "Estado" },
-];
+type FocusKey = "todos" | "sintickets" | "contickets" | "abiertos";
+
+const FOCUS_KEYS: FocusKey[] = ["todos", "sintickets", "contickets", "abiertos"];
+
+const clientSortOptions = [
+  { value: "actividad:desc", label: "Actividad reciente" },
+  { value: "actividad:asc", label: "Sin actividad reciente" },
+  { value: "tickets:desc", label: "Más tickets" },
+  { value: "tickets:asc", label: "Menos tickets" },
+  { value: "contactos:desc", label: "Más contactos" },
+  { value: "contactos:asc", label: "Menos contactos" },
+  { value: "fecha:desc", label: "Alta reciente" },
+  { value: "fecha:asc", label: "Clientes más antiguos" },
+  { value: "nombre:asc", label: "Nombre (A–Z)" },
+  { value: "nombre:desc", label: "Nombre (Z–A)" },
+  { value: "codigo:asc", label: "Código (A–Z)" },
+  { value: "estado:desc", label: "Activos primero" },
+] as const;
+
+const clientFocusOptions = [
+  { value: "todos", label: "Todos los clientes" },
+  { value: "contickets", label: "Con tickets" },
+  { value: "abiertos", label: "Con tickets abiertos" },
+  { value: "sintickets", label: "Sin tickets" },
+] as const;
+
+function parseSortValue(value: string): { key: SortKey; dir: "asc" | "desc" } {
+  const [rawKey, rawDir] = value.split(":");
+  const key = rawKey as SortKey;
+  const dir = rawDir === "desc" ? "desc" : "asc";
+  return { key, dir };
+}
 
 // El tipo de cliente no es ni accion principal, ni estado activo, ni salud: es
 // una clasificacion. Por la regla del rojo unico y del verde reservado a lo
@@ -85,48 +101,28 @@ const TYPE_OPTIONS = [
 
 const TYPE_KEYS = TYPE_OPTIONS.map((option) => option.value);
 
-const NO_TERRITORIES: Territory[] = [];
-
 export function ClientsPage() {
   const navigate = useNavigate();
   const { can } = usePermissions();
   const receipts = useReceipts();
   const canWrite = can("clients.write");
 
-  // Catalogo acotado: se recorre entero. Con el tope de cien, un territorio
-  // mas alla de esa cifra no existia para el filtro ni para la tabla.
-  const territoriesQuery = useTerritoriesCatalog();
-  // Los SELECTORES de vendedor ya no salen de aqui: buscan en el servidor.
-  // Esta lista solo resuelve el nombre de la columna «Vendedor», porque el
-  // DTO del listado trae el id y no el nombre. Se recorre entera para no
-  // pintar «Sin vendedor» sobre un cliente que si lo tiene; el arreglo de
-  // fondo es que el API devuelva `salesRepName` en la fila.
-  const staffQuery = useQuery(catalogs.activeStaff());
-  const territories: Territory[] = territoriesQuery.data ?? NO_TERRITORIES;
-  const staff = staffQuery.data;
-  const salesReps = useMemo(
-    () => (staff ?? []).map((s) => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })),
-    [staff],
-  );
+  const [salesReps, setSalesReps] = useState<{ id: number; name: string }[]>([]);
   // Misma politica que la ficha: los catalogos de apoyo degradan la pantalla,
   // no la tumban, pero su fallo se dice y se puede reintentar.
-  const referenceError =
-    (territoriesQuery.isError && !territoriesQuery.isFetching) || (staffQuery.isError && !staffQuery.isFetching)
-      ? "No se pudieron cargar los territorios ni los vendedores: la tabla los muestra como «—» y sus dos filtros quedan vacíos."
-      : null;
+  const [referenceError, setReferenceError] = useState<string | null>(null);
   const { modal, setModal, busyId, confirm, dialog } = useCatalogActions<Client>();
 
   // Criterios en la URL: volver desde la ficha deja el listado como estaba.
   const [search, setSearch] = useUrlState<string>("q", "");
-  const [territoryId, setTerritoryId] = useUrlState<string>("territorio", "todos");
   const [salesRepId, setSalesRepId] = useUrlState<string>("vendedor", "todos");
   const [type, setType] = useUrlState<string>("tipo", "todos", TYPE_KEYS);
   const [chip, setChip] = useUrlState<ChipKey>("estado", "todos", CHIP_KEYS);
-const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
+  const [focus, setFocus] = useUrlState<FocusKey>("enfoque", "todos", FOCUS_KEYS);
+  const { sort, sortOf, setSort } = useSort<SortKey>("actividad", "desc");
   const [pageSize, setPageSize] = useUrlNumber("tam", 10, PAGE_SIZES);
 
   const [reassigning, setReassigning] = useState<Client | null>(null);
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(COLUMNS.map((c) => c.id));
   /**
    * RF-C7 en lote: la seleccion es sobre la pagina visible, no sobre todo el
    * filtro. `POST /api/clients/bulk/sales-rep` solo acepta una lista explicita
@@ -138,25 +134,35 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
-  function isVisible(id: string) {
-    return visibleColumns.includes(id);
-  }
-
   function loadReferenceData() {
-    void territoriesQuery.refetch();
-    void staffQuery.refetch();
+    setReferenceError(null);
+    return fetchAllPages((page, pageSize) =>
+      staffApi.list({ page, pageSize, status: "activos", sort: "nombre", dir: "asc" }),
+    )
+      .then((items) =>
+        setSalesReps(items.map((s) => ({ id: s.id, name: `${s.firstName} ${s.lastName}` }))),
+      )
+      .catch(() =>
+        setReferenceError(
+          "No se pudieron cargar los vendedores: la tabla los muestra como «—» y su filtro queda vacío.",
+        ),
+      );
   }
 
-  const { data, error, setPage, refresh } = usePagedList<ClientQuery, ClientListResponse>({
-    queryKey: ["clients"],
+  useEffect(() => {
+    void loadReferenceData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const { data, isStale, error, setPage, refresh } = usePagedList<ClientQuery, ClientListResponse>({
     fetch: clientsApi.list,
     criteria: {
       pageSize,
       search: debouncedSearch || undefined,
-      territoryId: idParam(territoryId),
       salesRepId: idParam(salesRepId),
       type: type === "todos" ? undefined : type,
       status: chipToStatus[chip],
+      focus: focus === "todos" ? undefined : focus,
       sort: sort.key,
       dir: sort.dir,
     },
@@ -164,20 +170,23 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
     pageKey: "pagina",
   });
 
-  const rows = data?.items ?? [];
+  const listLoading = data === null || isStale;
+  const rows = isStale ? [] : (data?.items ?? []);
   const counts = data?.counts;
   const unfiltered =
-    chip === "todos" && territoryId === "todos" && salesRepId === "todos" && type === "todos" && !debouncedSearch;
+    chip === "todos" &&
+    focus === "todos" &&
+    salesRepId === "todos" &&
+    type === "todos" &&
+    !debouncedSearch;
 
   /* Los tres criterios que viven detras del boton. */
   const filtrosPuestos =
-    (territoryId !== "todos" ? 1 : 0) +
     (salesRepId !== "todos" ? 1 : 0) +
     (type !== "todos" ? 1 : 0);
 
   /** Quita solo lo del panel; la busqueda y las pastillas no se tocan. */
   function clearNarrowFilters() {
-    setTerritoryId("todos");
     setSalesRepId("todos");
     setType("todos");
     setPage(1);
@@ -186,10 +195,23 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
   /** Quita los cinco recortes de una vez: es la salida del estado vacio. */
   function clearFilters() {
     setSearch("");
-    setTerritoryId("todos");
     setSalesRepId("todos");
     setType("todos");
     setChip("todos");
+    setFocus("todos");
+    setPage(1);
+  }
+
+  const sortMenuValue = `${sort.key}:${sort.dir}`;
+
+  function handleSortMenuChange(value: string) {
+    const next = parseSortValue(value);
+    setSort(next);
+    setPage(1);
+  }
+
+  function handleFocusChange(value: string) {
+    setFocus(value as FocusKey);
     setPage(1);
   }
 
@@ -212,18 +234,7 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
    * ordenar IsActive de menor a mayor pondria a los inactivos arriba, y nadie
    * abre el listado para ver primero lo que ya no opera.
    */
-  function territoryName(id: number) {
-    const territory = territories.find((t) => t.id === id);
-    if (!territory || territory.code === "UNASSIGNED") return "—";
-    return territory.name;
-  }
 
-  function territoryLookupLabel(id: number | null) {
-    if (id === null) return null;
-    const territory = territories.find((t) => t.id === id);
-    if (!territory || territory.code === "UNASSIGNED") return null;
-    return territory.name;
-  }
 
   function repName(id: number | null) {
     if (id === null) return null;
@@ -318,9 +329,9 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
       title: "Eliminar cliente",
       description: (
         <>
-          Se eliminará permanentemente a{" "}
-          <strong className="font-semibold text-ink">{client.name}</strong>. Esta acción no se puede
-          deshacer.
+          Se quitará del directorio a{" "}
+          <strong className="font-semibold text-ink">{client.name}</strong>. Tickets e historial
+          vinculados se conservan; el código quedará libre para un cliente nuevo.
         </>
       ),
       confirmLabel: "Eliminar",
@@ -332,6 +343,7 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
             title: "Cliente eliminado",
             detail: `${client.name} (${client.code})`,
           });
+          refresh();
         } catch (err) {
           receipts.failed({
             action: "eliminar-cliente",
@@ -339,7 +351,6 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
             detail: err instanceof Error ? err.message : undefined,
           });
         }
-        refresh();
       },
     });
   }
@@ -445,19 +456,6 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
             />
 
             <LookupFilterDropdown
-              title="Seleccionar territorio"
-              aria-label="Filtrar por territorio"
-              placeholder="Todos los territorios"
-              searchPlaceholder="Buscar territorio…"
-              defaultIcon={<MapPin className="h-3.5 w-3.5 text-zinc-500" />}
-              value={territoryId === "todos" ? "" : territoryId}
-              selectedLabel={territoryId === "todos" ? null : territoryLookupLabel(Number(territoryId))}
-              resolveSelectedLabel={resolveTerritoryLabel}
-              search={searchTerritories}
-              onChange={(value) => setTerritoryId(value === "" ? "todos" : value)}
-            />
-
-            <LookupFilterDropdown
               title="Seleccionar vendedor"
               aria-label="Filtrar por vendedor"
               placeholder="Todos los vendedores"
@@ -466,7 +464,7 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
               value={salesRepId === "todos" ? "" : salesRepId}
               selectedLabel={salesRepId === "todos" ? null : repName(Number(salesRepId))}
               resolveSelectedLabel={resolveStaffLabel}
-              search={searchActiveStaff}
+              search={searchSalesRepStaff}
               onChange={(value) => setSalesRepId(value === "" ? "todos" : value)}
             />
 
@@ -479,30 +477,39 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
               options={TYPE_OPTIONS}
             />
 
-            {(search || filtrosPuestos > 0) && (
+            {(search || filtrosPuestos > 0 || focus !== "todos") && (
               <ClearFiltersButton
                 onClick={() => {
                   setSearch("");
                   clearNarrowFilters();
+                  setFocus("todos");
                 }}
               />
             )}
 
             <div className="ml-auto">
-              <ColumnPicker columns={COLUMNS} visible={visibleColumns} onChange={setVisibleColumns} label="Columnas" />
+              <ClientViewMenu
+                sortValue={sortMenuValue}
+                focusValue={focus}
+                sortOptions={[...clientSortOptions]}
+                focusOptions={[...clientFocusOptions]}
+                onSortChange={handleSortMenuChange}
+                onFocusChange={handleFocusChange}
+              />
             </div>
           </div>
         }
         footer={
           <ServerPagination
             data={data}
+            loading={listLoading}
             onPageChange={setPage}
             onPageSizeChange={setPageSize}
             noun="clientes"
           />
         }
       >
-        {data === null ? (
+        {listLoading ? (
           error === null && <TableSkeleton rows={pageSize} columns={9} />
         ) : rows.length === 0 ? (
           <EmptyResult
@@ -534,12 +541,12 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
                     </Th>
                   )}
                   <Th sort={sortOf("nombre")}>Cliente</Th>
-                  {isVisible("codigo") && <Th sort={sortOf("codigo")}>Código</Th>}
-                  {isVisible("tipo") && <Th>Tipo</Th>}
-                  {isVisible("territorio") && <Th sort={sortOf("territorio")}>Territorio</Th>}
-                  {isVisible("vendedor") && <Th>Vendedor</Th>}
-                  {isVisible("contactos") && <Th>Contactos</Th>}
-                  {isVisible("estado") && <Th sort={sortOf("estado")}>Estado</Th>}
+                  <Th sort={sortOf("codigo")}>Código</Th>
+                  <Th sort={sortOf("tipo")}>Tipo</Th>
+                  <Th>Vendedor</Th>
+                  <Th sort={sortOf("tickets")}>Tickets</Th>
+                  <Th sort={sortOf("contactos")}>Contactos</Th>
+                  <Th sort={sortOf("estado")}>Estado</Th>
                   {canWrite && <Th className="w-24 text-right">Acciones</Th>}
                 </HeadRow>
               </thead>
@@ -584,59 +591,50 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
                         </span>
                       </Link>
                     </Td>
-                    {isVisible("codigo") && (
-                      <Td>
-                        {/* El codigo comercial lo lee la operacion, no una maquina: va en
-                            Poppins como el resto de la fila, no en mono. */}
-                        <span className="text-[12.5px] tabular-nums text-brand-gray">{client.code}</span>
-                      </Td>
-                    )}
-                    {isVisible("tipo") && (
-                      <Td>
-                        <Badge tone="neutral">{client.type}</Badge>
-                      </Td>
-                    )}
-                    {isVisible("territorio") && (
-                      <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">{territoryName(client.territoryId)}</Td>
-                    )}
-                    {isVisible("vendedor") && (
-                      <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">
-                        {/* Ambar: "sin asignar" es un estado intermedio, no un dato ausente.
-                            `nowrap`: "Richard De Leon Ramirez" partia en dos lineas y esa
-                            fila quedaba 10 px mas alta que sus vecinas. Un listado se lee
-                            por el ritmo de sus filas; con alturas dispares no hay ritmo. */}
-                        <span
-                          className="block max-w-[170px] truncate"
-                          title={repName(client.salesRepStaffId) ?? undefined}
-                        >
-                          {repName(client.salesRepStaffId) ?? <span className="text-warn">Sin vendedor</span>}
+                    <Td>
+                      <span className="text-[12.5px] tabular-nums text-brand-gray">{client.code}</span>
+                    </Td>
+                    <Td>
+                      <Badge tone="neutral">{client.type}</Badge>
+                    </Td>
+                    <Td className="whitespace-nowrap text-[12.5px] text-brand-gray">
+                      <span
+                        className="block max-w-[170px] truncate"
+                        title={repName(client.salesRepStaffId) ?? undefined}
+                      >
+                        {repName(client.salesRepStaffId) ?? <span className="text-warn">Sin vendedor</span>}
+                      </span>
+                    </Td>
+                    <Td>
+                      {client.ticketCount > 0 ? (
+                        <span className="inline-flex items-center gap-1.5 text-[12.5px] tabular-nums text-brand-gray">
+                          <Ticket aria-hidden className="h-3.5 w-3.5 text-faint" />
+                          {client.ticketCount}
                         </span>
-                      </Td>
-                    )}
-                    {isVisible("contactos") && (
-                      <Td>
-                        {client.contactCount > 0 ? (
-                          <span className="inline-flex items-center gap-1.5 text-[12.5px] tabular-nums text-brand-gray">
-                            <Users aria-hidden className="h-3.5 w-3.5 text-faint" />
-                            {client.contactCount}
-                          </span>
-                        ) : client.contactPersonName || client.phone || client.email ? (
-                          <span
-                            className="text-[12.5px] text-brand-gray"
-                            title="Teléfono, correo o persona en la ficha del cliente"
-                          >
-                            En ficha
-                          </span>
-                        ) : (
-                          <span className="text-[12.5px] text-faint">Ninguno</span>
-                        )}
-                      </Td>
-                    )}
-                    {isVisible("estado") && (
-                      <Td>
-                        <StatusDot active={client.isActive} />
-                      </Td>
-                    )}
+                      ) : (
+                        <span className="text-[12.5px] text-faint">0</span>
+                      )}
+                    </Td>
+                    <Td>
+                      {client.contactCount > 0 ? (
+                        <span className="inline-flex items-center gap-1.5 text-[12.5px] tabular-nums text-brand-gray">
+                          <Users aria-hidden className="h-3.5 w-3.5 text-faint" />
+                          {client.contactCount}
+                        </span>
+                      ) : client.contactPersonName || client.phone || client.email ? (
+                        <span
+                          className="text-[12.5px] text-brand-gray"
+                          title="Teléfono, correo o persona en la ficha del cliente"
+                        >
+                          En ficha
+                        </span>
+                      ) : (
+                        <span className="text-[12.5px] text-faint">Ninguno</span>
+                      )}
+                    </Td>
+                    <Td>
+                      <StatusDot active={client.isActive} />
+                    </Td>
                     {canWrite && (
                       /* `pl-0`: los iconos van pegados a la derecha, asi que el
                          relleno izquierdo de la celda son 14 px muertos — y eran
@@ -685,7 +683,6 @@ const { sort, sortOf } = useSort<SortKey>("nombre", "asc");
       {modal !== null && (
         <ClientModal
           client={modal === "nuevo" ? undefined : modal}
-          territories={territories}
           onClose={() => setModal(null)}
           onSaved={(savedClient) => {
             const isEdit = modal !== "nuevo";

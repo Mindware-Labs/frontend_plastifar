@@ -8,7 +8,6 @@
 import { clientsApi } from "../api/clients";
 import { settingsApi } from "../api/settings";
 import { staffApi } from "../api/staff";
-import { territoriesApi } from "../api/territories";
 import type { LookupResult } from "../components/ui/LookupSelect";
 
 /**
@@ -43,13 +42,14 @@ export async function searchClients(term: string): Promise<LookupResult> {
  * pantalla: la lista de vendedores ofrece solo activos, y el orden por nombre
  * es el que hace reconocible el resultado.
  */
-export function searchStaff(status?: string) {
+export function searchStaff(status?: string, salesRepOnly?: boolean) {
   return async function search(term: string): Promise<LookupResult> {
     const { items, total } = await staffApi.list({
       page: 1,
       pageSize: LOOKUP_PAGE_SIZE,
       search: term || undefined,
       status,
+      salesRepOnly,
       sort: "nombre",
       dir: "asc",
     });
@@ -67,6 +67,30 @@ export function searchStaff(status?: string) {
 
 /** Solo colaboradores activos: es lo que se ofrece para asignar trabajo. */
 export const searchActiveStaff = searchStaff("activos");
+
+/** Clientes sin vendedor activo (alta de vendedor / reasignación). */
+export async function searchClientsWithoutSalesRep(term: string): Promise<LookupResult> {
+  const { items, total } = await clientsApi.list({
+    page: 1,
+    pageSize: LOOKUP_PAGE_SIZE,
+    search: term || undefined,
+    status: "sinvendedor",
+    sort: "nombre",
+    dir: "asc",
+  });
+
+  return {
+    options: items.map((client) => ({
+      value: String(client.id),
+      label: client.name,
+      hint: client.code,
+    })),
+    hasMore: total > items.length,
+  };
+}
+
+/** Vendedores activos marcados en personal. */
+export const searchSalesRepStaff = searchStaff("activos", true);
 
 const staffLabelCache = new Map<string, string>();
 
@@ -115,28 +139,4 @@ export async function resolveProductLabel(value: string): Promise<string | null>
 export async function resolveClientLabel(value: string): Promise<string | null> {
   const { client } = await clientsApi.get(Number(value));
   return client.name;
-}
-
-/** Busca territorios por nombre o código. */
-export async function searchTerritories(term: string): Promise<LookupResult> {
-  const { items, total } = await territoriesApi.list({
-    page: 1,
-    pageSize: LOOKUP_PAGE_SIZE,
-    search: term || undefined,
-  });
-
-  return {
-    options: items.map((territory) => ({
-      value: String(territory.id),
-      label: territory.name,
-      hint: territory.code,
-    })),
-    hasMore: total > items.length,
-  };
-}
-
-/** Nombre de un territorio por id, para pintar lo ya seleccionado. */
-export async function resolveTerritoryLabel(value: string): Promise<string | null> {
-  const territory = await territoriesApi.get(Number(value));
-  return territory.name;
 }

@@ -13,6 +13,7 @@ import { Button } from "../../components/ui/Button";
 import { formatDay, formatInstant } from "../../lib/dates";
 import { isTaskCaseReference } from "../../lib/formCaseReference";
 import { formatAmount, formatPrice, formatQuantity } from "../../lib/numbers";
+import { getClaimQualitySectionLabel } from "../../lib/claimQualitySection";
 import { topicRequiresOther, type ClaimClosureCondition, type CustomerClaim } from "../../types/claims";
 import { ClaimStatusBadge } from "./ClaimStatusBadge";
 
@@ -40,6 +41,7 @@ export function ClaimExecutiveSummary({
     : claim.reason;
 
   const isClosed = claim.status === "Cerrada";
+  const qualityLabel = getClaimQualitySectionLabel(claim.qualitySectionStatus);
 
   return (
     <div className="space-y-4 text-xs">
@@ -286,9 +288,31 @@ export function ClaimExecutiveSummary({
           <span className="rounded bg-zinc-100 px-2 py-0.5 text-[10.5px] font-semibold text-zinc-600">
             Exclusivo Calidad
           </span>
+          <span
+            className={`rounded px-2 py-0.5 text-[10.5px] font-semibold ${
+              claim.qualitySectionStatus === "complete"
+                ? "bg-emerald-50 text-emerald-800"
+                : claim.qualitySectionStatus === "waived"
+                  ? "bg-zinc-100 text-zinc-600"
+                  : "bg-amber-50 text-amber-800"
+            }`}
+          >
+            {qualityLabel}
+          </span>
         </div>
 
         <div className="mt-3.5 space-y-3.5">
+          {claim.qualitySectionStatus === "waived" && (
+            <p className="rounded-lg border border-zinc-200/80 bg-zinc-50/80 px-3 py-2.5 text-[12px] leading-relaxed text-zinc-600">
+              Se registró que no se requiere llenar Calidad en este paso del ciclo. El departamento puede completar la
+              sección IV más adelante desde Tratamiento.
+            </p>
+          )}
+          {claim.qualitySectionStatus === "pending" && (
+            <p className="rounded-lg border border-amber-200/80 bg-amber-50/50 px-3 py-2.5 text-[12px] leading-relaxed text-amber-900">
+              Apartado de Calidad pendiente. Complétalo desde Tratamiento cuando corresponda.
+            </p>
+          )}
           <div>
             <span className={fieldLabelClass}>
               Primera respuesta como corrección
@@ -367,7 +391,11 @@ export function ClaimExecutiveSummary({
             </div>
           )}
 
-          {!isClosed && closureConditions && closureConditions.length > 0 && (
+          {!isClosed &&
+            claim.qualitySectionStatus !== "waived" &&
+            claim.qualitySectionStatus !== "pending" &&
+            closureConditions &&
+            closureConditions.length > 0 && (
             <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-3.5">
               <span className={`${fieldLabelClass} font-heading`}>
                 Condiciones pendientes para cerrar la reclamación

@@ -6,8 +6,8 @@ import { tasksApi, type TaskQuery } from "../../api/tasks";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Avatar } from "../../components/ui/Avatar";
 import { Button } from "../../components/ui/Button";
-import { ColumnPicker, type ColumnOption } from "../../components/ui/ColumnPicker";
-import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
+import { DataTable, HeadRow, Row, Td, Th, type SortDir } from "../../components/ui/DataTable";
+import { ListSortMenu, type ListSortOption } from "../../components/ui/ListSortMenu";
 import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { ClearFiltersButton, FilterDropdown } from "../../components/ui/FilterDropdown";
@@ -24,6 +24,7 @@ import { usePermissions } from "../../hooks/usePermissions";
 import { useSort } from "../../hooks/useSort";
 import { useTablePageSelection } from "../../hooks/useTablePageSelection";
 import { buildDepartmentFilterOptions } from "../../lib/departmentFilterOptions";
+import { priorityFilterDefaultIcon, priorityFilterOptions } from "../../lib/priorityFilterOptions";
 import { departmentPaths } from "../../lib/departments";
 import { formatDateTime } from "../../lib/format";
 import { useReceipts } from "../../context/useReceipts";
@@ -35,17 +36,15 @@ import { TaskFormModal } from "./TaskFormModal";
 import { TaskStatusCell, TASK_STATUS_FILTER_OPTIONS } from "./taskCells";
 
 type ChipKey = "todas" | "mias" | "pendientes" | "enprogreso" | "completadas" | "vencidas";
-type SortKey = "titulo" | "departamento" | "prioridad" | "estado" | "limite" | "fecha";
+type SortKey = "titulo" | "departamento" | "prioridad" | "estado" | "limite" | "fecha" | "actividad";
 
-const COLUMNS: ColumnOption[] = [
-  { id: "tarea", label: "Tarea", locked: true },
-  { id: "asignado", label: "Asignado" },
-  { id: "departamento", label: "Departamento" },
-  { id: "prioridad", label: "Prioridad" },
-  { id: "estado", label: "Estado" },
-  { id: "cliente", label: "Cliente" },
-  { id: "limite", label: "Fecha límite" },
-  { id: "origen", label: "Canal" },
+const taskSortOptions: ListSortOption[] = [
+  { value: "actividad:desc", label: "Actividad reciente" },
+  { value: "actividad:asc", label: "Actividad más antigua" },
+  { value: "limite:asc", label: "Fecha límite próxima" },
+  { value: "prioridad:desc", label: "Mayor prioridad" },
+  { value: "titulo:asc", label: "Título (A–Z)" },
+  { value: "fecha:desc", label: "Creación reciente" },
 ];
 
 function formatDue(value: string | null) {
@@ -81,19 +80,14 @@ export function TasksPage() {
   const [priority, setPriority] = useState("todos");
   const [status, setStatus] = useState("todos");
   const [chip, setChip] = useState<ChipKey>("todas");
-  const { sort, sortOf } = useSort<SortKey>("fecha", "desc");
+  const { sort, sortOf, setSort } = useSort<SortKey>("actividad", "desc");
   const [pageSize, setPageSize] = useState(10);
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(COLUMNS.map((column) => column.id));
   const [creating, setCreating] = useState(false);
 
   // Bulk actions state
   const [bulkModal, setBulkModal] = useState<BulkModalMode | null>(null);
 
   const debouncedSearch = useDebouncedValue(search).trim();
-
-  function isVisible(id: string) {
-    return visibleColumns.includes(id);
-  }
 
   function loadDepartments() {
     setReferenceError(null);
@@ -116,7 +110,7 @@ export function TasksPage() {
     [departments],
   );
 
-  const { data, error, setPage, refresh } = usePagedList<TaskQuery, TaskListResponse>({
+  const { data, isStale, error, setPage, refresh } = usePagedList<TaskQuery, TaskListResponse>({
     fetch: tasksApi.list,
     criteria: {
       pageSize,
@@ -131,7 +125,8 @@ export function TasksPage() {
     fallbackError: "No se pudieron cargar las tareas",
   });
 
-  const rows = useMemo(() => data?.items ?? [], [data?.items]);
+  const listLoading = data === null || isStale;
+  const rows = useMemo(() => (isStale ? [] : (data?.items ?? [])), [data?.items, isStale]);
   const counts = data?.counts;
 
   // Multi-row selection
@@ -153,6 +148,14 @@ export function TasksPage() {
     setSearch("");
     setChip("todas");
     clearNarrowFilters();
+  }
+
+  const sortValue = `${sort.key}:${sort.dir}`;
+  function handleSortChange(next: string) {
+    const [nextKey, nextDir] = next.split(":") as [SortKey, SortDir];
+    if (nextKey && (nextDir === "asc" || nextDir === "desc")) {
+      setSort({ key: nextKey, dir: nextDir });
+    }
   }
 
   // Bulk actions definition
@@ -300,56 +303,56 @@ export function TasksPage() {
             : undefined
         }
         toolbar={
-          <div className="flex w-full flex-wrap items-center gap-2">
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              placeholder="Buscar por título, instrucciones, asignado o cliente…"
-              className="w-[280px]"
-            />
-            <FilterDropdown
-              title="Seleccionar departamento"
-              aria-label="Filtrar por departamento"
-              value={departmentId}
-              onChange={setDepartmentId}
-              searchable
-              searchPlaceholder="Buscar departamento…"
-              defaultIcon={<Building2 className="h-3.5 w-3.5 text-zinc-500" />}
-              options={departmentOptions}
-            />
-            <FilterDropdown
-              title="Seleccionar prioridad"
-              aria-label="Filtrar por prioridad"
-              value={priority}
-              onChange={setPriority}
-              defaultIcon={<Flag className="h-3.5 w-3.5 text-zinc-500" />}
-              options={[
-                { value: "todos", label: "Todas las prioridades" },
-                { value: "Emergencia", label: "Emergencia" },
-                { value: "Alta", label: "Alta" },
-                { value: "Normal", label: "Normal" },
-                { value: "Baja", label: "Baja" },
-              ]}
-            />
-            <FilterDropdown
-              title="Seleccionar estado"
-              aria-label="Filtrar por estado"
-              value={status}
-              onChange={setStatus}
-              defaultIcon={<ListTodo className="h-3.5 w-3.5 text-zinc-500" />}
-              options={TASK_STATUS_FILTER_OPTIONS}
-            />
-            {(search || narrowFilters > 0) && (
-              <ClearFiltersButton onClick={() => { setSearch(""); clearNarrowFilters(); }} />
-            )}
-            <div className="ml-auto">
-              <ColumnPicker columns={COLUMNS} visible={visibleColumns} onChange={setVisibleColumns} label="Columnas" />
+          <div className="flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Buscar por título, instrucciones, asignado o cliente…"
+                className="w-[280px]"
+              />
+              <FilterDropdown
+                title="Seleccionar departamento"
+                aria-label="Filtrar por departamento"
+                value={departmentId}
+                onChange={setDepartmentId}
+                searchable
+                searchPlaceholder="Buscar departamento…"
+                defaultIcon={<Building2 className="h-3.5 w-3.5 text-zinc-500" />}
+                options={departmentOptions}
+              />
+              <FilterDropdown
+                title="Seleccionar prioridad"
+                aria-label="Filtrar por prioridad"
+                value={priority}
+                onChange={setPriority}
+                defaultIcon={priorityFilterDefaultIcon}
+                options={priorityFilterOptions("h-3.5 w-3.5", "todos")}
+              />
+              <FilterDropdown
+                title="Seleccionar estado"
+                aria-label="Filtrar por estado"
+                value={status}
+                onChange={setStatus}
+                defaultIcon={<ListTodo className="h-3.5 w-3.5 text-zinc-500" />}
+                options={TASK_STATUS_FILTER_OPTIONS}
+              />
+              {(search || narrowFilters > 0) && (
+                <ClearFiltersButton onClick={() => { setSearch(""); clearNarrowFilters(); }} />
+              )}
             </div>
+            <ListSortMenu
+              sortValue={sortValue}
+              sortOptions={taskSortOptions}
+              onSortChange={handleSortChange}
+              menuAriaLabel="Ordenar tareas"
+            />
           </div>
         }
         footer={
           data !== null && (
             <Pagination
+              loading={listLoading}
               page={data.page}
               pageSize={data.pageSize}
               total={data.total}
@@ -361,7 +364,7 @@ export function TasksPage() {
           )
         }
       >
-        {data === null ? (
+        {listLoading ? (
           error === null && <TableSkeleton rows={pageSize} columns={9} />
         ) : rows.length === 0 ? (
           <EmptyResult
@@ -381,13 +384,13 @@ export function TasksPage() {
                     />
                   </Th>
                   <Th sort={sortOf("titulo")}>Tarea</Th>
-                  {isVisible("asignado") && <Th>Asignado</Th>}
-                  {isVisible("departamento") && <Th sort={sortOf("departamento")}>Departamento</Th>}
-                  {isVisible("prioridad") && <Th sort={sortOf("prioridad")}>Prioridad</Th>}
-                  {isVisible("estado") && <Th sort={sortOf("estado")}>Estado</Th>}
-                  {isVisible("cliente") && <Th>Cliente</Th>}
-                  {isVisible("limite") && <Th sort={sortOf("limite")}>Fecha límite</Th>}
-                  {isVisible("origen") && <Th>Canal</Th>}
+                  <Th>Asignado</Th>
+                  <Th sort={sortOf("departamento")}>Departamento</Th>
+                  <Th sort={sortOf("prioridad")}>Prioridad</Th>
+                  <Th sort={sortOf("estado")}>Estado</Th>
+                  <Th>Cliente</Th>
+                  <Th sort={sortOf("limite")}>Fecha límite</Th>
+                  <Th>Canal</Th>
                 </HeadRow>
               </thead>
               <tbody>
@@ -415,47 +418,37 @@ export function TasksPage() {
                           <span className="text-[12px] tabular-nums text-brand-gray">{task.number}</span>
                         </Link>
                       </Td>
-                      {isVisible("asignado") && (
-                        <Td>
-                          {task.assignedStaffName ? (
-                            <span className="inline-flex items-center gap-2">
-                              <Avatar name={task.assignedStaffName} seed={task.assignedStaffId ?? task.id} size={22} />
-                              <span className="whitespace-nowrap text-[12.5px] text-zinc-800">{task.assignedStaffName}</span>
-                            </span>
-                          ) : (
-                            <span className="text-[12.5px] text-zinc-400">Sin asignar</span>
-                          )}
-                        </Td>
-                      )}
-                      {isVisible("departamento") && (
-                        <Td>
-                          <span className="text-[12.5px] text-zinc-700">
-                            {departmentPathById.get(task.departmentId) ?? task.departmentName}
+                      <Td>
+                        {task.assignedStaffName ? (
+                          <span className="inline-flex items-center gap-2">
+                            <Avatar name={task.assignedStaffName} seed={task.assignedStaffId ?? task.id} size={22} />
+                            <span className="whitespace-nowrap text-[12.5px] text-zinc-800">{task.assignedStaffName}</span>
                           </span>
-                        </Td>
-                      )}
-                      {isVisible("prioridad") && <Td><PriorityCell priority={task.priority} /></Td>}
-                      {isVisible("estado") && <Td><TaskStatusCell status={task.status} /></Td>}
-                      {isVisible("cliente") && (
-                        <Td>
-                          <span className="text-[12.5px] text-zinc-700">{task.clientName ?? "—"}</span>
-                        </Td>
-                      )}
-                      {isVisible("limite") && (
-                        <Td>
-                          <span className={`text-[12.5px] tabular-nums ${task.isOverdue ? "font-medium text-red-700" : "text-zinc-600"}`}>
-                            {formatDue(task.dueDate)}
-                          </span>
-                          {task.isOverdue && <span className="ml-1.5 text-[11px] font-medium text-red-700">Vencida</span>}
-                        </Td>
-                      )}
-                      {isVisible("origen") && (
-                        <Td>
-                          <span className="text-[12.5px] text-zinc-600" title={formatDateTime(task.createdAt)}>
-                            {task.origin === "Correo" ? "Correo" : "Manual"}
-                          </span>
-                        </Td>
-                      )}
+                        ) : (
+                          <span className="text-[12.5px] text-zinc-400">Sin asignar</span>
+                        )}
+                      </Td>
+                      <Td>
+                        <span className="text-[12.5px] text-zinc-700">
+                          {departmentPathById.get(task.departmentId) ?? task.departmentName}
+                        </span>
+                      </Td>
+                      <Td><PriorityCell priority={task.priority} /></Td>
+                      <Td><TaskStatusCell status={task.status} /></Td>
+                      <Td>
+                        <span className="text-[12.5px] text-zinc-700">{task.clientName ?? "—"}</span>
+                      </Td>
+                      <Td>
+                        <span className={`text-[12.5px] tabular-nums ${task.isOverdue ? "font-medium text-red-700" : "text-zinc-600"}`}>
+                          {formatDue(task.dueDate)}
+                        </span>
+                        {task.isOverdue && <span className="ml-1.5 text-[11px] font-medium text-red-700">Vencida</span>}
+                      </Td>
+                      <Td>
+                        <span className="text-[12.5px] text-zinc-600" title={formatDateTime(task.createdAt)}>
+                          {task.origin === "Correo" ? "Correo" : "Manual"}
+                        </span>
+                      </Td>
                     </Row>
                   );
                 })}

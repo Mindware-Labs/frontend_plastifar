@@ -5,7 +5,6 @@ import { productLinesApi } from "../api/productLines";
 import { rolesApi } from "../api/roles";
 import { settingsApi } from "../api/settings";
 import { staffApi } from "../api/staff";
-import { territoriesApi } from "../api/territories";
 import { ticketTopicsApi } from "../api/ticketTopics";
 import { queryClient } from "./queryClient";
 
@@ -15,7 +14,7 @@ import { queryClient } from "./queryClient";
  * ------------------------------------------------------------------
  * EL PROBLEMA QUE RESUELVE
  * ------------------------------------------------------------------
- * Plantas, lineas de producto, territorios, temas… se pedian enteros (todas
+ * Plantas, lineas de producto, temas… se pedian enteros (todas
  * las paginas) en cada pantalla y otra vez en cada modal que se abria encima:
  * Reclamaciones pedia las plantas al abrir la lista y otra vez al abrir el
  * formulario. Aqui cada catalogo tiene UNA clave: el primero que lo pide lo
@@ -49,13 +48,6 @@ export const catalogs = {
     queryOptions({
       queryKey: ["catalog", "product-lines"] as const,
       queryFn: () => fetchAllPages((page, pageSize) => productLinesApi.list({ page, pageSize })),
-      staleTime: CATALOG_STALE_TIME,
-    }),
-
-  territories: () =>
-    queryOptions({
-      queryKey: ["catalog", "territories"] as const,
-      queryFn: () => fetchAllPages((page, pageSize) => territoriesApi.list({ page, pageSize })),
       staleTime: CATALOG_STALE_TIME,
     }),
 
@@ -116,10 +108,6 @@ export function usePlantsCatalog() {
 
 export function useProductLinesCatalog() {
   return useQuery(catalogs.productLines());
-}
-
-export function useTerritoriesCatalog() {
-  return useQuery(catalogs.territories());
 }
 
 export function useActiveTicketTopicsCatalog() {

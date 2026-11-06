@@ -1,10 +1,14 @@
 import {
   AlertCircle,
-  Building,
+  BarChart3,
+  Building2,
   Check,
   CheckCheck,
   FileWarning,
+  Inbox,
   Layers,
+  LayoutGrid,
+  ListTodo,
   Lock,
   PackageMinus,
   PackageSearch,
@@ -15,14 +19,16 @@ import {
   ShieldCheck,
   Ticket,
   Users,
+  type LucideIcon,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { ApiError } from "../../api/client";
 import { rolesApi } from "../../api/roles";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { Drawer } from "../../components/ui/Drawer";
+import { FormLineTabStrip, formLineTabIndexAttr } from "../../components/ui/FormLineTabStrip";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Spinner } from "../../components/ui/Spinner";
 import { flattenPermissions } from "../../lib/permissionCatalog";
@@ -42,17 +48,63 @@ interface RolePermissionsDrawerProps {
   onEditRole?: (role: RoleResponse) => void;
 }
 
-const MODULE_ICONS: Record<string, React.ReactNode> = {
-  Personal: <Users className="h-4 w-4 text-blue-600" />,
-  Clientes: <Building className="h-4 w-4 text-emerald-600" />,
-  Tickets: <Ticket className="h-4 w-4 text-indigo-600" />,
-  Calidad: <ShieldCheck className="h-4 w-4 text-amber-600" />,
-  Reclamaciones: <FileWarning className="h-4 w-4 text-rose-600" />,
-  Discrepancias: <PackageSearch className="h-4 w-4 text-purple-600" />,
-  "Retiros de mercancía": <PackageMinus className="h-4 w-4 text-orange-600" />,
-  Retiros: <PackageMinus className="h-4 w-4 text-orange-600" />,
-  Reportes: <Layers className="h-4 w-4 text-cyan-600" />,
-  Configuración: <Settings className="h-4 w-4 text-zinc-600" />,
+/** Iconos alineados con PermissionCatalog.cs y la barra lateral. */
+const MODULE_ICON_META: Record<string, { Icon: LucideIcon; tone: string }> = {
+  todos: { Icon: LayoutGrid, tone: "text-zinc-500" },
+  Personal: { Icon: Users, tone: "text-blue-600" },
+  "Departamentos y Sedes": { Icon: Building2, tone: "text-sky-600" },
+  Clientes: { Icon: Building2, tone: "text-emerald-600" },
+  Correo: { Icon: Inbox, tone: "text-violet-600" },
+  Tickets: { Icon: Ticket, tone: "text-indigo-600" },
+  Calidad: { Icon: ShieldCheck, tone: "text-amber-600" },
+  Reclamaciones: { Icon: FileWarning, tone: "text-rose-600" },
+  "Discrepancias de carga": { Icon: PackageSearch, tone: "text-purple-600" },
+  Discrepancias: { Icon: PackageSearch, tone: "text-purple-600" },
+  Retiros: { Icon: PackageMinus, tone: "text-orange-600" },
+  Tareas: { Icon: ListTodo, tone: "text-teal-600" },
+  Reportes: { Icon: BarChart3, tone: "text-cyan-600" },
+  Configuración: { Icon: Settings, tone: "text-zinc-600" },
+};
+
+function moduleIconMeta(module: string) {
+  return MODULE_ICON_META[module] ?? { Icon: Layers, tone: "text-zinc-500" };
+}
+
+function ModuleTabIcon({ module, selected }: { module: string; selected: boolean }) {
+  const { Icon, tone } = moduleIconMeta(module);
+  return (
+    <Icon
+      className={`h-3.5 w-3.5 shrink-0 ${selected ? "text-brand-red" : tone}`}
+      aria-hidden
+    />
+  );
+}
+
+function ModuleHeaderIcon({ module }: { module: string }) {
+  const { Icon, tone } = moduleIconMeta(module);
+  return <Icon className={`h-3.5 w-3.5 ${tone}`} aria-hidden />;
+}
+
+const rolePermissionTabClass = (selected: boolean) =>
+  `inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-1 text-[11.5px] font-medium transition-colors duration-150 cursor-pointer ${
+    selected
+      ? "border-brand-red/30 bg-brand-red/10 text-brand-red shadow-2xs font-semibold"
+      : "border-zinc-200/90 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
+  }`;
+
+/** Acciones masivas junto al buscador (altura alineada con SearchInput). */
+const bulkGrantRevokeBtnClass =
+  "inline-flex h-7 items-center gap-0.5 rounded-md px-1.5 text-[10.5px] font-medium leading-none text-zinc-600 transition-colors hover:bg-white hover:text-zinc-900 disabled:pointer-events-none disabled:opacity-35 cursor-pointer";
+
+const rolePermissionTabBadgeClass = (selected: boolean, complete: boolean) => {
+  if (complete) {
+    return selected
+      ? "bg-brand-red/15 font-semibold text-brand-red"
+      : "bg-emerald-100 font-semibold text-emerald-800";
+  }
+  return selected
+    ? "bg-brand-red/10 font-medium text-brand-red/90"
+    : "bg-zinc-100 font-medium text-zinc-600 ring-1 ring-inset ring-zinc-200/70";
 };
 
 export function RolePermissionsDrawer({
@@ -234,6 +286,28 @@ export function RolePermissionsDrawer({
       .filter((group) => group.permissions.length > 0);
   }, [matrix, selectedModule, search]);
 
+  const moduleTabs = useMemo(() => {
+    const todos = { id: "todos", module: "todos" as const, label: "Todos" };
+    if (!matrix) return [todos];
+    return [todos, ...matrix.groups.map((g) => ({ id: g.module, module: g.module, label: g.module }))];
+  }, [matrix]);
+
+  const activeTabIndex = Math.max(
+    0,
+    moduleTabs.findIndex((t) => t.module === selectedModule),
+  );
+
+  const moduleGrantedCount = useCallback(
+    (moduleName: string, permissionCount: number) => {
+      if (moduleName === "todos") return grantedCount;
+      if (isSystem) return permissionCount;
+      const group = matrix?.groups.find((g) => g.module === moduleName);
+      if (!group) return 0;
+      return group.permissions.filter((p) => grants.includes(p.key)).length;
+    },
+    [grantedCount, grants, isSystem, matrix?.groups],
+  );
+
   function handleCloseRequest() {
     if (hasChanges) {
       setConfirmDiscard(true);
@@ -249,23 +323,24 @@ export function RolePermissionsDrawer({
         onClose={handleCloseRequest}
         size="xl"
         footer={
-          <div className="flex w-full items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-[12px] text-zinc-500">
+          <div className="flex w-full flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0 text-[12px] text-subtle">
               {isSystem ? (
-                <span className="flex items-center gap-1.5 text-zinc-500">
-                  <Lock className="h-3.5 w-3.5 text-zinc-400" />
+                <span className="inline-flex items-center gap-1.5">
+                  <Lock className="h-3.5 w-3.5 shrink-0 text-faint" />
                   Rol protegido del sistema (solo lectura)
                 </span>
               ) : hasChanges ? (
-                <span className="font-medium text-amber-700 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200/80">
-                  {dirtyChanges.total} {dirtyChanges.total === 1 ? "cambio pendiente" : "cambios pendientes"}
+                <span className="inline-flex items-center rounded-edge border border-amber-200/80 bg-amber-50 px-2 py-0.5 font-medium text-amber-800">
+                  {dirtyChanges.total}{" "}
+                  {dirtyChanges.total === 1 ? "cambio pendiente" : "cambios pendientes"}
                 </span>
               ) : (
-                <span className="text-zinc-400">Sin cambios pendientes</span>
+                <span className="text-faint">Sin cambios pendientes</span>
               )}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               <Button type="button" variant="secondary" size="sm" onClick={handleCloseRequest}>
                 {hasChanges ? "Cancelar" : "Cerrar"}
               </Button>
@@ -350,94 +425,78 @@ export function RolePermissionsDrawer({
             )}
           </div>
 
-          {/* Barra de herramientas: Búsqueda y Filtros de Módulo */}
-          <div className="flex flex-col gap-2.5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="relative flex-1 min-w-[200px]">
-                <SearchInput
-                  value={search}
-                  onChange={setSearch}
-                  placeholder="Buscar permiso por nombre, clave o descripción…"
-                  className="w-full text-xs"
-                />
-              </div>
-
+          {/* Búsqueda + acciones masivas + módulos */}
+          <div className="flex flex-col gap-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Buscar permiso…"
+                className="min-w-0 flex-1"
+              />
               {!isSystem && (
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div
+                  className="flex h-8 shrink-0 items-center gap-px rounded-lg border border-zinc-200/90 bg-zinc-50/90 p-0.5 shadow-2xs"
+                  role="group"
+                  aria-label="Acciones masivas sobre permisos"
+                >
                   <button
                     type="button"
                     onClick={grantAll}
                     disabled={grantedCount === totalCatalogCount}
-                    className="inline-flex h-8 items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2.5 text-[11.5px] font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer shadow-2xs"
+                    className={bulkGrantRevokeBtnClass}
+                    title="Conceder todos los permisos"
                   >
-                    <CheckCheck className="h-3.5 w-3.5 text-emerald-600" />
-                    <span>Conceder todos</span>
+                    <CheckCheck className="h-3 w-3 shrink-0 text-emerald-600" aria-hidden />
+                    Conceder todos
                   </button>
+                  <span aria-hidden className="h-4 w-px shrink-0 bg-zinc-200/90" />
                   <button
                     type="button"
                     onClick={revokeAll}
                     disabled={grantedCount === 0}
-                    className="inline-flex h-8 items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2.5 text-[11.5px] font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer shadow-2xs"
+                    className={bulkGrantRevokeBtnClass}
+                    title="Quitar todos los permisos"
                   >
-                    <RotateCcw className="h-3.5 w-3.5 text-zinc-400" />
-                    <span>Limpiar</span>
+                    <RotateCcw className="h-3 w-3 shrink-0 text-zinc-400" aria-hidden />
+                    Limpiar
                   </button>
                 </div>
               )}
             </div>
 
-            {/* Selector horizontal de módulos */}
             {matrix && (
-              <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none">
-                <button
-                  type="button"
-                  onClick={() => setSelectedModule("todos")}
-                  className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1 text-[11.5px] font-medium transition-colors cursor-pointer ${
-                    selectedModule === "todos"
-                      ? "bg-zinc-900 text-white font-semibold"
-                      : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-900"
-                  }`}
-                >
-                  <span>Todos</span>
-                  <span className="opacity-75 text-[10px]">({totalCatalogCount})</span>
-                </button>
-
-                {matrix.groups.map((group) => {
-                  const isSelected = selectedModule === group.module;
-                  const groupGrantedCount = isSystem
-                    ? group.permissions.length
-                    : group.permissions.filter((p) => grants.includes(p.key)).length;
+              <FormLineTabStrip activeIndex={activeTabIndex} tabCount={moduleTabs.length}>
+                {moduleTabs.map((tab, index) => {
+                  const isSelected = selectedModule === tab.module;
+                  const permTotal =
+                    tab.module === "todos"
+                      ? totalCatalogCount
+                      : matrix.groups.find((g) => g.module === tab.module)?.permissions.length ?? 0;
+                  const granted = moduleGrantedCount(tab.module, permTotal);
 
                   return (
                     <button
-                      key={group.module}
+                      key={tab.id}
                       type="button"
-                      onClick={() => setSelectedModule(group.module)}
-                      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1 text-[11.5px] font-medium transition-colors cursor-pointer ${
-                        isSelected
-                          ? "bg-zinc-900 text-white font-semibold"
-                          : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-900"
-                      }`}
+                      {...formLineTabIndexAttr(index)}
+                      onClick={() => setSelectedModule(tab.module)}
+                      className={rolePermissionTabClass(isSelected)}
                     >
-                      <span className="shrink-0">{MODULE_ICONS[group.module]}</span>
-                      <span>{group.module}</span>
+                      <ModuleTabIcon module={tab.module} selected={isSelected} />
+                      <span>{tab.label}</span>
                       <span
-                        className={`text-[10px] rounded-full px-1.5 py-0.2 ${
-                          groupGrantedCount === group.permissions.length && groupGrantedCount > 0
-                            ? isSelected
-                              ? "bg-emerald-500 text-white font-bold"
-                              : "bg-emerald-100 text-emerald-800 font-bold"
-                            : isSelected
-                            ? "bg-white/20 text-white"
-                            : "bg-zinc-200 text-zinc-600"
-                        }`}
+                        className={`rounded-full px-1.5 py-px text-[10px] tabular-nums ${rolePermissionTabBadgeClass(
+                          isSelected,
+                          granted === permTotal && granted > 0,
+                        )}`}
                       >
-                        {groupGrantedCount}/{group.permissions.length}
+                        {tab.module === "todos" ? permTotal : `${granted}/${permTotal}`}
                       </span>
                     </button>
                   );
                 })}
-              </div>
+              </FormLineTabStrip>
             )}
           </div>
 
@@ -472,12 +531,10 @@ export function RolePermissionsDrawer({
                     className="overflow-hidden rounded-xl border border-zinc-200/80 bg-white shadow-2xs"
                   >
                     {/* Cabecera del Módulo */}
-                    <div className="flex items-center justify-between border-b border-zinc-100 bg-zinc-50/80 px-4 py-2.5">
+                    <div className="flex items-center justify-between border-b border-line bg-fill px-4 py-2.5">
                       <div className="flex items-center gap-2">
                         <div className="flex h-6 w-6 items-center justify-center rounded-md bg-white border border-zinc-200/80 shadow-2xs">
-                          {MODULE_ICONS[group.module] ?? (
-                            <Layers className="h-3.5 w-3.5 text-zinc-500" />
-                          )}
+                          <ModuleHeaderIcon module={group.module} />
                         </div>
                         <h3 className="font-heading text-[13px] font-bold text-zinc-900 tracking-tight">
                           {group.module}
@@ -500,7 +557,7 @@ export function RolePermissionsDrawer({
                           <button
                             type="button"
                             onClick={() => (isAllGranted ? revokeModule(group) : grantModule(group))}
-                            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50 transition-colors cursor-pointer"
+                            className="inline-flex items-center gap-1 rounded-edge px-2 py-1 text-[11px] font-semibold text-subtle transition-colors hover:bg-white hover:text-ink cursor-pointer"
                           >
                             {isAllGranted ? (
                               <span>Revocar módulo</span>
@@ -527,8 +584,8 @@ export function RolePermissionsDrawer({
                             className={`group flex items-start gap-3 px-4 py-3 transition-colors ${
                               isSystem
                                 ? "cursor-default"
-                                : "cursor-pointer hover:bg-zinc-50/80"
-                            } ${isGranted ? "bg-zinc-50/30" : ""}`}
+                                : "cursor-pointer hover:bg-fill"
+                            } ${isGranted ? "bg-fill/40" : ""}`}
                           >
                             {/* Control interactivo (Checkbox / Check indicator) */}
                             <div className="pt-0.5">
@@ -559,10 +616,6 @@ export function RolePermissionsDrawer({
                                 >
                                   {p.label}
                                 </span>
-
-                                <code className="rounded border border-zinc-200 bg-zinc-100 px-1.5 py-0.2 font-mono text-[10.5px] text-zinc-500">
-                                  {p.key}
-                                </code>
 
                                 {p.reserved && (
                                   <span className="rounded-full bg-amber-100 px-1.5 py-0.2 text-[9.5px] font-bold text-amber-800">

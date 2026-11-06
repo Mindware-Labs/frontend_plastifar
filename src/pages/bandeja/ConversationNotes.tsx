@@ -21,6 +21,7 @@ import {
 import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
 import { useAuth } from "../../context/useAuth";
+import { useReceipts } from "../../context/useReceipts";
 import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
 import type { EmailNoteResponse } from "../../types/api";
 import { InternalNoteThread } from "../../components/notes/InternalNoteThread";
@@ -76,6 +77,7 @@ function formatNoteTime(iso: string): string {
 export const ConversationNotes = forwardRef<ConversationNotesHandle, ConversationNotesProps>(
   function ConversationNotes({ emailId, onNotesCountChange }, ref) {
   const { user } = useAuth();
+  const receipts = useReceipts();
   const [notes, setNotes] = useState<EmailNoteResponse[] | null>(null);
   const [open, setOpen] = useState(false);
   const [originX, setOriginX] = useState(0);
@@ -202,6 +204,7 @@ export const ConversationNotes = forwardRef<ConversationNotesHandle, Conversatio
       const nextNotes = [...(notes ?? []), newNote];
       setNotes(nextNotes);
       onNotesCountChange?.(nextNotes.length);
+      receipts.done({ action: "agregar-nota", title: "Nota agregada" });
       closeAddForm();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo guardar la nota");
@@ -356,6 +359,7 @@ export const ConversationNotes = forwardRef<ConversationNotesHandle, Conversatio
               canReply={Boolean(user)}
               onReply={async (parentId, body) => {
                 const created = await emailsApi.addNote(emailId, body, parentId);
+                receipts.done({ action: "responder-nota", title: "Respuesta agregada" });
                 setNotes((prev) => {
                   const list = prev ?? [];
                   const next = mergeNotes(list, [created]);
@@ -428,6 +432,7 @@ interface AddNotePanelProps {
 
 /** El creador se mantiene al pie de la conversacion, donde estaba antes. */
 export function AddNotePanel({ emailId, onNoteAdded }: AddNotePanelProps) {
+  const receipts = useReceipts();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -481,6 +486,7 @@ export function AddNotePanel({ emailId, onNoteAdded }: AddNotePanelProps) {
     setError(null);
     try {
       const newNote = await emailsApi.addNote(emailId, body);
+      receipts.done({ action: "agregar-nota", title: "Nota agregada" });
       closeForm(() => onNoteAdded(newNote));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo guardar la nota");
@@ -490,26 +496,26 @@ export function AddNotePanel({ emailId, onNoteAdded }: AddNotePanelProps) {
   }
 
   return (
-    <div className="shrink-0 border-t border-zinc-200/80 bg-zinc-50/50">
+    <div className="shrink-0 border-t border-zinc-100 bg-white">
       <button
         type="button"
         onClick={toggleForm}
-        className="group flex w-full items-center gap-2.5 px-4 py-2 text-left outline-none transition-colors hover:bg-zinc-100/70 select-none cursor-pointer"
+        className="group flex w-full items-center justify-between px-4 py-2 text-left outline-none transition-colors hover:bg-zinc-50/80 select-none cursor-pointer"
       >
-        <div className="flex size-5.5 shrink-0 items-center justify-center rounded-md bg-amber-100/90 text-amber-700 shadow-2xs">
-          <StickyNote className="h-3 w-3" />
+        <div className="flex items-center gap-2 text-zinc-500 group-hover:text-zinc-800 transition-colors">
+          <StickyNote className="size-3.5 text-zinc-400 group-hover:text-zinc-600 transition-colors" />
+          <span className="text-[12px] font-medium">
+            {open ? "Cerrar nota interna" : "Agregar nota interna…"}
+          </span>
         </div>
-        <span className="font-heading text-[11px] font-bold uppercase tracking-wider text-zinc-600 group-hover:text-zinc-900 transition-colors">
-          Agregar nota interna
-        </span>
-        <span className="ml-auto rounded-md border border-zinc-200/80 bg-white px-2 py-0.5 text-[10.5px] font-semibold text-zinc-600 shadow-2xs group-hover:border-zinc-300 group-hover:text-zinc-900 transition-all">
-          {open || formMotion.isExiting(ADD_NOTE_PANEL_FORM_KEY) ? "Ocultar" : "Mostrar"}
+        <span className="text-[11px] font-medium text-zinc-400 group-hover:text-zinc-600 transition-colors">
+          {open ? "Ocultar" : "Ctrl+Enter"}
         </span>
       </button>
 
       {open && (
         <AppleMotionBlock phase={formMotion.phaseFor(ADD_NOTE_PANEL_FORM_KEY)} rowPreset="composer">
-          <div className="flex flex-col gap-2.5 px-4 pb-3.5 pt-1">
+          <div className="flex flex-col gap-2 px-4 pb-3 pt-0">
             <textarea
               ref={textareaRef}
               value={draft}

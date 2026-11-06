@@ -36,8 +36,8 @@ export function getAvailableTransitions(status: string): StatusTransitionOption[
         {
           target: "Solucionado",
           category: "veredicto",
-          label: "Marcar veredicto",
-          description: "Cierra el caso como resuelto.",
+          label: "Completar ticket",
+          description: "Cierra el caso como resuelto con su veredicto correspondiente.",
           icon: Gavel,
         },
         CANCEL_TRANSITION,
@@ -58,8 +58,8 @@ export function getAvailableTransitions(status: string): StatusTransitionOption[
         {
           target: "Solucionado",
           category: "veredicto",
-          label: "Marcar veredicto",
-          description: "Cierra el caso como resuelto.",
+          label: "Completar ticket",
+          description: "Cierra el caso como resuelto con su veredicto correspondiente.",
           icon: Gavel,
         },
         CANCEL_TRANSITION,

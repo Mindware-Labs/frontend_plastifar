@@ -139,7 +139,8 @@ export const emailsApi = {
   contactDirectory: () => apiRequest<ContactResponse[]>("/api/emails/contact-directory"),
 
   // El archivo llega con la sesion: se baja como blob y se entrega al navegador.
-  exportConversation: (id: number) => apiBlob(`/api/emails/${id}/export`),
+  exportConversation: (id: number, includeNotes: boolean = true) =>
+    apiBlob(`/api/emails/${id}/export?includeNotes=${includeNotes}`),
 
   staffOptions: () => apiRequest<StaffOptionResponse[]>("/api/staff/options"),
 

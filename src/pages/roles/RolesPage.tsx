@@ -1,6 +1,5 @@
 import { Ban, CheckCircle2, KeyRound, Lock, Pencil, Plus, ShieldCheck, Trash2, X } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ApiError } from "../../api/client";
 import { useSearchParams } from "react-router-dom";
 import { permissionsApi } from "../../api/permissions";
@@ -17,11 +16,12 @@ import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { SelectBox } from "../../components/ui/SelectBox";
-import { Spinner } from "../../components/ui/Spinner";
+import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useActionErrorReceipt, useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
+import { useReceipts } from "../../context/useReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { useTablePageSelection } from "../../hooks/useTablePageSelection";
 import type { RoleListResponse, RoleResponse } from "../../types/api";
@@ -59,6 +59,7 @@ export function RolesPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const receipts = useReceipts();
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(
     null,
   );
@@ -69,20 +70,21 @@ export function RolesPage() {
   const [permissionDrawerRole, setPermissionDrawerRole] = useState<RoleResponse | null>(null);
 
   // Catálogo completo de permisos en caché para el drawer
-  // Un fallo es silencioso: el drawer se queda sin catalogo, como antes.
-  const matrixQuery = useQuery({
-    queryKey: ["permissions", "matrix"],
-    queryFn: () => permissionsApi.matrix(),
-  });
-  const matrix: PermissionMatrixResponse | null = matrixQuery.data ?? null;
+  const [matrix, setMatrix] = useState<PermissionMatrixResponse | null>(null);
+
+  useEffect(() => {
+    permissionsApi
+      .matrix()
+      .then(setMatrix)
+      .catch(() => {});
+  }, []);
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("todos");
   const [pageSize, setPageSize] = useState(10);
   const debouncedSearch = useDebouncedValue(search).trim();
 
-  const { data, error, setPage, refresh } = usePagedList<RoleQuery, RoleListResponse>({
-    queryKey: ["roles"],
+  const { data, isStale, error, setPage, refresh } = usePagedList<RoleQuery, RoleListResponse>({
     fetch: rolesApi.list,
     criteria: { pageSize, search: debouncedSearch || undefined, status: filter },
     fallbackError: "No se pudieron cargar los roles",
@@ -91,7 +93,8 @@ export function RolesPage() {
   useLoadErrorReceipt(error, "roles-list", refresh);
   useActionErrorReceipt(actionError, "roles-action");
 
-  const rows = data?.items ?? [];
+  const listLoading = data === null || isStale;
+  const rows = isStale ? [] : (data?.items ?? []);
   const counts = data?.counts;
   const unfiltered = filter === "todos" && !debouncedSearch;
 
@@ -118,6 +121,13 @@ export function RolesPage() {
             ? `Se eliminaron ${result.updatedCount} de ${result.totalRequested}. ${skipped} omitidos (sistema, en uso o predeterminados en departamentos).`
             : `Se actualizaron ${result.updatedCount} de ${result.totalRequested}. Los roles del sistema se omiten.`,
         );
+      } else {
+        const titles = { activate: "Roles activados", deactivate: "Roles desactivados", delete: "Roles eliminados" };
+        receipts.done({
+          action: `${action}-roles-lote`,
+          title: titles[action],
+          detail: `${result.updatedCount} ${result.updatedCount === 1 ? "rol" : "roles"}`,
+        });
       }
       clearSelection();
       refresh();
@@ -132,30 +142,26 @@ export function RolesPage() {
     setConfirmation({
       tone: "warn",
       icon: CheckCircle2,
-      eyebrow: "Personal · Roles",
       title: `Activar ${selectedIds.size} roles`,
       description: "Los roles personalizados seleccionados volverán a poder asignarse.",
       confirmLabel: "Activar",
-      onConfirm: () => {
-        setConfirmation(null);
-        void runBulk("activate");
-      },
+      onConfirm: () => runBulk("activate"),
     });
   }
 
   function askBulkDeactivate() {
     setConfirmation({
-      tone: "danger",
+      tone: "warn",
       icon: Ban,
-      eyebrow: "Personal · Roles",
       title: `Desactivar ${selectedIds.size} roles`,
-      description:
-        "Quienes los tengan asignados perderán la sesión activa. Los roles del sistema no se modifican.",
+      description: (
+        <>
+          Quienes los tengan asignados perderán la sesión activa. Los roles del sistema no se
+          modifican.
+        </>
+      ),
       confirmLabel: "Desactivar",
-      onConfirm: () => {
-        setConfirmation(null);
-        void runBulk("deactivate");
-      },
+      onConfirm: () => runBulk("deactivate"),
     });
   }
 
@@ -163,15 +169,15 @@ export function RolesPage() {
     setConfirmation({
       tone: "danger",
       icon: Trash2,
-      eyebrow: "Personal · Roles",
       title: `Eliminar ${selectedIds.size} roles`,
-      description:
-        "Solo se borran los personalizados sin personal asignado ni uso como rol predeterminado. El resto se omitirá.",
+      description: (
+        <>
+          Solo se borran los personalizados sin personal asignado ni uso como rol predeterminado. El
+          resto se omitirá.
+        </>
+      ),
       confirmLabel: "Eliminar",
-      onConfirm: () => {
-        setConfirmation(null);
-        void runBulk("delete");
-      },
+      onConfirm: () => runBulk("delete"),
     });
   }
 
@@ -184,7 +190,6 @@ export function RolesPage() {
     setConfirmation({
       tone: "danger",
       icon: Trash2,
-      eyebrow: "Personal · Roles",
       title: "Eliminar rol",
       description: (
         <>
@@ -197,7 +202,14 @@ export function RolesPage() {
         setBusyId(role.id);
         try {
           await rolesApi.remove(role.id);
+          receipts.done({ action: "eliminar-rol", title: "Rol eliminado", detail: role.name });
           refresh();
+        } catch (err) {
+          receipts.failed({
+            action: "eliminar-rol",
+            title: "No se pudo eliminar el rol",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyId(null);
         }
@@ -240,20 +252,20 @@ export function RolesPage() {
     />
   );
 
-  // Si estamos en la pestaña de matriz de permisos, renderizamos la vista de matriz embebida
-  if (currentTab === "permisos") {
-    return (
-      <div className="flex h-full flex-col">
-        <PermissionsView
-          title="Roles y Permisos"
-          headerExtra={tabSwitcher}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="flex h-full flex-col">
+      <div
+        key={currentTab}
+        className="flex min-h-0 flex-1 flex-col animate-plf-apple-tab motion-reduce:animate-none"
+      >
+        {currentTab === "permisos" ? (
+          <PermissionsView
+            title="Roles y Permisos"
+            headerExtra={tabSwitcher}
+            onMatrixLoaded={setMatrix}
+          />
+        ) : (
+          <>
       <ModuleHeader
         title="Roles y Permisos"
         summary={
@@ -393,6 +405,7 @@ export function RolesPage() {
           footer={
             data !== null && data.total > 0 ? (
               <Pagination
+                loading={listLoading}
                 page={data.page}
                 pageSize={data.pageSize}
                 total={data.total}
@@ -404,10 +417,8 @@ export function RolesPage() {
             ) : undefined
           }
         >
-        {data === null ? (
-          <div className="flex justify-center py-16">
-            <Spinner />
-          </div>
+        {listLoading ? (
+          error === null && <TableSkeleton rows={pageSize} columns={6} />
         ) : (
           <div className="plf-results-in">
             <DataTable>
@@ -552,6 +563,9 @@ export function RolesPage() {
         )}
         </ListPanel>
       </div>
+          </>
+        )}
+      </div>
 
       {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}
 
@@ -560,6 +574,12 @@ export function RolesPage() {
           role={modal === "nuevo" ? undefined : modal}
           onClose={() => setModal(null)}
           onSaved={(savedRole) => {
+            const isEdit = modal !== "nuevo";
+            receipts.done({
+              action: isEdit ? "editar-rol" : "crear-rol",
+              title: isEdit ? "Rol actualizado" : "Rol creado exitosamente",
+              detail: savedRole.name,
+            });
             refresh();
             // Si acabamos de crear un rol nuevo, abrir directamente el drawer de permisos para asignarle
             if (modal === "nuevo") {
@@ -575,7 +595,8 @@ export function RolesPage() {
           role={permissionDrawerRole}
           matrix={matrix}
           onClose={() => setPermissionDrawerRole(null)}
-          onSaved={(_updated) => {
+          onSaved={(updated) => {
+            receipts.done({ action: "permisos-rol", title: "Permisos del rol actualizados", detail: updated.name });
             refresh();
             setPermissionDrawerRole(null);
           }}

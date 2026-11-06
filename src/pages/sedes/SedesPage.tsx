@@ -15,7 +15,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
-import { ClearFiltersButton, FilterDropdown } from "../../components/ui/FilterDropdown";
+import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
@@ -26,6 +26,7 @@ import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useActionErrorReceipt, useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
+import { useReceipts } from "../../context/useReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { useTablePageSelection } from "../../hooks/useTablePageSelection";
@@ -42,6 +43,7 @@ export function SedesPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const receipts = useReceipts();
   const [search, setSearch] = useState("");
   const [chip, setChip] = useState<ChipKey>("todos");
   const [pageSize, setPageSize] = useState(15);
@@ -51,7 +53,7 @@ export function SedesPage() {
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
-  const { data, error, page, setPage, refresh } = usePagedList<
+  const { data, isStale, error, page, setPage, refresh } = usePagedList<
     PagedSedeQuery,
     Awaited<ReturnType<typeof sedesApi.list>>
   >({
@@ -69,7 +71,8 @@ export function SedesPage() {
   useLoadErrorReceipt(error, "sedes-list", refresh);
   useActionErrorReceipt(actionError, "sedes-action");
 
-  const rows = data?.items ?? [];
+  const listLoading = data === null || isStale;
+  const rows = isStale ? [] : (data?.items ?? []);
   const counts = data?.counts;
   const isFiltering = debouncedSearch !== "" || chip !== "todos";
 
@@ -93,6 +96,13 @@ export function SedesPage() {
             ? `Se eliminaron ${result.updatedCount} de ${result.totalRequested}. ${skipped} tienen departamentos asignados.`
             : `Se actualizaron ${result.updatedCount} de ${result.totalRequested} sedes.`,
         );
+      } else {
+        const titles = { activate: "Sedes activadas", deactivate: "Sedes desactivadas", delete: "Sedes eliminadas" };
+        receipts.done({
+          action: `${action}-sedes-lote`,
+          title: titles[action],
+          detail: `${result.updatedCount} ${result.updatedCount === 1 ? "sede" : "sedes"}`,
+        });
       }
       clearSelection();
       refresh();
@@ -110,10 +120,7 @@ export function SedesPage() {
       title: `Reactivar ${selectedIds.size} sedes`,
       description: "Volverán a ofrecerse al asignar sede a un departamento.",
       confirmLabel: "Reactivar",
-      onConfirm: () => {
-        setConfirmation(null);
-        void runBulk("activate");
-      },
+      onConfirm: () => runBulk("activate"),
     });
   }
 
@@ -124,10 +131,7 @@ export function SedesPage() {
       title: `Desactivar ${selectedIds.size} sedes`,
       description: "Dejarán de ofrecerse en selectores; los departamentos que ya las usan las conservan.",
       confirmLabel: "Desactivar",
-      onConfirm: () => {
-        setConfirmation(null);
-        void runBulk("deactivate");
-      },
+      onConfirm: () => runBulk("deactivate"),
     });
   }
 
@@ -139,10 +143,7 @@ export function SedesPage() {
       description:
         "Solo se borran las que no tienen departamentos. Las demás se omitirán; desactívalas si no las necesitas.",
       confirmLabel: "Eliminar",
-      onConfirm: () => {
-        setConfirmation(null);
-        void runBulk("delete");
-      },
+      onConfirm: () => runBulk("delete"),
     });
   }
 
@@ -183,7 +184,18 @@ export function SedesPage() {
             address: current.address,
             isActive: !current.isActive,
           });
+          receipts.done({
+            action: current.isActive ? "reactivar-sede" : "desactivar-sede",
+            title: current.isActive ? "Sede desactivada" : "Sede reactivada",
+            detail: current.name,
+          });
           refresh();
+        } catch (err) {
+          receipts.failed({
+            action: "toggle-sede",
+            title: "No se pudo cambiar el estado de la sede",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyId(null);
         }
@@ -207,7 +219,14 @@ export function SedesPage() {
         setBusyId(sede.id);
         try {
           await sedesApi.remove(sede.id);
+          receipts.done({ action: "eliminar-sede", title: "Sede eliminada", detail: sede.name });
           refresh();
+        } catch (err) {
+          receipts.failed({
+            action: "eliminar-sede",
+            title: "No se pudo eliminar la sede",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyId(null);
         }
@@ -279,17 +298,6 @@ export function SedesPage() {
                   placeholder="Buscar sede por nombre o dirección…"
                   className="w-[260px] sm:w-[300px]"
                 />
-                <FilterDropdown
-                  title="Estado"
-                  aria-label="Filtrar por estado de la sede"
-                  value={chip}
-                  onChange={(next) => setChip(next as ChipKey)}
-                  options={[
-                    { value: "todos", label: "Todas las sedes" },
-                    { value: "activos", label: "Activas" },
-                    { value: "inactivos", label: "Inactivas" },
-                  ]}
-                />
                 {isFiltering && (
                   <ClearFiltersButton
                     onClick={() => {
@@ -335,6 +343,7 @@ export function SedesPage() {
           footer={
             data && data.total > 0 && (
               <Pagination
+                loading={listLoading}
                 page={page}
                 pageSize={pageSize}
                 total={data.total}
@@ -346,8 +355,8 @@ export function SedesPage() {
             )
           }
         >
-          {data === undefined ? (
-            !error && <TableSkeleton rows={6} columns={5} />
+          {listLoading ? (
+            error === null && <TableSkeleton rows={pageSize} columns={5} />
           ) : rows.length === 0 ? (
             <p className="py-14 text-center text-[13.5px] text-faint">
               {isFiltering
@@ -355,7 +364,8 @@ export function SedesPage() {
                 : "Todavía no hay ninguna sede registrada."}
             </p>
           ) : (
-            <DataTable>
+            <div className="plf-results-in">
+              <DataTable>
               <thead>
                 <HeadRow>
                   {canWrite && (
@@ -461,6 +471,7 @@ export function SedesPage() {
                 })}
               </tbody>
             </DataTable>
+            </div>
           )}
         </ListPanel>
       </div>
@@ -469,7 +480,15 @@ export function SedesPage() {
         <SedeModal
           sede={modal === "nuevo" ? undefined : modal}
           onClose={() => setModal(null)}
-          onSaved={() => refresh()}
+          onSaved={(saved) => {
+            const isEdit = modal !== "nuevo";
+            receipts.done({
+              action: isEdit ? "editar-sede" : "crear-sede",
+              title: isEdit ? "Sede actualizada" : "Sede creada exitosamente",
+              detail: saved.name,
+            });
+            refresh();
+          }}
         />
       )}
 

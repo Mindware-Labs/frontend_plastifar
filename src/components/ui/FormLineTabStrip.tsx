@@ -62,7 +62,22 @@ export function FormLineTabStrip({
     const el = scrollerRef.current;
     if (!el) return;
     const tab = el.querySelector<HTMLElement>(`[data-line-tab-index="${activeIndex}"]`);
-    tab?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+    if (!tab) return;
+
+    // Scroll exclusivamente horizontal dentro de la barra sin desplazar la ventana ni padres
+    const tabLeft = tab.offsetLeft;
+    const tabWidth = tab.offsetWidth;
+    const scrollLeft = el.scrollLeft;
+    const clientWidth = el.clientWidth;
+
+    if (tabLeft < scrollLeft) {
+      el.scrollTo({ left: Math.max(0, tabLeft - 12), behavior: "smooth" });
+    } else if (tabLeft + tabWidth > scrollLeft + clientWidth) {
+      el.scrollTo({
+        left: tabLeft + tabWidth - clientWidth + 12,
+        behavior: "smooth",
+      });
+    }
   }, [activeIndex, tabCount]);
 
   const scrollBy = (delta: number) => {

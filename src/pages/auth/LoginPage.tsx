@@ -1,12 +1,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CircleAlert, Lock, Mail, ShieldCheck } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { ShieldCheck } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { ApiError } from "../../api/client";
-import { AuthButton } from "../../components/auth/AuthButton";
-import { AuthField, AuthPasswordField } from "../../components/auth/AuthField";
+import { Alert } from "../../components/ui/Alert";
+import { Button } from "../../components/ui/Button";
+import { PasswordField, TextField, type FieldState } from "../../components/ui/Field";
 import { useAuth } from "../../context/useAuth";
 import { AuthLayout } from "../../layouts/AuthLayout";
 
@@ -35,11 +36,9 @@ export function LoginPage() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [attempt, setAttempt] = useState(0);
   const [settle, setSettle] = useState(false);
-  const [relayKey, setRelayKey] = useState(0);
   const [announcement, setAnnouncement] = useState("");
   const [stale, setStale] = useState<FormValues | null>(null);
   const [emailBlurError, setEmailBlurError] = useState<string | null>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!settle) return;
@@ -51,11 +50,17 @@ export function LoginPage() {
     register,
     handleSubmit,
     getValues,
-    formState: { errors, isSubmitting },
-  } = useForm<FormValues>({ resolver: zodResolver(schema) });
+    formState: { errors, touchedFields, isSubmitting },
+  } = useForm<FormValues>({ resolver: zodResolver(schema), mode: "onTouched" });
 
   const requested = (location.state as { from?: string } | null)?.from;
   const from = requested && requested.startsWith("/") && !requested.startsWith("//") ? requested : "/";
+
+  function stateOf(field: keyof FormValues): FieldState {
+    if (field === "email" && emailBlurError) return "error";
+    if (errors[field]) return "error";
+    return touchedFields[field] ? "valid" : "idle";
+  }
 
   function fail(next: Exclude<Phase, "idle">, values: FormValues, text: string) {
     setStale(values);
@@ -95,7 +100,6 @@ export function LoginPage() {
           : "Sigue sin coincidir. Puedes recuperar la contraseña desde el enlace.",
       );
       setSettle(true);
-      setRelayKey((k) => k + 1);
     }
   }
 
@@ -132,14 +136,11 @@ export function LoginPage() {
     emailReg.onChange(e);
     const val = e.target.value.trim();
 
-    // Si ya teníamos el mensaje de correo inválido activo:
     if (emailBlurError) {
       const result = z.string().email().safeParse(val);
       if (result.success) {
-        // En cuanto lo que escribe sea un correo válido, se quita el error y vuelve a 'Iniciar sesión'
         setEmailBlurError(null);
       } else {
-        // Si aún no es válido, se mantiene el mensaje correspondiente
         setEmailBlurError(val ? "Correo inválido" : "Ingresa tu correo");
       }
     }
@@ -151,7 +152,7 @@ export function LoginPage() {
   const staleEmail = stale?.email ?? "";
 
   let buttonTone: "primary" | "ink" = "primary";
-  let buttonToneLabel: React.ReactNode = undefined;
+  let buttonToneLabel: string | undefined;
   let isButtonDisabled = false;
 
   if (emailBlurError) {
@@ -171,88 +172,83 @@ export function LoginPage() {
       settle={settle}
       footer={
         <div className="space-y-4">
-          <div className="flex items-center justify-between text-[12px] text-zinc-500">
-            <span className="flex items-center gap-1.5 font-medium text-zinc-600">
+          <div className="flex items-center justify-between text-[12px] text-subtle">
+            <span className="flex items-center gap-1.5 font-medium text-ink">
               <ShieldCheck className="h-4 w-4 text-emerald-600" />
               Acceso seguro SSL
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-2.5 py-0.5 text-[11px] font-medium text-zinc-600">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-canvas px-2.5 py-0.5 text-[11px] font-medium text-subtle">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
               Uso interno
             </span>
           </div>
-          <p className="text-center text-[12.5px] leading-relaxed text-zinc-500">
+          <p className="text-center text-[12.5px] leading-relaxed text-subtle">
             ¿Aún no tienes acceso?{" "}
-            <span className="font-semibold text-zinc-800">Solicítalo a tu administrador.</span>
+            <span className="font-semibold text-ink">Solicítalo a tu administrador.</span>
           </p>
         </div>
       }
     >
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-5 sm:gap-5.5">
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-3.5">
         {phase === "limited" && (
-          <div className="flex items-start gap-2.5 rounded-xl border border-amber-200/90 bg-amber-50/80 p-3.5 text-[13px] text-amber-900 animate-plf-rise">
-            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden />
-            <div className="flex-1 leading-snug">
-              <span>Demasiados intentos de acceso.</span> Por seguridad, espera unos minutos o{" "}
-              <Link
-                to="/forgot-password"
-                state={{ email: staleEmail }}
-                className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800"
-              >
-                recupera tu contraseña
-              </Link>.
-            </div>
-          </div>
+          <Alert variant="info" className="text-[13px]">
+            <span className="font-medium">Demasiados intentos de acceso.</span> Por seguridad, espera unos minutos o{" "}
+            <Link
+              to="/forgot-password"
+              state={{ email: staleEmail }}
+              className="font-medium text-brand-red-dark underline underline-offset-2"
+            >
+              recupera tu contraseña
+            </Link>
+            .
+          </Alert>
         )}
 
         {phase === "deactivated" && (
-          <div className="flex items-start gap-2.5 rounded-xl border border-red-200/90 bg-red-50/80 p-3.5 text-[13px] text-red-900 animate-plf-rise">
-            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-brand-red" aria-hidden />
-            <div className="flex-1 leading-snug">
-              Esta cuenta ha sido desactivada. Solicita su reactivación al administrador de sistemas.
-            </div>
-          </div>
+          <Alert variant="error">
+            Esta cuenta ha sido desactivada. Solicita su reactivación al administrador de sistemas.
+          </Alert>
         )}
 
         {phase === "failed" && (
-          <div className="flex items-start gap-2.5 rounded-xl border border-red-200/90 bg-red-50/80 p-3.5 text-[13px] text-red-900 animate-plf-rise">
-            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-brand-red" aria-hidden />
-            <div className="flex-1 leading-snug">
-              No se pudo conectar con el servidor. Revisa tu conexión a la red e inténtalo de nuevo.
-            </div>
-          </div>
+          <Alert variant="error">
+            No se pudo conectar con el servidor. Revisa tu conexión a la red e inténtalo de nuevo.
+          </Alert>
         )}
 
-        <AuthField
+        <TextField
+          size="sm"
           label="Correo corporativo"
           placeholder="nombre@plastifar.com"
           type="email"
           inputMode="email"
           autoComplete="username"
           autoFocus
-          icon={<Mail className="h-[18px] w-[18px]" />}
-          hasError={Boolean(emailBlurError)}
+          required
+          state={stateOf("email")}
+          error={emailBlurError ?? errors.email?.message}
           {...emailReg}
           onChange={handleEmailChange}
           onBlur={handleEmailBlur}
         />
 
-        <AuthPasswordField
+        <PasswordField
           label="Contraseña"
           placeholder="••••••••"
           autoComplete="current-password"
-          icon={<Lock className="h-[18px] w-[18px]" />}
+          required
+          state={stateOf("password")}
           error={errors.password?.message}
-          relayFrom={buttonRef}
-          relayKey={relayKey}
-          action={
-            <Link
-              to="/forgot-password"
-              state={{ email: staleEmail || getValues("email") }}
-              className="text-[12.5px] font-medium text-zinc-500 transition-colors hover:text-brand-red hover:underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-red rounded"
-            >
-              ¿Olvidaste tu contraseña?
-            </Link>
+          hint={
+            <span className="flex justify-end">
+              <Link
+                to="/forgot-password"
+                state={{ email: staleEmail || getValues("email") }}
+                className="font-medium text-brand-red-dark hover:underline underline-offset-2"
+              >
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </span>
           }
           {...passwordReg}
           onChange={(e) => {
@@ -261,17 +257,16 @@ export function LoginPage() {
           }}
         />
 
-        <AuthButton
-          ref={buttonRef}
+        <Button
           type="submit"
           disabled={isButtonDisabled}
           isLoading={isSubmitting}
           tone={buttonTone}
           toneLabel={buttonToneLabel}
-          className="mt-2.5 sm:mt-3"
+          className="mt-1 w-full"
         >
           {isSubmitting ? "Iniciando sesión…" : "Iniciar sesión"}
-        </AuthButton>
+        </Button>
 
         <p role="status" aria-live="polite" className="sr-only">
           {announcement}

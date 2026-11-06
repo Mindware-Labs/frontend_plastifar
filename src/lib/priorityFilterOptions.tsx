@@ -3,11 +3,11 @@ import type { FilterOption } from "../components/ui/FilterDropdown";
 
 export const priorityFilterDefaultIcon = <Flag className="h-4 w-4 text-zinc-500" />;
 
-/** Opciones del filtro de prioridad (tickets, SLA, motivos). */
-export function priorityFilterOptions(iconClass = "h-4 w-4"): FilterOption[] {
+/** Opciones del filtro de prioridad (tickets, SLA, motivos, tareas). */
+export function priorityFilterOptions(iconClass = "h-4 w-4", allValue = "todas"): FilterOption[] {
   return [
     {
-      value: "todas",
+      value: allValue,
       label: "Todas las prioridades",
       icon: <Flag className={`${iconClass} text-zinc-500`} />,
     },

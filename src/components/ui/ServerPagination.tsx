@@ -7,17 +7,19 @@ interface ServerPaginationProps {
   onPageSizeChange: (pageSize: number) => void;
   noun: string;
   nounSingular?: string;
+  loading?: boolean;
 }
 
 /**
  * Pie de un listado paginado que pinta la pagina y el tamano tal como los
  * devolvio el servidor, y que se muestra aun sin resultados.
  */
-export function ServerPagination({ data, ...props }: ServerPaginationProps) {
+export function ServerPagination({ data, loading, ...props }: ServerPaginationProps) {
   if (data === null) return null;
   return (
     <Pagination
       {...props}
+      loading={loading}
       page={data.page}
       pageSize={data.pageSize}
       total={data.total}

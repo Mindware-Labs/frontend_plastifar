@@ -25,6 +25,7 @@ import { ListPanel } from "../../components/ui/ListPanel";
 import { Modal } from "../../components/ui/Modal";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
+import { SelectField } from "../../components/ui/Field";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { SelectBox } from "../../components/ui/SelectBox";
 import { TableSkeleton } from "../../components/ui/Skeleton";
@@ -40,6 +41,7 @@ import type {
   DepartmentType,
 } from "../../types/api";
 import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
+import { useReceipts } from "../../context/useReceipts";
 import { useReferenceData } from "../settings/catalogState";
 import { DepartmentModal } from "./DepartmentModal";
 
@@ -63,6 +65,7 @@ export function DepartmentsPage() {
   // Selección múltiple y acciones en lote
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const receipts = useReceipts();
   const [bulkSedeModalOpen, setBulkSedeModalOpen] = useState(false);
   const [selectedBulkSedeId, setSelectedBulkSedeId] = useState<string>("");
 
@@ -71,7 +74,7 @@ export function DepartmentsPage() {
   // Paginación real de servidor mediante usePagedList
   const {
     data,
-    // transición de página manejada en DataTable
+    isStale,
     error,
     page,
     setPage,
@@ -94,6 +97,9 @@ export function DepartmentsPage() {
     },
     fallbackError: "No se pudieron cargar los departamentos",
   });
+
+  const listLoading = data === null || isStale;
+  const rows = isStale ? [] : (data?.items ?? []);
 
   useLoadErrorReceipt(error, "departments-list", refresh);
 
@@ -133,8 +139,16 @@ export function DepartmentsPage() {
     return options;
   }, [sedesList]);
 
+  const bulkSedeOptions = useMemo(
+    () => [
+      { value: "", label: "Sin sede asignada" },
+      ...(sedesList?.items ?? []).map((s) => ({ value: String(s.id), label: s.name })),
+    ],
+    [sedesList],
+  );
+
   // Manejo de casillas de selección
-  const pageIds = useMemo(() => data?.items.map((d) => d.id) ?? [], [data?.items]);
+  const pageIds = useMemo(() => rows.map((d) => d.id), [rows]);
 
   const pageState: boolean | "mixed" = useMemo(() => {
     if (pageIds.length === 0) return false;
@@ -176,10 +190,26 @@ export function DepartmentsPage() {
         action,
         sedeId,
       });
+      const count = selectedIds.size;
+      const titles = {
+        activate: "Departamentos activados",
+        deactivate: "Departamentos desactivados",
+        "set-sede": "Sede asignada",
+        delete: "Departamentos eliminados",
+      };
+      receipts.done({
+        action: `${action}-departamentos-lote`,
+        title: titles[action],
+        detail: `${count} ${count === 1 ? "departamento" : "departamentos"}`,
+      });
       setSelectedIds(new Set());
       refresh();
     } catch (err) {
-      console.error(err);
+      receipts.failed({
+        action: `${action}-departamentos-lote`,
+        title: "No se pudo completar la acción en lote",
+        detail: err instanceof Error ? err.message : undefined,
+      });
     } finally {
       setBulkBusy(false);
     }
@@ -187,26 +217,33 @@ export function DepartmentsPage() {
 
   function askBulkActivate() {
     setConfirmation({
-      icon: Power,
+      tone: "warn",
+      icon: CheckCircle2,
       title: `Activar ${selectedIds.size} departamentos`,
-      description: `¿Deseas activar los ${selectedIds.size} departamentos seleccionados? Volverán a estar disponibles en la creación de tickets.`,
+      description: (
+        <>
+          Los <strong className="font-semibold text-ink">{selectedIds.size}</strong> departamentos
+          seleccionados volverán a estar disponibles al asignar personal y encolar tickets.
+        </>
+      ),
       confirmLabel: "Activar",
-      onConfirm: async () => {
-        await runBulk("activate");
-      },
+      onConfirm: () => runBulk("activate"),
     });
   }
 
   function askBulkDeactivate() {
     setConfirmation({
       tone: "warn",
-      icon: Power,
+      icon: Ban,
       title: `Desactivar ${selectedIds.size} departamentos`,
-      description: `¿Estás seguro de que deseas desactivar los ${selectedIds.size} departamentos seleccionados? Ya no se ofrecerán al asignar tickets.`,
+      description: (
+        <>
+          Dejarán de ofrecerse al asignar tickets nuevos. Quien ya los tenga asignados los
+          conserva.
+        </>
+      ),
       confirmLabel: "Desactivar",
-      onConfirm: async () => {
-        await runBulk("deactivate");
-      },
+      onConfirm: () => runBulk("deactivate"),
     });
   }
 
@@ -215,11 +252,14 @@ export function DepartmentsPage() {
       tone: "danger",
       icon: Trash2,
       title: `Eliminar ${selectedIds.size} departamentos`,
-      description: `¿Estás seguro de que deseas eliminar los ${selectedIds.size} departamentos seleccionados? Sólo se eliminarán los que no tengan colaboradores asociados.`,
+      description: (
+        <>
+          Solo se eliminan los que no tengan colaboradores asociados. El resto se omitirá; desactívalos
+          si ya no los necesitas.
+        </>
+      ),
       confirmLabel: "Eliminar seleccionados",
-      onConfirm: async () => {
-        await runBulk("delete");
-      },
+      onConfirm: () => runBulk("delete"),
     });
   }
 
@@ -229,7 +269,7 @@ export function DepartmentsPage() {
   function askToggle(department: DepartmentResponse) {
     setConfirmation({
       tone: "warn",
-      icon: Power,
+      icon: department.isActive ? Ban : CheckCircle2,
       title: department.isActive ? "Desactivar departamento" : "Reactivar departamento",
       description: department.isActive ? (
         <>
@@ -268,7 +308,20 @@ export function DepartmentsPage() {
             mailboxId: current.mailboxId ?? null,
             managerStaffId: current.managerStaffId ?? null,
           });
+          receipts.done({
+            action: current.isActive ? "reactivar-departamento" : "desactivar-departamento",
+            title: current.isActive ? "Departamento desactivado" : "Departamento reactivado",
+            detail: current.name,
+          });
           refresh();
+        } catch (err) {
+          receipts.failed({
+            action: "toggle-departamento",
+            title: department.isActive
+              ? "No se pudo desactivar el departamento"
+              : "No se pudo reactivar el departamento",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyId(null);
         }
@@ -292,7 +345,14 @@ export function DepartmentsPage() {
         setBusyId(department.id);
         try {
           await departmentsApi.remove(department.id);
+          receipts.done({ action: "eliminar-departamento", title: "Departamento eliminado", detail: department.name });
           refresh();
+        } catch (err) {
+          receipts.failed({
+            action: "eliminar-departamento",
+            title: "No se pudo eliminar el departamento",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyId(null);
         }
@@ -446,7 +506,7 @@ export function DepartmentsPage() {
                     onChange={(next) => setSelectedSedeId(next)}
                     defaultIcon={<Building className="h-3.5 w-3.5 text-zinc-500" />}
                     options={sedeOptions}
-                    searchable={sedeOptions.length > 6}
+                    searchable
                     searchPlaceholder="Buscar sede…"
                   />
                   {(search || typeChip !== "todos" || chip !== "todos" || selectedSedeId !== "todas") && (
@@ -466,6 +526,7 @@ export function DepartmentsPage() {
           footer={
             data && data.total > 0 && (
               <Pagination
+                loading={listLoading}
                 page={page}
                 pageSize={pageSize}
                 total={data.total}
@@ -478,9 +539,9 @@ export function DepartmentsPage() {
             )
           }
         >
-          {data === null ? (
-            <TableSkeleton rows={8} columns={7} />
-          ) : data.items.length === 0 ? (
+          {listLoading ? (
+            <TableSkeleton rows={pageSize} columns={7} />
+          ) : rows.length === 0 ? (
             <p className="py-14 text-center text-[13.5px] text-faint">
               {isFiltering
                 ? "Ningún departamento coincide con este filtro o búsqueda."
@@ -512,7 +573,7 @@ export function DepartmentsPage() {
                   </HeadRow>
                 </thead>
                 <tbody>
-                  {data.items.map((d) => {
+                  {rows.map((d) => {
                     const checked = selectedIds.has(d.id);
                     const propios = d.staffCount ?? 0;
 
@@ -635,45 +696,38 @@ export function DepartmentsPage() {
       {/* Modal para cambiar sede en lote */}
       {bulkSedeModalOpen && (
         <Modal
+          maxWidth="max-w-md"
           title={`Cambiar sede (${selectedIds.size} departamentos)`}
           description="Elige la sede a la que deseas asignar los departamentos seleccionados."
           onClose={() => setBulkSedeModalOpen(false)}
-        >
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-zinc-700 mb-1.5">
-                Sede destino
-              </label>
-              <select
-                value={selectedBulkSedeId}
-                onChange={(e) => setSelectedBulkSedeId(e.target.value)}
-                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-[13px] text-ink outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red"
-              >
-                <option value="">Sin sede asignada</option>
-                {sedesList?.items.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <Button variant="ghost" onClick={() => setBulkSedeModalOpen(false)}>
+          footer={
+            <div className="ml-auto flex items-center gap-2">
+              <Button type="button" variant="secondary" size="sm" onClick={() => setBulkSedeModalOpen(false)}>
                 Cancelar
               </Button>
               <Button
-                variant="primary"
+                size="sm"
+                isLoading={bulkBusy}
                 onClick={async () => {
                   const sid = selectedBulkSedeId === "" ? null : Number(selectedBulkSedeId);
                   await runBulk("set-sede", sid);
                   setBulkSedeModalOpen(false);
                 }}
-                disabled={bulkBusy}
               >
                 Guardar cambios
               </Button>
             </div>
-          </div>
+          }
+        >
+          <SelectField
+            size="sm"
+            searchable
+            label="Sede destino"
+            value={selectedBulkSedeId}
+            onChange={setSelectedBulkSedeId}
+            placeholder="Sin sede asignada"
+            options={bulkSedeOptions}
+          />
         </Modal>
       )}
 
@@ -681,7 +735,15 @@ export function DepartmentsPage() {
         <DepartmentModal
           department={modal === "nuevo" ? undefined : modal}
           onClose={() => setModal(null)}
-          onSaved={refresh}
+          onSaved={(name) => {
+            const isEdit = modal !== "nuevo";
+            receipts.done({
+              action: isEdit ? "editar-departamento" : "crear-departamento",
+              title: isEdit ? "Departamento actualizado" : "Departamento creado exitosamente",
+              detail: name,
+            });
+            refresh();
+          }}
         />
       )}
 

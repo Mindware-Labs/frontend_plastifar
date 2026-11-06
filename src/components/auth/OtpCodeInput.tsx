@@ -84,7 +84,7 @@ export function OtpCodeInput({
               ? "border-brand-green ring-3 ring-brand-green/10 text-brand-green animate-plf-otp-confirm"
               : error || invalid
                 ? "border-brand-red ring-3 ring-brand-red/10"
-                : `${digit ? "border-zinc-300" : "border-zinc-200"} hover:border-zinc-300 focus:border-brand-red focus:ring-3 focus:ring-brand-red/10`;
+                : `${digit ? "border-line-strong" : "border-line-strong"} hover:border-hairline-hover focus:border-brand-red focus:ring-3 focus:ring-brand-red/10`;
 
             return (
               <input
@@ -104,7 +104,7 @@ export function OtpCodeInput({
                 onPaste={handlePaste}
                 aria-label={`Dígito ${index + 1} de ${length} del código`}
                 aria-invalid={!!error || invalid}
-                className={`h-10 w-10 shrink-0 rounded-lg border bg-white text-center font-heading text-base font-semibold tabular-nums text-ink caret-brand-red outline-none transition-[border-color,box-shadow,color] duration-150 sm:h-12 sm:w-12 sm:text-lg ${stateClass}`}
+                className={`h-10 w-10 shrink-0 rounded-edge border bg-white text-center font-heading text-[15px] font-semibold tabular-nums text-ink caret-brand-red outline-none transition-[border-color,box-shadow,color] duration-150 sm:h-10 sm:w-11 sm:text-base ${stateClass}`}
               />
             );
           })}

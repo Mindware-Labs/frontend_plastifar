@@ -1,31 +1,59 @@
 import { ArrowUpRight, Printer } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  navigateToTicketFullView,
+  type EnterpriseListReturnRecord,
+} from "../../lib/enterpriseListReturn";
 import { discrepanciesApi } from "../../api/discrepancies";
 import { Button } from "../../components/ui/Button";
 import { Drawer } from "../../components/ui/Drawer";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
-import { Spinner } from "../../components/ui/Spinner";
+import { EnterpriseFormExecutiveSummarySkeleton } from "../../components/ui/Skeleton";
+import type { DiscrepancyDetail } from "../../types/discrepancies";
 import { DiscrepancyExecutiveSummary } from "./DiscrepancyExecutiveSummary";
+import { normalizeDiscrepancyStatus } from "./DiscrepancyStatusBadge";
 
 interface DiscrepancySummaryDrawerProps {
   discrepancyId: number;
   onClose: () => void;
+  getReturnSnapshot?: () => Omit<EnterpriseListReturnRecord, "ticketId"> | null;
 }
 
-export function DiscrepancySummaryDrawer({ discrepancyId, onClose }: DiscrepancySummaryDrawerProps) {
+export function DiscrepancySummaryDrawer({
+  discrepancyId,
+  onClose,
+  getReturnSnapshot,
+}: DiscrepancySummaryDrawerProps) {
   const navigate = useNavigate();
-  const query = useQuery({ queryKey: ["discrepancies", discrepancyId], queryFn: () => discrepanciesApi.get(discrepancyId) });
-  // El reintento mostraba su propio texto de error; se conserva.
-  const [retriedId, setRetriedId] = useState<number | null>(null);
-  const detail = query.data ?? null;
-  const loading = query.isPending || (query.isError && query.isFetching);
-  const error = query.isError
-    ? retriedId === discrepancyId
-      ? "Error al cargar."
-      : "No se pudo cargar el resumen de la investigación."
-    : null;
+  const [detail, setDetail] = useState<DiscrepancyDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError(null);
+
+    discrepanciesApi
+      .get(discrepancyId)
+      .then((data) => {
+        if (!active) return;
+        setDetail(data);
+      })
+      .catch(() => {
+        if (!active) return;
+        setError("No se pudo cargar el resumen de la investigación.");
+      })
+      .finally(() => {
+        if (!active) return;
+        setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [discrepancyId]);
 
   return (
     <Drawer
@@ -33,7 +61,7 @@ export function DiscrepancySummaryDrawer({ discrepancyId, onClose }: Discrepancy
       eyebrow="PF-FOR-291 · Discrepancia de carga"
       description={
         detail
-          ? `${detail.discrepancy.clientName ?? "Sin cliente"} · ${detail.discrepancy.status}`
+          ? `${detail.discrepancy.clientName ?? "Sin cliente"} · ${normalizeDiscrepancyStatus(detail.discrepancy.status)}`
           : "Cargando datos del formulario…"
       }
       maxWidth="max-w-[760px]"
@@ -43,7 +71,10 @@ export function DiscrepancySummaryDrawer({ discrepancyId, onClose }: Discrepancy
           <Button
             size="sm"
             variant="secondary"
-            onClick={() => window.open(`/discrepancias/${discrepancyId}/imprimir`, "_blank")}
+            onClick={() => {
+              onClose();
+              navigate(`/discrepancias/${discrepancyId}?documento=1`);
+            }}
           >
             <Printer className="mr-1 h-3.5 w-3.5" />
             Imprimir
@@ -58,10 +89,14 @@ export function DiscrepancySummaryDrawer({ discrepancyId, onClose }: Discrepancy
               disabled={!detail}
               onClick={() => {
                 if (!detail) return;
+                const url = `/tickets/${detail.discrepancy.ticketId}?tab=formularios&form=discrepancy-${detail.discrepancy.id}&openForm=1`;
+                const snapshot = getReturnSnapshot?.() ?? null;
                 onClose();
-                navigate(
-                  `/tickets/${detail.discrepancy.ticketId}?tab=formularios&form=discrepancy-${detail.discrepancy.id}`,
-                );
+                if (snapshot) {
+                  navigateToTicketFullView(navigate, url, detail.discrepancy.ticketId, snapshot);
+                } else {
+                  navigate(url);
+                }
               }}
             >
               <span>Ver ficha completa</span>
@@ -72,15 +107,17 @@ export function DiscrepancySummaryDrawer({ discrepancyId, onClose }: Discrepancy
       )}
     >
       {loading ? (
-        <div className="flex h-64 flex-col items-center justify-center gap-3">
-          <Spinner size="md" />
-          <p className="text-xs font-medium text-zinc-500">Cargando resumen…</p>
-        </div>
+        <EnterpriseFormExecutiveSummarySkeleton />
       ) : error ? (
         <ErrorRetry
           onRetry={() => {
-            setRetriedId(discrepancyId);
-            void query.refetch();
+            setLoading(true);
+            setError(null);
+            discrepanciesApi
+              .get(discrepancyId)
+              .then(setDetail)
+              .catch(() => setError("Error al cargar."))
+              .finally(() => setLoading(false));
           }}
         >
           {error}

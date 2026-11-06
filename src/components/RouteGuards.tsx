@@ -5,6 +5,7 @@ import { usePermissions } from "../hooks/usePermissions";
 import type { PermissionKey } from "../lib/permissions";
 import { Alert } from "./ui/Alert";
 import { Spinner } from "./ui/Spinner";
+import { PrintSheetSkeleton } from "./print/PrintSheetSkeleton";
 
 /**
  * Puerta trasera de desarrollo: entra al panel sin credenciales.
@@ -17,7 +18,16 @@ import { Spinner } from "./ui/Spinner";
  */
 const AUTH_BYPASS = import.meta.env.DEV && import.meta.env.VITE_AUTH_BYPASS === "true";
 
-function RestoringSession() {
+function RestoringSession({
+  isPrintRoute = false,
+  isLandscape = false,
+}: {
+  isPrintRoute?: boolean;
+  isLandscape?: boolean;
+}) {
+  if (isPrintRoute) {
+    return <PrintSheetSkeleton orientation={isLandscape ? "landscape" : "portrait"} />;
+  }
   return (
     <div className="flex min-h-dvh items-center justify-center bg-canvas">
       <Spinner size="lg" label="Restableciendo sesión..." />
@@ -30,7 +40,13 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   const { user, isLoading } = useAuth();
   const location = useLocation();
 
-  if (isLoading) return <RestoringSession />;
+  if (isLoading) {
+    const isPrintRoute =
+      location.pathname.includes("/imprimir") || location.search.includes("documento=1");
+    const isLandscape =
+      location.pathname.includes("/discrepancias") || location.pathname.includes("/retiros");
+    return <RestoringSession isPrintRoute={isPrintRoute} isLandscape={isLandscape} />;
+  }
   if (!user && !AUTH_BYPASS) {
     return <Navigate to="/login" state={{ from: location.pathname + location.search }} replace />;
   }

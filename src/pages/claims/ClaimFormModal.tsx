@@ -5,6 +5,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  CircleSlash,
   Factory,
   Plus,
   ShieldCheck,
@@ -27,6 +28,7 @@ import { claimsApi } from "../../api/claims";
 import { ApiError } from "../../api/client";
 import { ticketsApi } from "../../api/tickets";
 import { useReceipts } from "../../context/useReceipts";
+import { usePermissions } from "../../hooks/usePermissions";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
@@ -89,6 +91,30 @@ const CLAIM_AREA_TILES: { area: ClaimAffectedArea; icon: LucideIcon; description
   { area: "Almacén", icon: Warehouse, description: "Inventario y despacho" },
   { area: "Ventas", icon: ShoppingBag, description: "Pedido y atención comercial" },
 ];
+
+const CLAIM_QUALITY_INTENT_TILES: { value: "fill" | "waive"; icon: LucideIcon; label: string; description: string }[] =
+  [
+    {
+      value: "fill",
+      label: "Completar Calidad ahora",
+      icon: ShieldCheck,
+      description: "Sección IV · respuesta, acción correctiva y cierre",
+    },
+    {
+      value: "waive",
+      label: "No se requiere ahora",
+      icon: CircleSlash,
+      description: "Queda registrada la decisión; Calidad puede completar después",
+    },
+  ];
+
+const CLAIM_YES_NO = [
+  { value: "", label: "Sin responder" },
+  { value: "si", label: "Sí" },
+  { value: "no", label: "No" },
+];
+
+const claimBoolFromForm = (value: string) => (value === "" ? null : value === "si");
 
 const plantCountryLabel = (code: Plant["country"]) =>
   PLANT_COUNTRIES.find((c) => c.value === code)?.label ?? code;
@@ -155,6 +181,13 @@ const schema = z
         }),
       )
       .min(1, "Agrega al menos un producto reclamado"),
+    qualityIntent: z.enum(["", "fill", "waive"]),
+    firstResponseCorrection: z.string().trim().max(4000, "Máximo 4000 caracteres"),
+    requiresCorrectiveAction: z.string(),
+    rootCauseAnalysis: z.string().trim().max(4000, "Máximo 4000 caracteres"),
+    correctiveActions: z.string().trim().max(4000, "Máximo 4000 caracteres"),
+    customerSatisfied: z.string(),
+    treatmentObservations: z.string().trim().max(4000, "Máximo 4000 caracteres"),
   })
   .superRefine((values, ctx) => {
     if (values.firstCustomerContactAt !== "" && values.firstCustomerContactAt < values.claimDate) {
@@ -240,6 +273,25 @@ interface ClaimFormModalProps {
 
 const numberOrEmpty = (value: number | null) => (value === null ? "" : String(value));
 
+const claimBoolToForm = (value: boolean | null | undefined) =>
+  value === null || value === undefined ? "" : value ? "si" : "no";
+
+function inferQualityIntent(claim: CustomerClaim | undefined): "" | "fill" | "waive" {
+  if (!claim) return "";
+  if (claim.qualitySectionWaived) return "waive";
+  if (
+    claim.firstResponseCorrection ||
+    claim.requiresCorrectiveAction !== null ||
+    claim.customerSatisfied !== null ||
+    claim.rootCauseAnalysis ||
+    claim.correctiveActions ||
+    claim.observations
+  ) {
+    return "fill";
+  }
+  return "";
+}
+
 const CLAIM_TEXTAREA_AUTO = "min-h-0 resize-none overflow-hidden text-[12.5px] py-2 leading-relaxed";
 /** Una línea inicial (mismo criterio que HCA / discrepancias). */
 const CLAIM_TEXTAREA_LINE_MIN_PX = 42;
@@ -293,11 +345,13 @@ export function ClaimFormModal({
     !isEdit && ticketId > 0 ? enterpriseFormDraftKey("pf034", ticketId) : null;
   const draftLoadedRef = useRef(false);
   const receipts = useReceipts();
+  const { can } = usePermissions();
   const savedResultRef = useRef<ClaimDetail | null>(null);
   const [showClosePrompt, setShowClosePrompt] = useState(false);
   const [completedClaim, setCompletedClaim] = useState<ClaimDetail | null>(null);
+  const canTreatClaim = can("claims.treat");
 
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [saveDraftConfirmOpen, setSaveDraftConfirmOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   // Las plantas son catálogo acotado (16 en la fuente): se recorren enteras. Una planta des...
@@ -319,6 +373,23 @@ export function ClaimFormModal({
       : undefined;
 
   const ticketProducts = ticketProductsProp ?? ticketProductsFetched;
+
+  function proceedAfterQualityStep(saved: ClaimDetail) {
+    if (
+      shouldPromptEnterpriseFormHostClose(
+        formHostKind,
+        ticketId,
+        hostTaskId,
+        ticketStatus,
+        hostTaskStatus,
+      )
+    ) {
+      setCompletedClaim(saved);
+      setShowClosePrompt(true);
+    } else {
+      finishModal(saved);
+    }
+  }
 
   const finishModal = (saved: ClaimDetail) => {
     setShowClosePrompt(false);
@@ -403,6 +474,13 @@ export function ClaimFormModal({
             unitPrice: line.unitPrice ?? "",
           }))
         : [emptyLine()],
+      qualityIntent: inferQualityIntent(claim),
+      firstResponseCorrection: claim?.firstResponseCorrection ?? "",
+      requiresCorrectiveAction: claimBoolToForm(claim?.requiresCorrectiveAction),
+      rootCauseAnalysis: claim?.rootCauseAnalysis ?? "",
+      correctiveActions: claim?.correctiveActions ?? "",
+      customerSatisfied: claimBoolToForm(claim?.customerSatisfied),
+      treatmentObservations: claim?.observations ?? "",
     },
   });
 
@@ -419,8 +497,8 @@ export function ClaimFormModal({
     if (!draft?.values) return;
     draftLoadedRef.current = true;
     reset(draft.values);
-    if (typeof draft.step === "number" && draft.step >= 1 && draft.step <= 4) {
-      setStep(draft.step as 1 | 2 | 3 | 4);
+    if (typeof draft.step === "number" && draft.step >= 1 && draft.step <= 5) {
+      setStep(draft.step as 1 | 2 | 3 | 4 | 5);
     }
     if (typeof draft.activeLineIndex === "number") {
       setActiveLineIndex(Math.max(0, draft.activeLineIndex));
@@ -456,6 +534,20 @@ export function ClaimFormModal({
   const descriptionTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const commentsTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
+  const firstResponseCorrectionField = register("firstResponseCorrection");
+  const rootCauseAnalysisField = register("rootCauseAnalysis");
+  const correctiveActionsField = register("correctiveActions");
+  const treatmentObservationsField = register("treatmentObservations");
+  const firstResponseCorrectionTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const rootCauseAnalysisTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const correctiveActionsTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const treatmentObservationsTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const firstResponseCorrectionValue = useWatch({ control, name: "firstResponseCorrection" }) ?? "";
+  const rootCauseAnalysisValue = useWatch({ control, name: "rootCauseAnalysis" }) ?? "";
+  const correctiveActionsValue = useWatch({ control, name: "correctiveActions" }) ?? "";
+  const treatmentObservationsValue = useWatch({ control, name: "treatmentObservations" }) ?? "";
+
   useLayoutEffect(() => {
     if (step !== 4) return;
     autoResizeTextarea(descriptionTextareaRef.current, CLAIM_TEXTAREA_LINE_MIN_PX);
@@ -478,16 +570,54 @@ export function ClaimFormModal({
     "";
   const showReasonOther = topicRequiresOther(selectedTopicName);
 
+  const qualityIntent = useWatch({ control, name: "qualityIntent" });
+
+  useLayoutEffect(() => {
+    if (step !== 5 || qualityIntent !== "fill") return;
+    autoResizeTextarea(firstResponseCorrectionTextareaRef.current, CLAIM_TEXTAREA_LINE_MIN_PX);
+    autoResizeTextarea(rootCauseAnalysisTextareaRef.current, CLAIM_TEXTAREA_LINE_MIN_PX);
+    autoResizeTextarea(correctiveActionsTextareaRef.current, CLAIM_TEXTAREA_LINE_MIN_PX);
+    autoResizeTextarea(treatmentObservationsTextareaRef.current, CLAIM_TEXTAREA_LINE_MIN_PX);
+  }, [
+    step,
+    qualityIntent,
+    firstResponseCorrectionValue,
+    rootCauseAnalysisValue,
+    correctiveActionsValue,
+    treatmentObservationsValue,
+  ]);
+
   const claimStepMissing = useMemo(
-    () => getClaimStepMissing(step, claimValues as FormValues, selectedTopicName),
-    [step, claimValues, selectedTopicName],
+    () =>
+      getClaimStepMissing(step, claimValues as FormValues, selectedTopicName, {
+        canFillQuality: canTreatClaim,
+      }),
+    [step, claimValues, selectedTopicName, canTreatClaim],
   );
 
   async function invalidateClaimStep() {
     if (step === 1) await trigger(["claimDate", "country", "contactName", "contactPhone"]);
     else if (step === 2) await trigger([...STEP2_FIELDS]);
     else if (step === 3) await trigger([...STEP3_FIELDS]);
-    else await trigger();
+    else if (step === 4)
+      await trigger([
+        "description",
+        "comments",
+        "unitsToReturn",
+        "currency",
+        "receivedAt",
+        "firstCustomerContactAt",
+      ]);
+    else
+      await trigger([
+        "qualityIntent",
+        "firstResponseCorrection",
+        "requiresCorrectiveAction",
+        "customerSatisfied",
+        "rootCauseAnalysis",
+        "correctiveActions",
+        "treatmentObservations",
+      ]);
   }
 
   function focusClaimField(fieldId: string) {
@@ -506,6 +636,16 @@ export function ClaimFormModal({
       if (lineMatch) {
         setActiveLineIndex(Number(lineMatch[1]));
       }
+    } else if (
+      fieldId === "qualityIntent" ||
+      fieldId.startsWith("firstResponse") ||
+      fieldId.startsWith("requires") ||
+      fieldId.startsWith("customer") ||
+      fieldId.startsWith("rootCause") ||
+      fieldId.startsWith("corrective") ||
+      fieldId.startsWith("treatment")
+    ) {
+      if (step !== 5) setStep(5);
     } else {
       if (step !== 4) setStep(4);
     }
@@ -573,19 +713,32 @@ export function ClaimFormModal({
         return;
       }
       setStep(4);
+      return;
+    }
+    if (step === 4) {
+      const ok = await trigger([
+        "description",
+        "comments",
+        "unitsToReturn",
+        "currency",
+        "receivedAt",
+        "firstCustomerContactAt",
+      ]);
+      if (ok) setStep(5);
     }
   }
 
-  const stepLabels: Record<typeof step, { title: string; hint: string }> = {
+  const stepLabels: Record<1 | 2 | 3 | 4 | 5, { title: string; hint: string }> = {
     1: { title: "Información general", hint: "Fecha, código y cliente" },
     2: { title: "Sobre la reclamación", hint: "Motivo, plantas y referencias" },
     3: { title: "Productos", hint: "Productos reclamados" },
     4: { title: "Descripción", hint: "Relato y fechas de recepción" },
+    5: { title: "Calidad", hint: "Sección IV · Depto. Calidad" },
   };
 
   const renderStepper = () => (
     <div className="flex w-full items-center justify-between max-w-4xl mx-auto select-none gap-0.5">
-      {([1, 2, 3, 4] as const).map((n, idx) => (
+      {([1, 2, 3, 4, 5] as const).map((n, idx) => (
         <Fragment key={n}>
           <button
             type="button"
@@ -617,7 +770,7 @@ export function ClaimFormModal({
               <span className="truncate text-[10px] text-zinc-400">{stepLabels[n].hint}</span>
             </div>
           </button>
-          {idx < 3 && (
+          {idx < 4 && (
             <div
               className={`mx-0.5 h-0.5 flex-1 rounded-full transition-colors ${
                 step > n ? "bg-emerald-600/40" : "bg-zinc-200"
@@ -781,20 +934,21 @@ export function ClaimFormModal({
         detail: `${CLAIM_FORM_CONTROL.code} · ${saved.claim.ticketNumber}`,
       });
 
-      if (
-        shouldPromptEnterpriseFormHostClose(
-          formHostKind,
-          ticketId,
-          hostTaskId,
-          ticketStatus,
-          hostTaskStatus,
-        )
-      ) {
-        setCompletedClaim(saved);
-        setShowClosePrompt(true);
-      } else {
-        finishModal(saved);
+      let detail = saved;
+      if (values.qualityIntent === "waive") {
+        detail = await claimsApi.waiveQualitySection(saved.claim.id);
+      } else if (values.qualityIntent === "fill" && canTreatClaim) {
+        const tBlank = (value: string) => (value.trim() === "" ? null : value.trim());
+        detail = await claimsApi.updateTreatment(saved.claim.id, {
+          firstResponseCorrection: tBlank(values.firstResponseCorrection),
+          requiresCorrectiveAction: claimBoolFromForm(values.requiresCorrectiveAction),
+          rootCauseAnalysis: tBlank(values.rootCauseAnalysis),
+          correctiveActions: tBlank(values.correctiveActions),
+          customerSatisfied: claimBoolFromForm(values.customerSatisfied),
+          observations: tBlank(values.treatmentObservations),
+        });
       }
+      proceedAfterQualityStep(detail);
     } catch (err) {
       const fallback = isEdit ? "No se pudo guardar la reclamación" : "No se pudo registrar la reclamación";
       setFormError(err instanceof ApiError ? err.message : fallback);
@@ -1287,6 +1441,147 @@ export function ClaimFormModal({
     </div>
   );
 
+  const qualityIntentOptions = useMemo(
+    () =>
+      CLAIM_QUALITY_INTENT_TILES.filter((tile) => tile.value !== "fill" || canTreatClaim).map(
+        ({ value, icon, label, description }) => ({
+          value,
+          label,
+          icon,
+          description,
+        }),
+      ),
+    [canTreatClaim],
+  );
+
+  const renderStep5 = () => (
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 animate-plf-fade text-left">
+      <FormSection title="IV. Tratamiento (Departamento de Calidad)">
+        <p className="text-[12px] leading-relaxed text-zinc-500">
+          El formulario principal ya quedó listo. Indica si completarás Calidad en este paso o si no aplica ahora.
+        </p>
+        {!canTreatClaim && (
+          <Alert variant="info">
+            Tu rol no incluye «Tratar reclamaciones». Solo puedes registrar que Calidad no se completa en este paso.
+          </Alert>
+        )}
+        <Controller
+          name="qualityIntent"
+          control={control}
+          render={({ field }) => (
+            <ChoiceTileGroup
+              legend="¿Completar apartado de Calidad?"
+              required
+              columns={2}
+              reserveSearchSlot
+              selectionNoun={{ one: "opción", other: "opciones" }}
+              options={qualityIntentOptions}
+              value={field.value ? [field.value] : []}
+              onChange={(next) => {
+                const picked = next.length === 0 ? "" : next[next.length - 1]!;
+                field.onChange(picked === field.value ? "" : picked);
+              }}
+              onBlur={field.onBlur}
+              error={errors.qualityIntent?.message}
+            />
+          )}
+        />
+
+        {qualityIntent === "waive" && (
+          <p className="rounded-lg border border-zinc-200/80 bg-zinc-50/80 px-3 py-2.5 text-[12px] leading-relaxed text-zinc-600">
+            Quedará registrado que no se requiere llenar Calidad en este paso. El departamento puede completar la
+            sección IV más adelante.
+          </p>
+        )}
+
+        {qualityIntent === "fill" && canTreatClaim && (
+          <div className="space-y-3 border-t border-zinc-100 pt-3">
+            <TextAreaField
+              label="Primera respuesta como corrección"
+              required
+              rows={1}
+              className={CLAIM_TEXTAREA_AUTO}
+              placeholder="Qué se hizo de inmediato: reposición, nota de crédito, recogida…"
+              error={errors.firstResponseCorrection?.message}
+              {...bindAutoResizeTextarea(
+                firstResponseCorrectionField,
+                CLAIM_TEXTAREA_LINE_MIN_PX,
+                (element) => {
+                  firstResponseCorrectionTextareaRef.current = element;
+                },
+              )}
+            />
+            <Controller
+              name="requiresCorrectiveAction"
+              control={control}
+              render={({ field }) => (
+                <SelectField
+                  size="sm"
+                  label="Se requiere acción correctiva"
+                  required
+                  name={field.name}
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  options={CLAIM_YES_NO}
+                  hint="Con «Sí», la reclamación no se cierra hasta que exista una HCA ligada al ticket."
+                  error={errors.requiresCorrectiveAction?.message}
+                />
+              )}
+            />
+            <TextAreaField
+              label="Resultados del análisis de causa raíz"
+              rows={1}
+              className={CLAIM_TEXTAREA_AUTO}
+              placeholder="Opcional en este paso"
+              error={errors.rootCauseAnalysis?.message}
+              {...bindAutoResizeTextarea(rootCauseAnalysisField, CLAIM_TEXTAREA_LINE_MIN_PX, (element) => {
+                rootCauseAnalysisTextareaRef.current = element;
+              })}
+            />
+            <TextAreaField
+              label="Acciones correctivas y/o preventivas"
+              rows={1}
+              className={CLAIM_TEXTAREA_AUTO}
+              placeholder="Opcional en este paso"
+              error={errors.correctiveActions?.message}
+              {...bindAutoResizeTextarea(correctiveActionsField, CLAIM_TEXTAREA_LINE_MIN_PX, (element) => {
+                correctiveActionsTextareaRef.current = element;
+              })}
+            />
+            <Controller
+              name="customerSatisfied"
+              control={control}
+              render={({ field }) => (
+                <SelectField
+                  size="sm"
+                  label="¿Cliente satisfecho?"
+                  required
+                  name={field.name}
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  options={CLAIM_YES_NO}
+                  error={errors.customerSatisfied?.message}
+                />
+              )}
+            />
+            <TextAreaField
+              label="Observaciones"
+              rows={1}
+              className={CLAIM_TEXTAREA_AUTO}
+              placeholder="Opcional"
+              error={errors.treatmentObservations?.message}
+              {...bindAutoResizeTextarea(treatmentObservationsField, CLAIM_TEXTAREA_LINE_MIN_PX, (element) => {
+                treatmentObservationsTextareaRef.current = element;
+              })}
+            />
+          </div>
+        )}
+      </FormSection>
+    </div>
+  );
+
   const renderSaveDraftConfirmModal = () =>
     saveDraftConfirmOpen ? (
       <EnterpriseFormSaveDraftConfirmModal
@@ -1338,7 +1633,7 @@ export function ClaimFormModal({
   };
 
   const renderFooterLeft = () =>
-    step === 4 ? (
+    step === 5 ? (
       <span className="hidden select-none items-center gap-1 text-[11px] text-zinc-400 sm:inline-flex">
         <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 font-mono text-[10px] text-zinc-500">
           Ctrl
@@ -1350,7 +1645,7 @@ export function ClaimFormModal({
         <span className="ml-0.5">para guardar</span>
       </span>
     ) : (
-      <span className="text-[11.5px] text-zinc-400 select-none">Paso {step} de 4</span>
+      <span className="text-[11.5px] text-zinc-400 select-none">Paso {step} de 5</span>
     );
 
   const renderFooterButtons = () => (
@@ -1360,7 +1655,7 @@ export function ClaimFormModal({
           type="button"
           variant="secondary"
           size="sm"
-          onClick={() => setStep((s) => (s - 1) as 1 | 2 | 3)}
+          onClick={() => setStep((s) => (s - 1) as 1 | 2 | 3 | 4 | 5)}
         >
           <ChevronLeft className="h-3.5 w-3.5" />
           <span>Anterior</span>
@@ -1375,7 +1670,7 @@ export function ClaimFormModal({
         disabled={isSubmitting}
         onClick={() => setSaveDraftConfirmOpen(true)}
       />
-      {step < 4 ? (
+      {step < 5 ? (
         <SubmitValidationButton
           key={`claim-next-${step}`}
           ready={claimStepMissing.length === 0}
@@ -1416,7 +1711,7 @@ export function ClaimFormModal({
       onKeyDown={(e) => {
         if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
           e.preventDefault();
-          if (step < 4) void handleNextStep();
+          if (step < 5) void handleNextStep();
           else void handleSubmit(onSubmit)();
         }
       }}
@@ -1428,6 +1723,7 @@ export function ClaimFormModal({
       {step === 2 && renderStep2()}
       {step === 3 && renderStep3()}
       {step === 4 && renderStep4()}
+      {step === 5 && renderStep5()}
     </form>
   );
 

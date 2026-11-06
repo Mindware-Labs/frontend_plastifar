@@ -36,7 +36,6 @@ const FILTER_LABEL: Record<ReportFilterKey, string> = {
   client: "Cliente",
   productLine: "Línea de producto",
   responsible: "Responsable",
-  territory: "Territorio",
   salesRep: "Vendedor",
   clientType: "Tipo de cliente",
   activeOnly: "Sólo activos",
@@ -109,12 +108,6 @@ export function ReportPreview({
     "Línea",
     criteria.productLineId,
     nameOf(reference.productLines, criteria.productLineId, "—"),
-  );
-  pushIfSet(
-    "territory",
-    "Territorio",
-    criteria.territoryId,
-    nameOf(reference.territories, criteria.territoryId, "—"),
   );
   pushIfSet(
     "clientType",

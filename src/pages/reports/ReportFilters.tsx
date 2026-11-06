@@ -6,6 +6,7 @@ import {
   resolveClientLabel,
   resolveStaffLabel,
   searchActiveStaff,
+  searchSalesRepStaff,
   searchClients,
 } from "../../lib/lookups";
 import {
@@ -23,7 +24,6 @@ export interface ReportCriteria {
   clientId: string;
   productLineId: string;
   responsibleStaffId: string;
-  territoryId: string;
   salesRepStaffId: string;
   clientType: string;
   activeOnly: boolean;
@@ -41,7 +41,6 @@ export interface ReferenceOption {
  */
 export interface ReferenceData {
   productLines: ReferenceOption[];
-  territories: ReferenceOption[];
   clientTypes: ReferenceOption[];
 }
 
@@ -200,16 +199,6 @@ export function ReportFilters({
         />
       )}
 
-      {has("territory") && (
-        <SelectField
-          label="Territorio"
-          id={`${id}-territorio`}
-          value={criteria.territoryId}
-          onChange={(value) => set({ territoryId: value })}
-          options={[{ value: ANY, label: "Todos los territorios" }, ...reference.territories]}
-        />
-      )}
-
       {has("salesRep") && (
         <LookupField
           label="Vendedor"
@@ -219,7 +208,7 @@ export function ReportFilters({
           placeholder="Todos los vendedores"
           searchPlaceholder="Buscar vendedor…"
           clearLabel="Todos los vendedores"
-          search={searchActiveStaff}
+          search={searchSalesRepStaff}
           resolveSelectedLabel={resolveStaffLabel}
         />
       )}

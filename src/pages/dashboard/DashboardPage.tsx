@@ -4,20 +4,16 @@ import {
   CheckCircle2,
   ClipboardList,
   Clock,
-  MapPin,
   TrendingUp,
   UserCheck,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
 import { reportsApi, type ClientsReport, type QualityReport } from "../../api/reports";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { Board, KpiRow, PeriodTabs, RefreshButton, type KpiItem } from "./board";
 import { CategoryBars, HealthGauge, SeriesLegend, TrendArea } from "./boardCharts";
-import { DashboardSkeleton } from "./DashboardSkeleton";
-import { TerritoriesTable } from "./TerritoriesTable";
 import { formatDecimal, formatInteger, formatPercent } from "./format";
 import { localIso } from "../reports/useDateRange";
 
@@ -111,77 +107,98 @@ const monthFormat = new Intl.DateTimeFormat("es-DO", { month: "short" });
  */
 const CLOSURE_GOAL = 0.85;
 
-interface BoardData {
-  quality: QualityReport;
-  /** El mismo reporte, un periodo atras. Es contra esto que comparan las fichas. */
-  previous: QualityReport;
-  clients: ClientsReport;
+/** Esqueleto con la MISMA reparticion que el tablero cargado: al llegar los
+ *  datos lo unico que cambia es que las cajas se llenan, no que saltan. */
+function DashboardSkeleton() {
+  const box = "animate-pulse rounded-edge border border-line bg-canvas";
+  return (
+    <div aria-hidden className="flex flex-col gap-4">
+      <div className={`h-[112px] shrink-0 ${box}`} />
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <div className={`h-[320px] xl:col-span-8 ${box}`} />
+        <div className={`h-[320px] xl:col-span-4 ${box}`} />
+      </div>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <div className={`h-[340px] xl:col-span-5 ${box}`} />
+        <div className={`h-[340px] xl:col-span-7 ${box}`} />
+      </div>
+      <span className="sr-only">Cargando el tablero…</span>
+    </div>
+  );
 }
 
 export function DashboardPage() {
+  const [quality, setQuality] = useState<QualityReport | null>(null);
+  /** El mismo reporte, un periodo atras. Es contra esto que comparan las fichas. */
+  const [previous, setPrevious] = useState<QualityReport | null>(null);
+  const [clients, setClients] = useState<ClientsReport | null>(null);
   const [period, setPeriod] = useState<PeriodKey>("12m");
+  /** Cada clic en "Actualizar" o "Reintentar" sube este contador y relanza la carga. */
+  const [reloadTick, setReloadTick] = useState(0);
 
   const periodEntry = PERIODS.find((entry) => entry.key === period) ?? PERIODS[2];
   const range = useMemo(() => periodRange(periodEntry.months), [periodEntry.months]);
   const before = useMemo(() => previousRange(periodEntry.months), [periodEntry.months]);
 
-  // Una sola consulta con los tres reportes: llegan juntos, asi las pastillas
-  // nunca comparan la ventana nueva contra la anterior de otro periodo.
-  const board = useQuery({
-    queryKey: ["dashboard", "calidad", range.from, range.to, before.from, before.to],
-    queryFn: async (): Promise<BoardData> => {
-      const [quality, previous, clients] = await Promise.all([
-        reportsApi.quality(range.from, range.to),
-        reportsApi.quality(before.from, before.to),
-        reportsApi.clients(),
-      ]);
-      return { quality, previous, clients };
-    },
-  });
-
   /*
-   * Lo que se pinta es la ultima carga completa que salio bien: al cambiar de
-   * periodo o al fallar, el tablero anterior se queda a la vista (atenuado
-   * mientras carga) en vez de vaciarse.
+   * Carga y error se derivan de la peticion en curso: mientras la ultima peticion
+   * resuelta no sea la actual, el tablero esta cargando, y un error solo cuenta
+   * si es de la peticion actual.
    */
-  const [shown, setShown] = useState<BoardData | null>(null);
+  const requestKey = `${range.from}|${range.to}|${before.from}|${before.to}|${reloadTick}`;
+  const [settledKey, setSettledKey] = useState<string | null>(null);
+  const [failure, setFailure] = useState<{ key: string; message: string } | null>(null);
+  const isLoading = settledKey !== requestKey;
+  const error = failure?.key === requestKey ? failure.message : null;
+
+  const load = useCallback(() => setReloadTick((tick) => tick + 1), []);
+
+  useLoadErrorReceipt(error, "dashboard-calidad", load);
+
   /**
    * El periodo por defecto se ajusta UNA vez a la data que existe. Doce meses
    * fijos en una operacion que arranco hace dos dejaban diez columnas en cero y
    * el tablero se leia como si el reporte estuviera roto.
    */
-  const [autoRanged, setAutoRanged] = useState(false);
-  if (board.isSuccess && board.data !== shown) {
-    setShown(board.data);
-    if (!autoRanged) {
-      setAutoRanged(true);
-      const withActivity = board.data.quality.byMonth.filter((m) => m.opened > 0 || m.closed > 0).length;
-      const fits = withActivity === 0 ? undefined : PERIODS.find((entry) => entry.months >= withActivity);
-      if (fits && fits.key !== period) setPeriod(fits.key);
-    }
-  }
-  const quality = shown?.quality ?? null;
-  const previous = shown?.previous ?? null;
-  const clients = shown?.clients ?? null;
+  const autoRanged = useRef(false);
 
-  /*
-   * Carga y error se derivan de la peticion en curso: mientras haya una en
-   * vuelo el tablero esta cargando, y un error solo cuenta cuando ya no se esta
-   * reintentando (asi un segundo fallo vuelve a avisar).
-   */
-  const isLoading = board.isFetching;
-  const error =
-    board.isError && !board.isFetching
-      ? board.error instanceof ApiError
-        ? `${board.error.message} Vuelve a intentarlo.`
-        : "No se pudo cargar el tablero. Vuelve a intentarlo."
-      : null;
+  useEffect(() => {
+    let ignore = false;
+    Promise.all([
+      reportsApi.quality(range.from, range.to),
+      reportsApi.quality(before.from, before.to),
+      reportsApi.clients(),
+    ])
+      .then(([q, p, c]) => {
+        if (ignore) return;
+        setQuality(q);
+        setPrevious(p);
+        setClients(c);
 
-  const { refetch } = board;
-  /** "Actualizar" y "Reintentar" relanzan la carga del periodo actual. */
-  const load = useCallback(() => void refetch(), [refetch]);
-
-  useLoadErrorReceipt(error, "dashboard-calidad", load);
+        if (autoRanged.current) return;
+        autoRanged.current = true;
+        const withActivity = q.byMonth.filter((m) => m.opened > 0 || m.closed > 0).length;
+        if (withActivity === 0) return;
+        const fits = PERIODS.find((entry) => entry.months >= withActivity);
+        if (fits && fits.key !== period) setPeriod(fits.key);
+      })
+      .catch((err) => {
+        if (ignore) return;
+        setFailure({
+          key: requestKey,
+          message:
+            err instanceof ApiError
+              ? `${err.message} Vuelve a intentarlo.`
+              : "No se pudo cargar el tablero. Vuelve a intentarlo.",
+        });
+      })
+      .finally(() => {
+        if (!ignore) setSettledKey(requestKey);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [range.from, range.to, before.from, before.to, period, requestKey]);
 
   const months = useMemo(
     () =>
@@ -200,11 +217,11 @@ export function DashboardPage() {
     previous?.averageClosureDays ?? null,
   );
 
-  const territories = useMemo(
+  const salesReps = useMemo(
     () =>
-      (clients?.byTerritory ?? [])
-        .filter((entry) => entry.total > 0)
-        .map((entry) => ({ name: entry.territory, value: entry.total })),
+      (clients?.bySalesRep ?? [])
+        .filter((entry) => entry.clients > 0)
+        .map((entry) => ({ name: entry.salesRep, value: entry.clients })),
     [clients],
   );
 
@@ -371,16 +388,12 @@ export function DashboardPage() {
               </Board>
             </div>
 
-            {/* 3 — COMPARACION POR CATEGORIA + TABLA DE CIERRE. */}
+            {/* 3 — CARTERA POR VENDEDOR */}
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
               <Board
-                title="Cartera por territorio"
-                hint="Los siete territorios con más clientes."
-                // Sin piso propio: la fila la mide la tabla, que es la que tiene
-                // largo real. Con 340 px de minimo este panel estiraba siete
-                // barras de 18 px sobre medio metro de aire, en un tablero
-                // pedido a densidad de mesa de trabajo.
-                className="xl:col-span-5"
+                title="Cartera por vendedor"
+                hint="Los siete vendedores con más clientes asignados."
+                className="xl:col-span-12"
                 actions={
                   <span
                     aria-hidden
@@ -390,22 +403,7 @@ export function DashboardPage() {
                   </span>
                 }
               >
-                <CategoryBars data={territories} unit="clientes" />
-              </Board>
-
-              <Board
-                title="Detalle por territorio"
-                hint="Participación y actividad de cada zona."
-                className="min-h-[340px] xl:col-span-7"
-                bodyClassName="!p-0 overflow-y-auto"
-                actions={
-                  <span className="flex items-center gap-1.5 text-[11.5px] text-faint">
-                    <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                    {formatInteger(territories.length)} con cartera
-                  </span>
-                }
-              >
-                <TerritoriesTable report={clients} />
+                <CategoryBars data={salesReps} unit="clientes" />
               </Board>
             </div>
 

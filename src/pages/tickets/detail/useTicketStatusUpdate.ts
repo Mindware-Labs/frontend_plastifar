@@ -183,6 +183,11 @@ export function useTicketStatusUpdate({
       triggerSettle();
       return;
     }
+    if (updateCategory === "otro" && !updateComment.trim()) {
+      setTransitionError("Comentario de reapertura requerido");
+      triggerSettle();
+      return;
+    }
     if (updateCategory === "veredicto") {
       if (!updateVerdictId) {
         setTransitionError("Selecciona un veredicto");
@@ -190,7 +195,7 @@ export function useTicketStatusUpdate({
         return;
       }
       if (!updateComment.trim()) {
-        setTransitionError("Comentario de veredicto requerido");
+        setTransitionError("Comentario de cierre requerido");
         triggerSettle();
         return;
       }

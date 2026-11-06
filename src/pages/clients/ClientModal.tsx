@@ -18,7 +18,6 @@ import { Button } from "../../components/ui/Button";
 import {
   CheckboxField,
   LookupField,
-  SelectField,
   TextAreaField,
   TextField,
   type FieldState,
@@ -26,7 +25,7 @@ import {
 import { Modal } from "../../components/ui/Modal";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { formatPhoneNumber } from "../../lib/format";
-import { resolveStaffLabel, searchActiveStaff } from "../../lib/lookups";
+import { resolveStaffLabel, searchSalesRepStaff } from "../../lib/lookups";
 import type { Client, ClientType, SaveClientRequest } from "../../types/clients";
 import { fieldForServerError, type FieldRule } from "../../lib/serverFieldErrors";
 
@@ -55,7 +54,6 @@ const schema = z.object({
     .max(160, "Máximo 160 caracteres"),
   taxId: z.string().trim().max(20, "Máximo 20 caracteres"),
   type: z.string().min(1, "Elige el tipo de cliente"),
-  territoryId: z.string().min(1, "Elige el territorio"),
   salesRepStaffId: z.string(),
   contactPersonName: z.string().trim().max(120, "Máximo 120 caracteres"),
   phone: z
@@ -85,7 +83,6 @@ type FormValues = z.infer<typeof schema>;
 
 const fieldRules: FieldRule<keyof FormValues>[] = [
   { field: "taxId", matches: ["rnc", "registro nacional"] },
-  { field: "territoryId", matches: ["territorio"] },
   { field: "salesRepStaffId", matches: ["vendedor"] },
   { field: "email", matches: ["correo"] },
   { field: "phone", matches: ["telefono", "teléfono"] },
@@ -97,7 +94,6 @@ const fieldRules: FieldRule<keyof FormValues>[] = [
 
 interface ClientModalProps {
   client?: Client;
-  territories: { id: number; name: string; isActive: boolean }[];
   onClose: () => void;
   onSaved: (client: Client) => void;
 }
@@ -113,7 +109,7 @@ function FormDivider({ title }: { title: string }) {
   );
 }
 
-export function ClientModal({ client, territories, onClose, onSaved }: ClientModalProps) {
+export function ClientModal({ client, onClose, onSaved }: ClientModalProps) {
   const isEdit = client !== undefined;
   const [formError, setFormError] = useState<string | null>(null);
   const { isExiting, requestClose } = useModalAnimation();
@@ -132,7 +128,6 @@ export function ClientModal({ client, territories, onClose, onSaved }: ClientMod
       name: client?.name ?? "",
       taxId: client?.taxId ?? "",
       type: client?.type ?? "Detallista",
-      territoryId: client ? String(client.territoryId) : "",
       salesRepStaffId: client?.salesRepStaffId ? String(client.salesRepStaffId) : "",
       contactPersonName: client?.contactPersonName ?? "",
       phone: client?.phone ? formatPhoneNumber(client.phone) : "",
@@ -146,7 +141,6 @@ export function ClientModal({ client, territories, onClose, onSaved }: ClientMod
   const notesValue = useWatch({ control, name: "notes" }) ?? "";
   const clientName = useWatch({ control, name: "name" }) ?? "";
   const clientType = useWatch({ control, name: "type" }) ?? "";
-  const clientTerritory = useWatch({ control, name: "territoryId" }) ?? "";
   const clientFormMissing = useMemo(
     () =>
       buildValidationItems([
@@ -162,14 +156,8 @@ export function ClientModal({ client, territories, onClose, onSaved }: ClientMod
           short: "el tipo",
           valid: clientType.trim().length > 0,
         },
-        {
-          id: "territoryId",
-          label: "Falta elegir el territorio",
-          short: "el territorio",
-          valid: clientTerritory.trim().length > 0,
-        },
       ]),
-    [clientName, clientType, clientTerritory],
+    [clientName, clientType],
   );
 
   function stateOf(field: keyof FormValues): FieldState {
@@ -186,7 +174,6 @@ export function ClientModal({ client, territories, onClose, onSaved }: ClientMod
       name: values.name.trim(),
       taxId: taxId === "" ? null : taxId,
       type: values.type as ClientType,
-      territoryId: Number(values.territoryId),
       salesRepStaffId: values.salesRepStaffId === "" ? null : Number(values.salesRepStaffId),
       contactPersonName: values.contactPersonName.trim() === "" ? null : values.contactPersonName.trim(),
       phone: values.phone.trim() === "" ? null : values.phone.trim(),
@@ -353,30 +340,7 @@ export function ClientModal({ client, territories, onClose, onSaved }: ClientMod
         {/* 3. ASIGNACIÓN COMERCIAL */}
         <FormDivider title="Comercial" />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-          <Controller
-            name="territoryId"
-            control={control}
-            render={({ field }) => (
-              <SelectField
-                size="sm"
-                label="Territorio"
-                required
-                searchable
-                name={field.name}
-                value={field.value}
-                onChange={field.onChange}
-                onBlur={field.onBlur}
-                placeholder="Elige un territorio…"
-                options={territories
-                  .filter((territory) => territory.isActive || String(territory.id) === field.value)
-                  .map((territory) => ({ value: String(territory.id), label: territory.name }))}
-                state={stateOf("territoryId")}
-                error={errors.territoryId?.message}
-              />
-            )}
-          />
-
+        <div className="grid grid-cols-1 gap-2.5">
           <Controller
             name="salesRepStaffId"
             control={control}
@@ -391,7 +355,7 @@ export function ClientModal({ client, territories, onClose, onSaved }: ClientMod
                 placeholder="Sin vendedor asignado"
                 searchPlaceholder="Buscar vendedor…"
                 clearLabel="Sin vendedor asignado"
-                search={searchActiveStaff}
+                search={searchSalesRepStaff}
                 resolveSelectedLabel={resolveStaffLabel}
                 state={stateOf("salesRepStaffId")}
                 error={errors.salesRepStaffId?.message}

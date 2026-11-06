@@ -1,4 +1,4 @@
-import { Building2, FileText, Package, ShieldAlert } from "lucide-react";
+import { Building2, Package } from "lucide-react";
 import { Link } from "react-router-dom";
 import { formatDay, formatInstant } from "../../lib/dates";
 import { NOTIFICATION_ITEM } from "../../lib/discrepancies";
@@ -13,7 +13,6 @@ interface DiscrepancyExecutiveSummaryProps {
 
 export function DiscrepancyExecutiveSummary({
   discrepancy,
-  completionConditions,
 }: DiscrepancyExecutiveSummaryProps) {
   const kpiLabelClass = "font-heading text-[10px] font-semibold text-zinc-500";
   const sectionTitleClass = "font-heading text-[11px] font-semibold text-zinc-700";
@@ -141,25 +140,6 @@ export function DiscrepancyExecutiveSummary({
               </tbody>
             </table>
           </div>
-        </div>
-      )}
-
-      {completionConditions && completionConditions.length > 0 && discrepancy.status === "En investigación" && (
-        <div className="rounded-xl border border-zinc-200/90 bg-white p-4 shadow-2xs">
-          <div className="flex items-center gap-2 border-b border-zinc-100 pb-2.5">
-            <FileText className="h-4 w-4 text-zinc-500" />
-            <h4 className={sectionTitleClass}>Pendientes para completar</h4>
-          </div>
-          <ul className="mt-2 space-y-1.5">
-            {completionConditions
-              .filter((c) => !c.met)
-              .map((c) => (
-                <li key={c.id} className="flex items-start gap-2 text-[12px] text-amber-800">
-                  <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                  <span>{c.missing}</span>
-                </li>
-              ))}
-          </ul>
         </div>
       )}
     </div>

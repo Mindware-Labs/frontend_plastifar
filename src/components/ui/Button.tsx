@@ -71,10 +71,14 @@ export function Button({
             : "opacity-100 translate-y-0"
         }`}
       >
-        {isLoading && (
-          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+        {isLoading ? (
+          <span
+            className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"
+            aria-hidden
+          />
+        ) : (
+          children
         )}
-        {children}
       </span>
       {toneLabel != null && (
         <span

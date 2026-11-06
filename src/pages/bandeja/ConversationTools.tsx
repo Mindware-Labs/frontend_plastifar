@@ -7,6 +7,7 @@ import { Button } from "../../components/ui/Button";
 import { Modal } from "../../components/ui/Modal";
 import { Select, type SelectOption } from "../../components/ui/Select";
 import { useAuth } from "../../context/useAuth";
+import { useReceipts } from "../../context/useReceipts";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
 import type { EmailNoteResponse, StaffOptionResponse } from "../../types/api";
@@ -127,6 +128,7 @@ export function AssignmentControl({
   onNoteAdded,
 }: AssignmentProps) {
   const { user } = useAuth();
+  const receipts = useReceipts();
   const [options, setOptions] = useState<StaffOptionResponse[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -145,6 +147,11 @@ export function AssignmentControl({
     setError(null);
     try {
       const result = await emailsApi.assign(emailId, staffId);
+      receipts.done(
+        result.assignedStaffId === null
+          ? { action: "asignar-correo", title: "Asignación quitada" }
+          : { action: "asignar-correo", title: "Conversación asignada", detail: result.assignedStaffName ?? undefined },
+      );
       onChanged(result.assignedStaffId, result.assignedStaffName);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo asignar");
@@ -164,6 +171,11 @@ export function AssignmentControl({
         const newNote = await emailsApi.addNote(emailId, trimmed);
         onNoteAdded?.(newNote);
       }
+      receipts.done({
+        action: "asignar-correo",
+        title: "Conversación asignada",
+        detail: result.assignedStaffName ?? undefined,
+      });
       onChanged(result.assignedStaffId, result.assignedStaffName);
       setPendingAssignment(null);
     } catch (err) {

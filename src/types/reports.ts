@@ -43,7 +43,6 @@ export type ReportFilterKey =
   | "client"
   | "productLine"
   | "responsible"
-  | "territory"
   | "salesRep"
   | "clientType"
   | "activeOnly";
@@ -102,8 +101,7 @@ export const REPORT_CATALOG: ReportDefinition[] = [
   { id: "reclamaciones-por-motivo", family: "calidad", name: "Reclamaciones por motivo", description: "Qué tipo de reclamo pesa más.", blockedBy: TICKETS, filters: [] },
   { id: "reclamaciones-por-linea", family: "calidad", name: "Reclamaciones por línea de producto", description: "Qué línea concentra más no conformidades.", blockedBy: TICKETS, filters: [] },
   // Clientes (4 del plan + cartera por territorio) — sin rango: es una foto.
-  { id: "cartera-por-territorio", family: "clientes", name: "Reparto de la cartera por territorio", description: "Cuántos clientes y cuántos activos tiene cada zona.", blockedBy: null, filters: ["territory", "salesRep", "clientType", "activeOnly"] },
-  { id: "actividad-vendedor", family: "clientes", name: "Actividad por vendedor", description: "Cartera asignada a cada vendedor activo.", blockedBy: null, filters: ["territory", "salesRep", "clientType", "activeOnly"] },
+  { id: "actividad-vendedor", family: "clientes", name: "Actividad por vendedor", description: "Cartera asignada a cada vendedor activo.", blockedBy: null, filters: ["salesRep", "clientType", "activeOnly"] },
   { id: "ranking-volumen", family: "clientes", name: "Ranking por volumen de tickets", description: "Quién abre más solicitudes.", blockedBy: TICKETS, filters: [] },
   { id: "ranking-reclamaciones", family: "clientes", name: "Ranking por reclamaciones", description: "Quién reclama más, no solo quién compra más.", blockedBy: TICKETS, filters: [] },
   { id: "clientes-sin-actividad", family: "clientes", name: "Clientes sin actividad en el período", description: "Los que llevan tiempo sin tocar el sistema.", blockedBy: TICKETS, filters: [] },

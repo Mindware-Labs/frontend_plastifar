@@ -68,7 +68,7 @@ describe("taskFormSchema", () => {
     // Días posteriores no son pasados
     assert.equal(isPastDueDate("2026-10-29", undefined, now), false);
 
-    // Mismo día sin hora se permite
+    // Mismo día sin hora: válido a mediodía (fin de día UTC aún no llegó)
     assert.equal(isPastDueDate("2026-10-28", undefined, now), false);
 
     // Mismo día con hora pasada es pasado
@@ -76,6 +76,10 @@ describe("taskFormSchema", () => {
 
     // Mismo día con hora futura es válido
     assert.equal(isPastDueDate("2026-10-28", "16:00", now), false);
+
+    // Noche local: «hoy» sin hora ya venció en UTC (como en el API)
+    const lateNight = new Date(Date.UTC(2026, 9, 29, 3, 0, 0));
+    assert.equal(isPastDueDate("2026-10-28", undefined, lateNight), true);
   });
 });
 

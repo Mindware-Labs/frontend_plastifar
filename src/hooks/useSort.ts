@@ -16,5 +16,5 @@ export function useSort<K extends string>(initialKey: K, initialDir: SortDir) {
 
   const sortOf = (key: K) => ({ dir: sort.key === key ? sort.dir : null, onToggle: () => toggle(key) });
 
-  return { sort, sortOf };
+  return { sort, sortOf, setSort };
 }

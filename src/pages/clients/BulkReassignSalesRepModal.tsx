@@ -5,9 +5,21 @@ import { clientsApi } from "../../api/clients";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { LookupField } from "../../components/ui/Field";
-import { resolveStaffLabel, searchActiveStaff } from "../../lib/lookups";
 import { Modal } from "../../components/ui/Modal";
+import { useModalAnimation } from "../../hooks/useModalAnimation";
+import { resolveStaffLabel, searchSalesRepStaff } from "../../lib/lookups";
 import type { Client } from "../../types/clients";
+
+function FormDivider({ title }: { title: string }) {
+  return (
+    <div className="flex items-center gap-2 pt-2 border-t border-zinc-100 first:border-0 first:pt-0">
+      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400 select-none">
+        {title}
+      </span>
+      <div className="h-px flex-1 bg-zinc-100" />
+    </div>
+  );
+}
 
 interface BulkReassignSalesRepModalProps {
   clients: Client[];
@@ -16,20 +28,17 @@ interface BulkReassignSalesRepModalProps {
 }
 
 /**
- * RF-C7 en lote: la mitad comercial de este modulo es mover una cartera de un
- * vendedor a otro cuando alguien entra o sale, y hacerlo cliente por cliente
- * son treinta dialogos.
- *
- * El dialogo nombra a quien va a tocar antes de tocarlo: una accion sobre una
- * seleccion que no se ve es una accion a ciegas.
+ * RF-C7 en lote: mover una cartera de un vendedor a otro en una sola operación.
  */
 export function BulkReassignSalesRepModal({ clients, onClose, onSaved }: BulkReassignSalesRepModalProps) {
   const [formError, setFormError] = useState<string | null>(null);
+  const { isExiting, requestClose } = useModalAnimation();
+
   const { control, handleSubmit, formState } = useForm<{ salesRepStaffId: string }>({
     defaultValues: { salesRepStaffId: "" },
   });
 
-  const shown = clients.slice(0, 6);
+  const shown = clients.slice(0, 5);
   const overflow = clients.length - shown.length;
 
   async function onSubmit(values: { salesRepStaffId: string }) {
@@ -40,14 +49,23 @@ export function BulkReassignSalesRepModal({ clients, onClose, onSaved }: BulkRea
         salesRepStaffId: values.salesRepStaffId === "" ? null : Number(values.salesRepStaffId),
       });
       onSaved();
-      onClose();
+      requestClose();
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "No se pudo reasignar el vendedor");
     }
   }
 
+  function handleKeyDown(event: React.KeyboardEvent<HTMLFormElement>) {
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      event.preventDefault();
+      void handleSubmit(onSubmit)();
+    }
+  }
+
   return (
     <Modal
+      maxWidth="max-w-md"
+      eyebrow={`${clients.length} ${clients.length === 1 ? "cliente seleccionado" : "clientes seleccionados"}`}
       title="Reasignar vendedor en lote"
       description={
         clients.length === 1
@@ -55,44 +73,74 @@ export function BulkReassignSalesRepModal({ clients, onClose, onSaved }: BulkRea
           : `Cambia quién atiende comercialmente a los ${clients.length} clientes seleccionados.`
       }
       onClose={onClose}
+      isExiting={isExiting}
+      onRequestClose={requestClose}
       footer={
-        <>
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button type="submit" form="bulk-reassign-form" isLoading={formState.isSubmitting}>
-            {clients.length === 1 ? "Reasignar cliente" : `Reasignar ${clients.length} clientes`}
-          </Button>
-        </>
+        <div className="flex w-full items-center justify-between gap-3">
+          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
+            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+              Ctrl
+            </kbd>
+            <span>+</span>
+            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+              Enter
+            </kbd>
+            <span className="ml-0.5">para guardar</span>
+          </span>
+          <div className="flex items-center gap-2 ml-auto">
+            <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              form="bulk-reassign-form"
+              size="sm"
+              isLoading={formState.isSubmitting}
+            >
+              {clients.length === 1 ? "Reasignar cliente" : `Reasignar ${clients.length} clientes`}
+            </Button>
+          </div>
+        </div>
       }
     >
       <form
         id="bulk-reassign-form"
         onSubmit={handleSubmit(onSubmit)}
+        onKeyDown={handleKeyDown}
         noValidate
-        className="flex flex-col gap-4"
+        className="flex flex-col gap-3 text-left"
       >
         {formError && <Alert variant="error">{formError}</Alert>}
 
-        <ul className="flex flex-col gap-1 rounded-edge bg-canvas px-3 py-2.5 text-[12.5px] text-brand-gray">
-          {shown.map((client) => (
-            <li key={client.id} className="truncate">
-              {client.name}
-            </li>
-          ))}
-          {overflow > 0 && (
-            <li className="text-faint">
-              y {overflow} {overflow === 1 ? "cliente más" : "clientes más"}
-            </li>
-          )}
-        </ul>
+        {/* 1. CLIENTES AFECTADOS */}
+        <FormDivider title="Clientes seleccionados" />
+
+        <div className="rounded-lg border border-zinc-200/80 bg-zinc-50/70 p-3">
+          <ul className="flex flex-col divide-y divide-zinc-200/60 text-[12.5px]">
+            {shown.map((client) => (
+              <li key={client.id} className="flex items-center justify-between gap-2 py-1.5 first:pt-0 last:pb-0">
+                <span className="truncate font-medium text-zinc-900">{client.name}</span>
+                <span className="shrink-0 font-mono text-[11px] text-zinc-500">{client.code}</span>
+              </li>
+            ))}
+            {overflow > 0 && (
+              <li className="pt-2 text-[11.5px] font-medium text-zinc-400">
+                + {overflow} {overflow === 1 ? "cliente más" : "clientes más"}
+              </li>
+            )}
+          </ul>
+        </div>
+
+        {/* 2. NUEVA ASIGNACIÓN COMERCIAL */}
+        <FormDivider title="Nueva asignación comercial" />
 
         <Controller
           name="salesRepStaffId"
           control={control}
           render={({ field }) => (
             <LookupField
-              label="Vendedor"
+              size="sm"
+              label="Vendedor asignado"
               name={field.name}
               value={field.value}
               onChange={(value) => field.onChange(value)}
@@ -100,17 +148,12 @@ export function BulkReassignSalesRepModal({ clients, onClose, onSaved }: BulkRea
               placeholder="Sin vendedor asignado"
               searchPlaceholder="Buscar vendedor…"
               clearLabel="Sin vendedor asignado"
-              search={searchActiveStaff}
+              search={searchSalesRepStaff}
               resolveSelectedLabel={resolveStaffLabel}
-              hint="Se aplica a todos los clientes de la lista, incluidos los que ya tenían vendedor."
+              hint="Se aplicará a todos los clientes seleccionados."
             />
           )}
         />
-
-        <Alert variant="info">
-          El vendedor asignado debe ser personal activo. Si se desactiva, sus clientes vuelven al
-          filtro «Sin vendedor» para reasignarlos.
-        </Alert>
       </form>
     </Modal>
   );

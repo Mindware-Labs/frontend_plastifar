@@ -13,66 +13,58 @@ interface AuthLayoutProps {
 
 const CURRENT_YEAR = new Date().getFullYear();
 
-/** Layout corporativo centrado para pantallas de acceso. */
+/** Enlace secundario bajo formularios de acceso (volver al login, etc.). */
+export const authBackLinkClass =
+  "inline-flex items-center gap-1.5 rounded-md text-[13px] font-medium text-subtle transition-colors hover:text-brand-red-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25";
+
+/** Layout centrado para login y recuperación de acceso, alineado con tarjetas del panel. */
 export function AuthLayout({ title, subtitle, footer, children, settle = false }: AuthLayoutProps) {
   return (
-    <div className="relative flex min-h-dvh flex-col justify-between items-center bg-[#f8f9fa] px-4 py-10 sm:py-14 overflow-hidden selection:bg-brand-red/10 selection:text-brand-red">
-      {/* Fondo ambiental sutil con luz cenital tenue */}
+    <div className="relative flex min-h-dvh flex-col items-center justify-between overflow-hidden bg-canvas px-4 py-10 selection:bg-brand-red/10 selection:text-brand-red sm:py-14">
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[380px] bg-[radial-gradient(ellipse_at_top,rgba(228,0,43,0.05),transparent_70%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(#e2e4e8_1px,transparent_1px)] [background-size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_35%,#000_60%,transparent_100%)] opacity-50" />
+        <div className="absolute top-0 left-1/2 h-[320px] w-[880px] -translate-x-1/2 bg-[radial-gradient(ellipse_at_top,rgba(228,0,43,0.04),transparent_72%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(#e2e4e8_1px,transparent_1px)] [background-size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_35%,#000_55%,transparent_100%)] opacity-40" />
       </div>
 
-      <div className="w-full" /> {/* Spacer top para equilibrio visual */}
+      <div className="w-full" aria-hidden />
 
-      {/* Tarjeta central amplia y distinguida */}
-      <main className="relative z-10 w-full max-w-[440px] animate-plf-rise">
+      <main className="relative z-10 w-full max-w-[420px] animate-plf-rise">
         <div
-          className={`relative rounded-2xl sm:rounded-[22px] border border-zinc-200/90 bg-white p-8 sm:p-10 shadow-[0_2px_4px_rgba(0,0,0,0.02),0_12px_28px_-6px_rgba(27,27,29,0.05),0_28px_56px_-12px_rgba(27,27,29,0.07)] overflow-hidden transition-transform duration-300 ${
+          className={`overflow-hidden rounded-card border border-line bg-white p-7 shadow-card sm:p-9 ${
             settle ? "animate-plf-settle" : ""
           }`}
         >
-          {/* Cabecera con Logotipo oficial */}
           <header className="text-center">
-            <div className="flex justify-center mb-6">
-              <Logo variant="color" height={36} />
+            <div className="mb-5 flex justify-center">
+              <Logo variant="color" height={34} />
             </div>
 
-            <h1 className="font-heading text-[22px] sm:text-[23px] font-bold tracking-[-0.03em] text-zinc-900 leading-tight">
+            <h1 className="font-heading text-[20px] font-bold leading-tight tracking-[-0.02em] text-ink sm:text-[21px]">
               {title}
             </h1>
 
             {subtitle && (
-              <p className="mt-2 text-center text-[13.5px] text-zinc-500 font-normal leading-relaxed max-w-[34ch] mx-auto">
+              <p className="mx-auto mt-2 max-w-[36ch] text-center text-[13px] font-normal leading-relaxed text-subtle">
                 {subtitle}
               </p>
             )}
           </header>
 
-          {/* Formulario / Contenido */}
-          <div className="mt-8">
-            {children}
-          </div>
+          <div className="mt-7">{children}</div>
 
-          {/* Pie interior de la tarjeta */}
-          {footer && (
-            <div className="mt-8 pt-6 border-t border-zinc-100">
-              {footer}
-            </div>
-          )}
+          {footer && <div className="mt-7 border-t border-line pt-6">{footer}</div>}
         </div>
       </main>
 
-      {/* Pie institucional exterior */}
-      <footer className="relative z-10 mt-8 flex flex-col items-center gap-2.5 text-center animate-plf-fade">
-        <p className="text-[12px] tracking-normal text-zinc-400">
+      <footer className="relative z-10 mt-8 flex animate-plf-fade flex-col items-center gap-2.5 text-center">
+        <p className="text-[12px] text-faint">
           © {CURRENT_YEAR} Plastifar, S.A. · Autopista Duarte Km. 13½
         </p>
         <a
           href="https://www.cquest.do/"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1.5 rounded-full border border-zinc-200/80 bg-white/70 px-3 py-1 text-[11.5px] text-zinc-500 shadow-[0_1px_2px_rgba(0,0,0,0.02)] transition-colors hover:border-zinc-300 hover:bg-white"
+          className="flex items-center gap-1.5 rounded-full border border-line bg-white/80 px-3 py-1 text-[11.5px] text-subtle shadow-2xs transition-colors hover:border-zinc-300 hover:bg-white"
         >
           <span>Desarrollado por</span>
           <img
@@ -83,7 +75,7 @@ export function AuthLayout({ title, subtitle, footer, children, settle = false }
             draggable={false}
             className="select-none"
           />
-          <span className="font-semibold text-zinc-700 hover:text-brand-red hover:underline underline-offset-2">
+          <span className="font-semibold text-ink hover:text-brand-red hover:underline underline-offset-2">
             Center Quest
           </span>
         </a>

@@ -73,7 +73,7 @@ export function MotivosPage() {
 
   const debouncedSearch = useDebouncedValue(search, 300).trim();
 
-  const { data, error, setPage, refresh } = usePagedList<
+  const { data, isStale, error, setPage, refresh } = usePagedList<
     TicketTopicQuery,
     TicketTopicListResponse
   >({
@@ -95,7 +95,8 @@ export function MotivosPage() {
     departmentsApi.list().then(setDepartments).catch(() => setDepartments([]));
   }, []);
 
-  const rows = useMemo(() => data?.items ?? [], [data?.items]);
+  const listLoading = data === null || isStale;
+  const rows = useMemo(() => (isStale ? [] : (data?.items ?? [])), [data?.items, isStale]);
   const counts = data?.counts;
   const pageIds = useMemo(() => rows.map((row) => row.id), [rows]);
   const { selectedIds, pageState, togglePage, toggleSelect, clearSelection } = useTablePageSelection(pageIds);
@@ -127,29 +128,25 @@ export function MotivosPage() {
     setConfirmation({
       tone: "warn",
       icon: CheckCircle2,
-      eyebrow: "Tickets · Motivos",
       title: `Activar ${selectedIds.size} motivos`,
       description: "Volverán a ofrecerse al crear o clasificar tickets.",
       confirmLabel: "Activar",
-      onConfirm: () => {
-        setConfirmation(null);
-        void runBulk("activate");
-      },
+      onConfirm: () => runBulk("activate"),
     });
   }
 
   function askBulkDeactivate() {
     setConfirmation({
-      tone: "danger",
+      tone: "warn",
       icon: Ban,
-      eyebrow: "Tickets · Motivos",
       title: `Desactivar ${selectedIds.size} motivos`,
-      description: "Dejarán de ofrecerse en tickets nuevos. Los tickets que ya los usan no cambian.",
+      description: (
+        <>
+          Dejarán de ofrecerse en tickets nuevos. Los tickets que ya los usan no cambian.
+        </>
+      ),
       confirmLabel: "Desactivar",
-      onConfirm: () => {
-        setConfirmation(null);
-        void runBulk("deactivate");
-      },
+      onConfirm: () => runBulk("deactivate"),
     });
   }
 
@@ -157,15 +154,15 @@ export function MotivosPage() {
     setConfirmation({
       tone: "danger",
       icon: Trash2,
-      eyebrow: "Tickets · Motivos",
       title: `Eliminar ${selectedIds.size} motivos`,
-      description:
-        "Solo se borran los que ningún ticket usa. El resto se omitirá y tendrás que desactivarlos.",
+      description: (
+        <>
+          Solo se borran los que ningún ticket usa. El resto se omitirá y tendrás que
+          desactivarlos.
+        </>
+      ),
       confirmLabel: "Eliminar",
-      onConfirm: () => {
-        setConfirmation(null);
-        void runBulk("delete");
-      },
+      onConfirm: () => runBulk("delete"),
     });
   }
 
@@ -186,9 +183,8 @@ export function MotivosPage() {
   function askToggleActive(topic: TicketTopicResponse) {
     if (topic.isActive) {
       setConfirmation({
-        tone: "danger",
+        tone: "warn",
         icon: Ban,
-        eyebrow: "Tickets · Motivos",
         title: "Desactivar motivo",
         description: (
           <>
@@ -209,7 +205,6 @@ export function MotivosPage() {
     setConfirmation({
       tone: "danger",
       icon: Trash2,
-      eyebrow: "Tickets · Motivos",
       title: "Eliminar motivo",
       description: (
         <>
@@ -364,6 +359,8 @@ export function MotivosPage() {
                 options={departmentOptions}
                 defaultIcon={<Building2 className="h-4 w-4 text-zinc-500" />}
                 aria-label="Filtrar por departamento"
+                searchable
+                searchPlaceholder="Buscar departamento…"
               />
               <TicketFilterDropdown
                 title="Seleccionar prioridad"
@@ -394,6 +391,7 @@ export function MotivosPage() {
           footer={
             data !== null && data.total > 0 ? (
               <Pagination
+                loading={listLoading}
                 page={data.page}
                 pageSize={data.pageSize}
                 total={data.total}
@@ -405,7 +403,7 @@ export function MotivosPage() {
             ) : undefined
           }
         >
-          {!data ? (
+          {listLoading ? (
             error === null && <TableSkeleton rows={pageSize} columns={isAdmin ? 8 : 7} />
           ) : rows.length === 0 ? (
             <ListEmptyState

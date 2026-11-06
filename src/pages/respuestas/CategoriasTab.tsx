@@ -20,6 +20,7 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { formatDateTime } from "../../lib/format";
+import { useReceipts } from "../../context/useReceipts";
 import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import type { CategoriaResponseItem } from "../../types/api";
 import { getCategoryBadgeClasses } from "./cannedHelpers";
@@ -39,6 +40,7 @@ export function CategoriasTab({
 }: CategoriasTabProps) {
   const { can } = usePermissions();
   const canMailSend = can("mail.send");
+  const receipts = useReceipts();
 
   const [search, setSearch] = useState("");
   const [pageSize, setPageSize] = useState(10);
@@ -49,7 +51,7 @@ export function CategoriasTab({
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
-  const { data, error, setPage, refresh } = usePagedList({
+  const { data, isStale, error, setPage, refresh } = usePagedList({
     fetch: cannedCategoriesApi.list,
     criteria: { pageSize, search: debouncedSearch || undefined },
     fallbackError: "No se pudieron cargar las categorías.",
@@ -68,7 +70,8 @@ export function CategoriasTab({
 
   useLoadErrorReceipt(error, "canned-categories-list", refresh);
 
-  const rows = data?.items ?? [];
+  const listLoading = data === null || isStale;
+  const rows = isStale ? [] : (data?.items ?? []);
   const hasSearch = Boolean(debouncedSearch);
 
   // Selección múltiple
@@ -93,7 +96,6 @@ export function CategoriasTab({
     setConfirmation({
       tone: "danger",
       icon: Trash2,
-      eyebrow: "Correo · Categorías",
       title: "Eliminar categoría",
       description: (
         <>
@@ -110,8 +112,15 @@ export function CategoriasTab({
         setBusyId(item.id);
         try {
           await cannedCategoriesApi.remove(item.id);
+          receipts.done({ action: "eliminar-categoria-plantilla", title: "Categoría eliminada", detail: item.name });
           setSelectedIds((prev) => prev.filter((i) => i !== item.id));
           reload();
+        } catch (err) {
+          receipts.failed({
+            action: "eliminar-categoria-plantilla",
+            title: "No se pudo eliminar la categoría",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyId(null);
         }
@@ -126,7 +135,6 @@ export function CategoriasTab({
     setConfirmation({
       tone: "danger",
       icon: Trash2,
-      eyebrow: "Correo · Categorías en lote",
       title: `Eliminar ${count} ${count === 1 ? "categoría" : "categorías"}`,
       description: (
         <>
@@ -138,17 +146,31 @@ export function CategoriasTab({
       onConfirm: async () => {
         try {
           await cannedCategoriesApi.bulkDelete(selectedIds);
-          setSelectedIds([]);
-          reload();
+          receipts.done({
+            action: "eliminar-categorias-lote",
+            title: "Categorías eliminadas",
+            detail: `${count} ${count === 1 ? "categoría" : "categorías"}`,
+          });
         } catch {
+          let deleted = 0;
           for (const id of selectedIds) {
             try {
               await cannedCategoriesApi.remove(id);
+              deleted++;
             } catch {}
           }
-          setSelectedIds([]);
-          reload();
+          if (deleted === count) {
+            receipts.done({ action: "eliminar-categorias-lote", title: "Categorías eliminadas", detail: `${count} categorías` });
+          } else {
+            receipts.failed({
+              action: "eliminar-categorias-lote",
+              title: "No se pudieron eliminar todas las categorías",
+              detail: `Se eliminaron ${deleted} de ${count}`,
+            });
+          }
         }
+        setSelectedIds([]);
+        reload();
       },
     });
   }
@@ -189,6 +211,7 @@ export function CategoriasTab({
         footer={
           data !== null && data.total > 0 ? (
             <Pagination
+              loading={listLoading}
               page={data.page}
               pageSize={data.pageSize}
               total={data.total}
@@ -200,7 +223,7 @@ export function CategoriasTab({
           ) : undefined
         }
       >
-        {data === null ? (
+        {listLoading ? (
           error === null && <TableSkeleton rows={pageSize} columns={canMailSend ? 6 : 5} />
         ) : rows.length === 0 ? (
           <ListEmptyState

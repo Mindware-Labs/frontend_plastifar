@@ -9,16 +9,6 @@ export const CLIENT_TYPES: ClientType[] = [
   "Institucional",
 ];
 
-/** Catalogo de zonas; administrable desde Configuración (RF-C8). */
-export interface Territory {
-  id: number;
-  name: string;
-  code: string;
-  isActive: boolean;
-  /** Clientes que la referencian: alimenta el ranking comercial y la guarda de RF-C1. */
-  clientCount: number;
-}
-
 /** La organizacion que compra a Plastifar. */
 export interface Client {
   id: number;
@@ -27,7 +17,6 @@ export interface Client {
   /** RNC; unico cuando viene informado. */
   taxId: string | null;
   type: ClientType;
-  territoryId: number;
   /** Vendedor asignado; null cuando su colaborador se desactivo o nunca se asignó. */
   salesRepStaffId: number | null;
   phone: string | null;
@@ -88,7 +77,6 @@ export interface SaveClientRequest {
   name: string;
   taxId: string | null;
   type: ClientType;
-  territoryId: number;
   salesRepStaffId: number | null;
   phone: string | null;
   email: string | null;
@@ -118,8 +106,3 @@ export interface BulkReassignSalesRepResponse {
   updated: number;
 }
 
-export interface SaveTerritoryRequest {
-  name: string;
-  code: string;
-  isActive: boolean;
-}

@@ -1,5 +1,4 @@
 import {
-  HelpCircle,
   MessageSquareText,
   Pencil,
   Plus,
@@ -10,6 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { cannedApi, cannedCategoriesApi } from "../../api/canned";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { SEGMENTED_TAB_COUNT_BADGE_CLASS } from "../../components/ui/SegmentedTabs";
+import { useReceipts } from "../../context/useReceipts";
 import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
@@ -33,12 +33,12 @@ import { getCategoryBadgeClasses, parseCanned } from "./cannedHelpers";
 import { CannedPreviewDrawer } from "./CannedPreviewDrawer";
 import { CannedResponseStudio } from "./CannedResponseStudio";
 import { CategoriasTab } from "./CategoriasTab";
-import { RespuestasHelpSheet } from "./RespuestasHelpSheet";
 
 /** Plantillas de correo y categorías con selección múltiple y gestión en lote. */
 export function RespuestasPage() {
   const { user } = useAuth();
   const { can } = usePermissions();
+  const receipts = useReceipts();
   const canMailSend = can("mail.send");
 
   const [activeTab, setActiveTab] = useState<"plantillas" | "categorias">("plantillas");
@@ -59,12 +59,11 @@ export function RespuestasPage() {
     | null
   >(null);
   const [previewItem, setPreviewItem] = useState<CannedResponseResponse | null>(null);
-  const [helpOpen, setHelpOpen] = useState(false);
   const [pendingNewCategory, setPendingNewCategory] = useState(false);
 
   const debouncedSearch = useDebouncedValue(search).trim();
 
-  const { data, error, setPage, refresh } = usePagedList({
+  const { data, isStale, error, setPage, refresh } = usePagedList({
     fetch: cannedApi.list,
     criteria: {
       pageSize,
@@ -91,7 +90,8 @@ export function RespuestasPage() {
     loadCategories();
   }
 
-  const items = data?.items ?? null;
+  const listLoading = data === null || isStale;
+  const items = isStale ? [] : (data?.items ?? null);
 
   const parsedItems = useMemo(() => {
     return (items ?? []).map((item) => {
@@ -156,7 +156,6 @@ export function RespuestasPage() {
     setConfirmation({
       tone: "danger",
       icon: Trash2,
-      eyebrow: "Correo · Plantillas",
       title: "Eliminar plantilla",
       description: (
         <>
@@ -169,11 +168,18 @@ export function RespuestasPage() {
         setBusyId(item.id);
         try {
           await cannedApi.remove(item.id);
+          receipts.done({ action: "eliminar-plantilla", title: "Plantilla eliminada", detail: cleanTitle });
           if (previewItem?.id === item.id) {
             setPreviewItem(null);
           }
           setSelectedIds((prev) => prev.filter((id) => id !== item.id));
           reloadAll();
+        } catch (err) {
+          receipts.failed({
+            action: "eliminar-plantilla",
+            title: "No se pudo eliminar la plantilla",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyId(null);
         }
@@ -188,7 +194,6 @@ export function RespuestasPage() {
     setConfirmation({
       tone: "danger",
       icon: Trash2,
-      eyebrow: "Correo · Plantillas en lote",
       title: `Eliminar ${count} ${count === 1 ? "plantilla" : "plantillas"}`,
       description: (
         <>
@@ -200,18 +205,32 @@ export function RespuestasPage() {
       onConfirm: async () => {
         try {
           await cannedApi.bulkDelete(selectedIds);
-          setSelectedIds([]);
-          reloadAll();
+          receipts.done({
+            action: "eliminar-plantillas-lote",
+            title: "Plantillas eliminadas",
+            detail: `${count} ${count === 1 ? "plantilla" : "plantillas"}`,
+          });
         } catch {
           // Fallback individual si falla en lote
+          let deleted = 0;
           for (const id of selectedIds) {
             try {
               await cannedApi.remove(id);
+              deleted++;
             } catch {}
           }
-          setSelectedIds([]);
-          reloadAll();
+          if (deleted === count) {
+            receipts.done({ action: "eliminar-plantillas-lote", title: "Plantillas eliminadas", detail: `${count} plantillas` });
+          } else {
+            receipts.failed({
+              action: "eliminar-plantillas-lote",
+              title: "No se pudieron eliminar todas las plantillas",
+              detail: `Se eliminaron ${deleted} de ${count}`,
+            });
+          }
         }
+        setSelectedIds([]);
+        reloadAll();
       },
     });
   }
@@ -336,20 +355,12 @@ export function RespuestasPage() {
                     />
                   )}
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => setHelpOpen(true)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-[12px] font-medium text-zinc-700 shadow-2xs hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 transition-all cursor-pointer active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-brand-red/25"
-                >
-                  <HelpCircle className="h-3.5 w-3.5 text-brand-red" />
-                  <span>¿Para qué sirve?</span>
-                </button>
               </div>
             }
             footer={
               data !== null && data.total > 0 ? (
                 <Pagination
+                  loading={listLoading}
                   page={data.page}
                   pageSize={data.pageSize}
                   total={data.total}
@@ -361,7 +372,7 @@ export function RespuestasPage() {
               ) : undefined
             }
           >
-            {items === null ? (
+            {listLoading ? (
               error === null && <TableSkeleton rows={pageSize} columns={canMailSend ? 10 : 9} />
             ) : rows.length === 0 ? (
               <ListEmptyState
@@ -562,17 +573,6 @@ export function RespuestasPage() {
           onSaved={() => {
             reloadAll();
             setStudioState(null);
-          }}
-        />
-      )}
-
-      {/* Hoja de Ayuda */}
-      {helpOpen && (
-        <RespuestasHelpSheet
-          onClose={() => setHelpOpen(false)}
-          onNewResponse={() => {
-            setHelpOpen(false);
-            setStudioState({ mode: "nueva" });
           }}
         />
       )}

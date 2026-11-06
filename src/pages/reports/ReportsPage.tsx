@@ -1,8 +1,9 @@
 import { BarChart3, Download, Lock, ShieldAlert, SlidersHorizontal } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
+import { fetchAllPages } from "../../api/paging";
+import { productLinesApi } from "../../api/productLines";
 import {
   reportsApi,
   type AuditReport,
@@ -16,8 +17,8 @@ import { Button } from "../../components/ui/Button";
 import { Drawer } from "../../components/ui/Drawer";
 import { Pagination } from "../../components/ui/Pagination";
 import { usePermissions } from "../../hooks/usePermissions";
-import { catalogs } from "../../lib/catalogQueries";
 import { REPORT_CATALOG, type ReportDefinition } from "../../types/reports";
+import type { ProductLine } from "../../types/settings";
 import { ReportFilters, type ReferenceData, type ReportCriteria } from "./ReportFilters";
 import { AuditSliceResult, ClientsResult, QualityResult } from "./results";
 import { defaultRange } from "./useDateRange";
@@ -51,7 +52,6 @@ function emptyCriteria(): ReportCriteria {
     clientId: "",
     productLineId: "",
     responsibleStaffId: "",
-    territoryId: "",
     salesRepStaffId: "",
     clientType: "",
     activeOnly: false,
@@ -107,28 +107,26 @@ export function ReportsPage() {
   const [isExporting, setIsExporting] = useState(false);
   /** Un fallo al exportar no invalida el reporte que se esta viendo: va aparte. */
   const [exportError, setExportError] = useState<string | null>(null);
+  const [reference, setReference] = useState<ReferenceData>({
+    productLines: [],
+    clientTypes: CLIENT_TYPES,
+  });
+
   // Solo los catalogos acotados —lineas y territorios— se precargan, y enteros:
   // el corte de 200 dejaba fuera cualquiera que pasara de ahi. Cliente,
   // responsable y vendedor no se precargan: sus tres selectores buscan en el
   // servidor porque ni la cartera ni el personal tienen tope.
-  const linesQuery = useQuery({ ...catalogs.productLines(), enabled: canRead });
-  const territoriesQuery = useQuery({ ...catalogs.territories(), enabled: canRead });
-  const lines = linesQuery.data;
-  const territories = territoriesQuery.data;
-  // Un catalogo que no llega deja su selector vacio, y eso ya se ve. No es
-  // motivo para tumbar la pantalla: el reporte se puede generar sin acotar.
-  // Como antes, los dos selectores se llenan juntos o ninguno.
-  const reference = useMemo<ReferenceData>(
-    () =>
-      lines && territories
-        ? {
-            productLines: lines.map((l) => ({ value: String(l.id), label: l.name })),
-            territories: territories.map((t) => ({ value: String(t.id), label: t.name })),
-            clientTypes: CLIENT_TYPES,
-          }
-        : { productLines: [], territories: [], clientTypes: CLIENT_TYPES },
-    [lines, territories],
-  );
+  useEffect(() => {
+    if (!canRead) return;
+    void fetchAllPages<ProductLine>((page, pageSize) => productLinesApi.list({ page, pageSize }))
+      .then((lines) =>
+        setReference({
+          productLines: lines.map((l) => ({ value: String(l.id), label: l.name })),
+          clientTypes: CLIENT_TYPES,
+        }),
+      )
+      .catch(() => undefined);
+  }, [canRead]);
 
   const num = (value: string) => (value === "" ? undefined : Number(value));
 
@@ -151,7 +149,6 @@ export function ReportsPage() {
           case "clientes":
             return reportsApi
               .clients({
-                territoryId: num(values.territoryId),
                 salesRepStaffId: num(values.salesRepStaffId),
                 type: values.clientType === "" ? undefined : values.clientType,
                 activeOnly: values.activeOnly ? true : undefined,
@@ -239,7 +236,6 @@ export function ReportsPage() {
           clientId: num(criteria.clientId),
           productLineId: num(criteria.productLineId),
           responsibleStaffId: num(criteria.responsibleStaffId),
-          territoryId: num(criteria.territoryId),
           salesRepStaffId: num(criteria.salesRepStaffId),
           type: criteria.clientType === "" ? undefined : criteria.clientType,
           activeOnly: criteria.activeOnly ? true : undefined,
@@ -362,6 +358,7 @@ export function ReportsPage() {
                 {payload.data.total > 0 && (
                   <div className="mt-3">
                     <Pagination
+                      loading={isGenerating}
                       page={payload.data.page}
                       pageSize={payload.data.pageSize}
                       total={payload.data.total}

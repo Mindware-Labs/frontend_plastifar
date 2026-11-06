@@ -18,9 +18,8 @@ import {
   UserCheck,
   Users,
 } from "lucide-react";
-import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import {
   clientsApi,
@@ -29,7 +28,7 @@ import {
   type ContactQuery,
 } from "../../api/clients";
 import { ticketsApi } from "../../api/tickets";
-import { ModuleHeader } from "../../components/app/ModuleHeader";
+import { MODULE_HEADER_SYMMETRIC_BAND_CLASS, ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -40,12 +39,11 @@ import { DetailCard } from "../../components/ui/DetailCard";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
 import { ListPanel } from "../../components/ui/ListPanel";
-import { PageSpinner } from "../../components/ui/PageSpinner";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { StatTile } from "../../components/ui/StatTile";
-import { TableSkeleton } from "../../components/ui/Skeleton";
+import { ClientDetailSkeleton, TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
 import { useReceipts } from "../../context/useReceipts";
@@ -55,9 +53,11 @@ import { usePermissions } from "../../hooks/usePermissions";
 import { formatDateTime, formatPhoneNumber, formatTicketCode } from "../../lib/format";
 import { resolveStaffLabel } from "../../lib/lookups";
 import type { TicketListResponse, TicketQuery } from "../../types/api";
-import { useTerritoriesCatalog } from "../../lib/catalogQueries";
-import type { Client, ClientDetailResponse, Contact, Territory } from "../../types/clients";
+import type { Client, Contact } from "../../types/clients";
 import { PriorityCell, StatusCell } from "../tickets/ticketCells";
+import { TicketSummaryDrawer } from "../tickets/TicketSummaryDrawer";
+import { useEnterpriseListReturnRestore } from "../../hooks/useEnterpriseListReturnRestore";
+import { captureListScrollY, navigateToTicketFullView } from "../../lib/enterpriseListReturn";
 import { ClientModal } from "./ClientModal";
 import { ContactModal } from "./ContactModal";
 
@@ -79,9 +79,6 @@ const contactChips: { key: ContactChipKey; label: string; countKey: keyof Contac
   { key: "inactivos", label: "Inactivos", countKey: "inactive" },
 ];
 
-const NO_CONTACTS: Contact[] = [];
-const NO_TERRITORIES: Territory[] = [];
-
 const TYPE_ICONS: Record<string, typeof Truck> = {
   Distribuidor: Truck,
   Mayorista: Boxes,
@@ -95,9 +92,10 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   const canWrite = can("clients.write");
   const receipts = useReceipts();
 
-  const queryClient = useQueryClient();
-  /** Fallos de acciones y de la relectura tras un cambio; el de la carga sale de la consulta. */
-  const [actionError, setError] = useState<string | null>(null);
+  const [client, setClient] = useState<Client | null>(null);
+  const [previewContacts, setPreviewContacts] = useState<Contact[]>([]);
+  const [salesRepName, setSalesRepName] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [busyContactId, setBusyContactId] = useState<number | null>(null);
 
   const [editingClient, setEditingClient] = useState(false);
@@ -111,58 +109,9 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   const [ticketSearch, setTicketSearch] = useState("");
   const [ticketChip, setTicketChip] = useState<"todos" | "abiertos" | "cerrados">("todos");
   const [ticketPageSize, setTicketPageSize] = useState(10);
+  const [summaryTicketId, setSummaryTicketId] = useState<number | null>(null);
 
   const clientId = Number(id);
-
-  // Al cambiar de cliente se olvida el error del anterior, como hacia la carga inicial.
-  const [lastClientId, setLastClientId] = useState(clientId);
-  if (clientId !== lastClientId) {
-    setLastClientId(clientId);
-    setError(null);
-  }
-
-  // La ficha anterior sigue a la vista mientras llega la de otro id.
-  const record = useQuery({
-    queryKey: ["clients", clientId],
-    queryFn: () => clientsApi.get(clientId),
-    enabled: Boolean(id),
-    placeholderData: keepPreviousData,
-  });
-  // Al abrir la ficha se espera la lectura de este montaje: la copia de la cache
-  // podria sembrar el modal de edicion con datos ya cambiados.
-  const fresh = record.isFetchedAfterMount ? record.data : undefined;
-  const client: Client | null = fresh?.client ?? null;
-  const previewContacts: Contact[] = fresh?.contacts ?? NO_CONTACTS;
-  const loadError =
-    record.isError && !record.isFetching
-      ? record.error instanceof ApiError
-        ? record.error.message
-        : "No se pudo cargar la ficha del cliente"
-      : null;
-  const error = actionError ?? loadError;
-
-  function setClient(updated: Client) {
-    queryClient.setQueryData<ClientDetailResponse>(["clients", clientId], (current) =>
-      current ? { ...current, client: updated } : current,
-    );
-  }
-
-  const territoriesQuery = useTerritoriesCatalog();
-  const territories: Territory[] = territoriesQuery.data ?? NO_TERRITORIES;
-  const referenceError =
-    territoriesQuery.isError && !territoriesQuery.isFetching
-      ? "No se pudieron cargar los territorios: abajo aparecen sin nombre, y el diálogo de edición se abrirá con esa lista vacía."
-      : null;
-
-  const salesRepStaffId = client?.salesRepStaffId ?? null;
-  const salesRepQuery = useQuery({
-    queryKey: ["staff", salesRepStaffId, "label"],
-    queryFn: () => resolveStaffLabel(String(salesRepStaffId)),
-    enabled: salesRepStaffId !== null,
-    placeholderData: keepPreviousData,
-  });
-  const salesRepName = salesRepStaffId === null ? null : (salesRepQuery.data ?? null);
-
   useDynamicBreadcrumb(client?.name ?? null);
 
   const debouncedContactSearch = useDebouncedValue(contactSearch).trim();
@@ -171,12 +120,11 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   // Pestaña de Contactos
   const {
     data: contactPage,
-    // transición de página manejada en DataTable
+    isStale: contactsStale,
     error: contactsError,
     setPage: setContactPage,
     refresh: refreshContacts,
   } = usePagedList<ContactQuery, ContactListResponse>({
-    queryKey: ["clients", clientId, "contacts"],
     fetch: (query) => clientsApi.contacts.list(clientId, query),
     criteria: {
       pageSize: contactPageSize,
@@ -189,12 +137,11 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   // Pestaña de Historial de Tickets
   const {
     data: ticketPage,
-    // transición de página manejada en DataTable
+    isStale: ticketsStale,
     error: ticketsError,
     setPage: setTicketPage,
     refresh: refreshTickets,
   } = usePagedList<TicketQuery, TicketListResponse>({
-    queryKey: ["tickets", "by-client", clientId],
     fetch: (query) => ticketsApi.list(query),
     criteria: {
       clientId,
@@ -205,39 +152,120 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
     fallbackError: "No se pudieron cargar los tickets del cliente",
   });
 
-  const contactRows = contactPage?.items ?? [];
+  const contactsLoading = contactPage === null || contactsStale;
+  const contactRows = contactsStale ? [] : (contactPage?.items ?? []);
   const contactCounts = contactPage?.counts;
   const contactsUnfiltered = contactChip === "todos" && !debouncedContactSearch;
   const totalContacts = contactCounts?.all ?? client?.contactCount ?? 0;
 
-  const ticketRows = ticketPage?.items ?? [];
+  const ticketsLoading = ticketPage === null || ticketsStale;
+  const ticketRows = ticketsStale ? [] : (ticketPage?.items ?? []);
   const ticketCounts = ticketPage?.counts;
   const totalTickets = ticketCounts?.all ?? ticketPage?.total ?? client?.ticketCount ?? 0;
 
-  async function refreshAfterContactChange() {
-    refreshContacts();
-    const result = await record.refetch();
-    if (result.isError) {
-      setError(
-        result.error instanceof ApiError ? result.error.message : "No se pudo actualizar la ficha del cliente",
-      );
+  const navigate = useNavigate();
+
+  const applyTicketListState = useCallback((state: Record<string, unknown>) => {
+    if (typeof state.ticketSearch === "string") setTicketSearch(state.ticketSearch);
+    if (state.ticketChip === "todos" || state.ticketChip === "abiertos" || state.ticketChip === "cerrados") {
+      setTicketChip(state.ticketChip);
     }
+    if (typeof state.ticketPageSize === "number") setTicketPageSize(state.ticketPageSize);
+  }, []);
+
+  const getReturnSnapshot = useCallback(() => {
+    if (summaryTicketId === null) return null;
+    const ticket = ticketRows.find((t) => t.id === summaryTicketId);
+    return {
+      listPath: `/clientes/${clientId}/historial`,
+      scrollY: captureListScrollY(),
+      bannerTitle: `Historial de ${client?.name ?? "cliente"}`,
+      bannerDetail: ticket ? `${ticket.number || formatTicketCode(ticket.id)} · ${ticket.subject}` : undefined,
+      listState: {
+        page: ticketPage?.page ?? 1,
+        summaryId: summaryTicketId,
+        ticketSearch,
+        ticketChip,
+        ticketPageSize,
+      },
+    };
+  }, [summaryTicketId, ticketRows, clientId, client?.name, ticketPage?.page, ticketSearch, ticketChip, ticketPageSize]);
+
+  useEnterpriseListReturnRestore({
+    applyListState: applyTicketListState,
+    setPage: setTicketPage,
+    openSummary: setSummaryTicketId,
+    listReady: !ticketsLoading && ticketPage !== null,
+  });
+
+  function handleDirectTicketClick(event: React.MouseEvent, ticket: (typeof ticketRows)[number]) {
+    event.stopPropagation();
+    event.preventDefault();
+    const url = `/tickets/${ticket.id}`;
+    const snapshot = {
+      listPath: `/clientes/${clientId}/historial`,
+      scrollY: captureListScrollY(),
+      bannerTitle: `Historial de ${client?.name ?? "cliente"}`,
+      bannerDetail: `${ticket.number || formatTicketCode(ticket.id)} · ${ticket.subject}`,
+      listState: {
+        page: ticketPage?.page ?? 1,
+        ticketSearch,
+        ticketChip,
+        ticketPageSize,
+      },
+    };
+    navigateToTicketFullView(navigate, url, ticket.id, snapshot);
+  }
+
+
+
+  function reload() {
+    return clientsApi.get(clientId).then(({ client: loaded, contacts }) => {
+      setClient(loaded);
+      setPreviewContacts(contacts ?? []);
+    });
+  }
+
+  function refreshAfterContactChange() {
+    refreshContacts();
+    return reload().catch((err) => {
+      setError(err instanceof ApiError ? err.message : "No se pudo actualizar la ficha del cliente");
+    });
   }
 
   function loadRecord() {
     setError(null);
-    return record.refetch();
+    return reload().catch((err) => {
+      setError(err instanceof ApiError ? err.message : "No se pudo cargar la ficha del cliente");
+    });
   }
 
-  function loadReferenceData() {
-    return territoriesQuery.refetch();
-  }
+  useEffect(() => {
+    if (!id) return;
+    void loadRecord();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
-  function territoryName(territoryId: number) {
-    const territory = territories.find((t) => t.id === territoryId);
-    if (!territory || territory.code === "UNASSIGNED") return "—";
-    return territory.name;
-  }
+  useEffect(() => {
+    const staffId = client?.salesRepStaffId ?? null;
+    if (staffId === null) {
+      setSalesRepName(null);
+      return;
+    }
+
+    let cancelled = false;
+    resolveStaffLabel(String(staffId))
+      .then((name) => {
+        if (!cancelled) setSalesRepName(name);
+      })
+      .catch(() => {
+        if (!cancelled) setSalesRepName(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [client?.salesRepStaffId]);
 
   async function makePrimary(contact: Contact) {
     setBusyContactId(contact.id);
@@ -332,9 +360,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
   }
 
   if (client === null) {
-    return (
-      <PageSpinner />
-    );
+    return <ClientDetailSkeleton section={section} />;
   }
 
   const TypeIcon = TYPE_ICONS[client.type] ?? Store;
@@ -365,8 +391,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
         summary={
           <div className="flex items-center gap-1.5 text-[12px] text-zinc-500">
             <span className="font-medium text-zinc-700">{client.type}</span>
-            <span aria-hidden className="text-zinc-300">·</span>
-            <span>{territoryName(client.territoryId)}</span>
+
             {client.taxId && (
               <>
                 <span aria-hidden className="text-zinc-300">·</span>
@@ -393,14 +418,10 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
       />
 
       {/* Zona de contenido con scroll vertical asegurado */}
-      <div className="flex-1 min-h-0 overflow-y-auto pr-0.5 pb-8">
-        <div className="mx-auto w-full max-w-6xl">
+      <div className="flex-1 min-h-0 overflow-y-auto pb-8">
+        <div className={`w-full min-w-0 ${MODULE_HEADER_SYMMETRIC_BAND_CLASS}`}>
           {error !== null && (
             <ErrorRetry className="mb-3" onRetry={() => void loadRecord()}>{error}</ErrorRetry>
-          )}
-
-          {referenceError !== null && (
-            <ErrorRetry className="mb-3" onRetry={() => void loadReferenceData()}>{referenceError}</ErrorRetry>
           )}
 
           {/* Animación de entrada fluida estilo Apple */}
@@ -408,7 +429,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
             {section === "datos" && (
             <div className="space-y-3.5">
               {/* 1. Métrica rápida compacta */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <StatTile
                   label="Estado"
                   indicator={<span className={`h-2 w-2 rounded-full ${client.isActive ? "bg-emerald-500" : "bg-zinc-300"}`} />}
@@ -427,14 +448,6 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                   <div className="mt-1">
                     <span className="font-heading text-[15px] font-bold text-zinc-900 truncate block">
                       {client.type}
-                    </span>
-                  </div>
-                </StatTile>
-
-                <StatTile label="Territorio" indicator={<MapPin className="h-3.5 w-3.5 text-zinc-400" />}>
-                  <div className="mt-1">
-                    <span className="font-heading text-[15px] font-bold text-zinc-900 truncate block">
-                      {territoryName(client.territoryId)}
                     </span>
                   </div>
                 </StatTile>
@@ -484,13 +497,6 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                         <span className="inline-flex items-center gap-1.5 text-zinc-800 font-medium">
                           <TypeIcon className="h-3.5 w-3.5 text-zinc-400" />
                           {client.type}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between py-2 text-[12.5px]">
-                        <span className="text-zinc-500 font-medium">Territorio</span>
-                        <span className="text-zinc-800 font-medium">
-                          {territoryName(client.territoryId)}
                         </span>
                       </div>
 
@@ -644,13 +650,16 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                             )}
 
                             {primaryContact.email && (
-                              <div className="flex items-center justify-between">
-                                <span className="text-zinc-500 flex items-center gap-1.5">
+                              <div className="flex items-start justify-between gap-3">
+                                <span className="flex shrink-0 items-center gap-1.5 text-zinc-500">
                                   <Mail className="h-3 w-3 text-zinc-400" />
                                   Correo
                                 </span>
-                                <div className="flex items-center gap-1 text-zinc-800 truncate max-w-[150px]">
-                                  <a href={`mailto:${primaryContact.email}`} className="hover:text-brand-red truncate" title={primaryContact.email}>
+                                <div className="flex min-w-0 items-start justify-end gap-1 text-right text-zinc-800">
+                                  <a
+                                    href={`mailto:${primaryContact.email}`}
+                                    className="break-all hover:text-brand-red"
+                                  >
                                     {primaryContact.email}
                                   </a>
                                   <CopyButton text={primaryContact.email} label="Copiar correo" />
@@ -843,6 +852,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                 footer={
                   contactPage !== null && (
                     <Pagination
+                      loading={contactsLoading}
                       page={contactPage.page}
                       pageSize={contactPage.pageSize}
                       total={contactPage.total}
@@ -854,7 +864,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                   )
                 }
               >
-                {contactPage === null ? (
+                {contactsLoading ? (
                   contactsError === null && <TableSkeleton rows={contactPageSize} columns={7} />
                 ) : contactRows.length === 0 ? (
                   contactsUnfiltered ? (
@@ -1025,6 +1035,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                 footer={
                   ticketPage !== null && (
                     <Pagination
+                      loading={ticketsLoading}
                       page={ticketPage.page}
                       pageSize={ticketPage.pageSize}
                       total={ticketPage.total}
@@ -1036,7 +1047,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                   )
                 }
               >
-                {ticketPage === null ? (
+                {ticketsLoading ? (
                   ticketsError === null && <TableSkeleton rows={ticketPageSize} columns={7} />
                 ) : ticketRows.length === 0 ? (
                   <div className="py-12 text-center">
@@ -1063,17 +1074,22 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                           <Th className="w-32">Estado</Th>
                           <Th>Departamento</Th>
                           <Th>Asignado a</Th>
-                          <Th className="w-36 text-right">Creado</Th>
+                          <Th className="whitespace-nowrap text-right">Creado</Th>
                         </HeadRow>
                       </thead>
 
                       <tbody>
                         {ticketRows.map((ticket) => (
-                          <Row key={ticket.id}>
+                          <Row
+                            key={ticket.id}
+                            className="cursor-pointer"
+                            onClick={() => setSummaryTicketId(ticket.id)}
+                          >
                             <Td className="font-mono text-[12.5px] font-semibold text-zinc-900 tabular-nums">
                               <Link
                                 to={`/tickets/${ticket.id}`}
                                 className="text-brand-red hover:underline"
+                                onClick={(event) => handleDirectTicketClick(event, ticket)}
                               >
                                 {ticket.number || formatTicketCode(ticket.id)}
                               </Link>
@@ -1082,6 +1098,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                               <Link
                                 to={`/tickets/${ticket.id}`}
                                 className="hover:text-brand-red transition-colors line-clamp-1"
+                                onClick={(event) => handleDirectTicketClick(event, ticket)}
                               >
                                 {ticket.subject}
                               </Link>
@@ -1105,7 +1122,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                                 <span className="text-zinc-400">Sin asignar</span>
                               )}
                             </Td>
-                            <Td className="text-[12px] text-zinc-500 text-right tabular-nums">
+                            <Td className="whitespace-nowrap text-[12px] text-zinc-500 text-right tabular-nums">
                               {formatDateTime(ticket.createdAt)}
                             </Td>
                           </Row>
@@ -1124,7 +1141,6 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
       {editingClient && (
         <ClientModal
           client={client}
-          territories={territories}
           onClose={() => setEditingClient(false)}
           onSaved={(updated) => {
             setClient(updated);
@@ -1134,6 +1150,14 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
               detail: `${updated.name} (${updated.code})`,
             });
           }}
+        />
+      )}
+
+      {summaryTicketId !== null && (
+        <TicketSummaryDrawer
+          ticketId={summaryTicketId}
+          getReturnSnapshot={getReturnSnapshot}
+          onClose={() => setSummaryTicketId(null)}
         />
       )}
 

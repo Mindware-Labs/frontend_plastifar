@@ -21,13 +21,14 @@ import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useTablePageSelection } from "../../hooks/useTablePageSelection";
 import { useActionErrorReceipt, useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
+import { useReceipts } from "../../context/useReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { humanizeMinutes, workdayMinutes } from "../../lib/sla";
 import { invalidateActiveSlaPoliciesCache } from "../../lib/useActiveSlaPolicies";
 import { priorityFilterDefaultIcon, priorityFilterOptions } from "../../lib/priorityFilterOptions";
 import type { Holiday, Priority, SlaPolicy, SlaPolicyType } from "../../types/settings";
-import { freshCopy, staleClass, useReferenceData } from "./catalogState";
+import { freshCopy, useReferenceData } from "./catalogState";
 import { SlaModal } from "./SlaModal";
 
 type ChipKey = "todas" | "activas" | "inactivas";
@@ -53,6 +54,7 @@ export function SlaSection() {
   const canWrite = can("settings.write");
 
   const [busyId, setBusyId] = useState<number | null>(null);
+  const receipts = useReceipts();
   const [bulkBusy, setBulkBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -83,7 +85,8 @@ export function SlaSection() {
   const holidaysRef = useReferenceData<Holiday[]>(catalogs.activeHolidays().queryKey, () => fetchCatalog(catalogs.activeHolidays()), []);
   const holidays = holidaysRef.data;
 
-  const rows = useMemo(() => data?.items ?? [], [data?.items]);
+  const listLoading = data === null || isStale;
+  const rows = useMemo(() => (isStale ? [] : (data?.items ?? [])), [data?.items, isStale]);
   const counts = data?.counts;
   const isFiltering = debouncedSearch !== "" || chip !== "todas" || priority !== "todas" || typeFilter !== "todas";
 
@@ -105,6 +108,7 @@ export function SlaSection() {
     try {
       const current = await freshCopy(settingsApi.slaPolicies.get, policy);
       await settingsApi.slaPolicies.update(current.id, { ...toRequest(current), isDefault: true });
+      receipts.done({ action: "sla-predeterminada", title: "Política predeterminada actualizada", detail: current.name });
       reloadAll();
     } catch (err) {
       setActionError(
@@ -153,6 +157,12 @@ export function SlaSection() {
           ? `${lastMessage} (${updated} actualizadas, ${failed} con error).`
           : lastMessage,
       );
+    } else if (updated > 0) {
+      receipts.done({
+        action: nextActive ? "reactivar-sla-lote" : "desactivar-sla-lote",
+        title: nextActive ? "Políticas reactivadas" : "Políticas desactivadas",
+        detail: `${updated} ${updated === 1 ? "política" : "políticas"}`,
+      });
     }
 
     setBulkBusy(false);
@@ -165,10 +175,7 @@ export function SlaSection() {
       title: `Reactivar ${selectedIds.size} políticas`,
       description: "Volverán a estar disponibles para asignarse en tickets y tareas nuevos.",
       confirmLabel: "Reactivar",
-      onConfirm: () => {
-        setConfirmation(null);
-        void runBulkSetActive(true);
-      },
+      onConfirm: () => runBulkSetActive(true),
     });
   }
 
@@ -180,10 +187,7 @@ export function SlaSection() {
       description:
         "Dejarán de ofrecerse en registros nuevos. Si alguna era predeterminada, pierde ese rol. Los abiertos conservan sus plazos.",
       confirmLabel: "Desactivar",
-      onConfirm: () => {
-        setConfirmation(null);
-        void runBulkSetActive(false);
-      },
+      onConfirm: () => runBulkSetActive(false),
     });
   }
 
@@ -213,7 +217,18 @@ export function SlaSection() {
             isActive: !current.isActive,
             isDefault: current.isActive ? false : current.isDefault,
           });
+          receipts.done({
+            action: current.isActive ? "reactivar-sla" : "desactivar-sla",
+            title: current.isActive ? "Política desactivada" : "Política reactivada",
+            detail: current.name,
+          });
           reloadAll();
+        } catch (err) {
+          receipts.failed({
+            action: "toggle-sla",
+            title: policy.isActive ? "No se pudo desactivar la política" : "No se pudo reactivar la política",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyId(null);
         }
@@ -362,6 +377,7 @@ export function SlaSection() {
           data !== null &&
           data.total > 0 && (
             <Pagination
+              loading={listLoading}
               page={page}
               pageSize={pageSize}
               total={data.total}
@@ -373,7 +389,7 @@ export function SlaSection() {
           )
         }
       >
-        {data === null ? (
+        {listLoading ? (
           error === null && <TableSkeleton rows={pageSize} columns={canWrite ? 10 : 9} />
         ) : rows.length === 0 ? (
           <ListEmptyState
@@ -391,7 +407,7 @@ export function SlaSection() {
             emptyDescription="Crea una política para definir plazos de respuesta y resolución en tickets y tareas."
           />
         ) : (
-          <div className={staleClass(isStale)}>
+          <div className="plf-results-in">
             <DataTable>
               <thead>
                 <HeadRow>
@@ -539,7 +555,15 @@ export function SlaSection() {
           policy={modal === "nueva" ? undefined : modal}
           holidays={holidays}
           onClose={() => setModal(null)}
-          onSaved={reloadAll}
+          onSaved={(saved) => {
+            const isEdit = modal !== "nueva";
+            receipts.done({
+              action: isEdit ? "editar-politica" : "crear-politica",
+              title: isEdit ? "Política actualizada" : "Política creada exitosamente",
+              detail: saved.name,
+            });
+            reloadAll();
+          }}
         />
       )}
 

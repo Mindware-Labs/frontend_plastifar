@@ -638,13 +638,12 @@ export function TicketTasksTab({
           title="Eliminar tarea"
           description={
             <>
-              ¿Seguro que deseas eliminar la tarea{" "}
-              <strong className="font-semibold text-zinc-900">{taskToDelete.title}</strong>? Esta
-              acción no se puede deshacer y se eliminarán también sus comentarios y evidencias
-              asociadas.
+              Se eliminará la tarea{" "}
+              <strong className="font-semibold text-ink">{taskToDelete.title}</strong> y sus
+              comentarios y evidencias asociadas. Esta acción no se puede deshacer.
             </>
           }
-          confirmLabel="Eliminar tarea"
+          confirmLabel="Eliminar"
           cancelLabel="Cancelar"
           onConfirm={handleConfirmDelete}
           onClose={() => setTaskToDelete(null)}
