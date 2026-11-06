@@ -161,7 +161,7 @@ function ProductValue({ products }: { products: TicketProductResponse[] | undefi
       <span className="flex shrink-0 items-center gap-1">
         {rest.length > 0 && (
           <span title={summary ?? undefined} aria-label={extraLabel}>
-            <CodeBadge>+{rest.length}</CodeBadge>
+            <CodeBadge>{`+${rest.length}`}</CodeBadge>
           </span>
         )}
         {first.productCode ? <CodeBadge>{first.productCode}</CodeBadge> : null}
@@ -277,7 +277,7 @@ function TicketCard({ ticket: t, checked, department, onToggleSelect, onOpen }: 
             >
               {client ?? "Sin cliente"}
             </span>
-            {clientCode && <CodeBadge>#{clientCode}</CodeBadge>}
+            {clientCode && <CodeBadge>{`#${clientCode}`}</CodeBadge>}
           </span>
         </FactRow>
 
