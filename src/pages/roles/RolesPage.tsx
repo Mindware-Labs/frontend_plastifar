@@ -241,21 +241,20 @@ export function RolesPage() {
     />
   );
 
-  // Si estamos en la pestaña de matriz de permisos, renderizamos la vista de matriz embebida
-  if (currentTab === "permisos") {
-    return (
-      <div className="flex h-full flex-col">
-        <PermissionsView
-          title="Roles y Permisos"
-          headerExtra={tabSwitcher}
-          onMatrixLoaded={setMatrix}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="flex h-full flex-col">
+      <div
+        key={currentTab}
+        className="flex min-h-0 flex-1 flex-col animate-plf-apple-tab motion-reduce:animate-none"
+      >
+        {currentTab === "permisos" ? (
+          <PermissionsView
+            title="Roles y Permisos"
+            headerExtra={tabSwitcher}
+            onMatrixLoaded={setMatrix}
+          />
+        ) : (
+          <>
       <ModuleHeader
         title="Roles y Permisos"
         summary={
@@ -552,6 +551,9 @@ export function RolesPage() {
           </div>
         )}
         </ListPanel>
+      </div>
+          </>
+        )}
       </div>
 
       {confirmation && <ConfirmDialog {...confirmation} onClose={() => setConfirmation(null)} />}

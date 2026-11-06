@@ -1,13 +1,15 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Lock, Users } from "lucide-react";
-import React, { useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { AlertCircle, Lock, Users } from "lucide-react";
+import { useMemo, useState, type KeyboardEvent } from "react";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
+import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
 import { departmentsApi } from "../../api/departments";
 import { fetchAllPages } from "../../api/paging";
 import { rolesApi } from "../../api/roles";
 import { sedesApi } from "../../api/sedes";
 import { Alert } from "../../components/ui/Alert";
+import { Button } from "../../components/ui/Button";
 import {
   CheckboxField,
   LookupField,
@@ -15,15 +17,15 @@ import {
   TextField,
   type FieldState,
 } from "../../components/ui/Field";
+import { FormDivider } from "../../components/ui/FormDivider";
 import { Modal } from "../../components/ui/Modal";
-import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { applyServerError, type ServerErrorRule } from "../../lib/formErrors";
 import { resolveStaffLabel, searchActiveStaff } from "../../lib/lookups";
+import { buildValidationItems, focusFormField } from "../../lib/validationItems";
 import type { DepartmentResponse, RoleResponse } from "../../types/api";
 import type { Sede } from "../../types/sedes";
 import { useReferenceData } from "../settings/catalogState";
-import { FormDivider } from "../../components/ui/FormDivider";
 
 const schema = z.object({
   name: z.string().trim().min(2, "Al menos 2 caracteres").max(60, "Máximo 60 caracteres"),
@@ -46,6 +48,11 @@ const CAMPO_POR_MENSAJE: ServerErrorRule<keyof FormValues>[] = [
   { field: "sedeId", startsWith: "la sede" },
   { field: "defaultRoleId", startsWith: "el rol no existe" },
   { field: "managerStaffId", startsWith: "el responsable no existe" },
+];
+
+const DEPARTMENT_TYPE_ITEMS = [
+  { value: "Publico" as const, label: "Público", icon: Users },
+  { value: "Privado" as const, label: "Privado", icon: Lock },
 ];
 
 interface DepartmentModalProps {
@@ -94,6 +101,20 @@ export function DepartmentModal({ department, onClose, onSaved }: DepartmentModa
     },
   });
 
+  const departmentName = useWatch({ control, name: "name" }) ?? "";
+  const departmentFormMissing = useMemo(
+    () =>
+      buildValidationItems([
+        {
+          id: "name",
+          label: "Falta el nombre del departamento",
+          short: "el nombre",
+          valid: departmentName.trim().length >= 2,
+        },
+      ]),
+    [departmentName],
+  );
+
   const opcionesSede = [
     { value: SIN_SEDE, label: "Sin sede" },
     ...sedesRef.data
@@ -137,7 +158,7 @@ export function DepartmentModal({ department, onClose, onSaved }: DepartmentModa
     return touchedFields[field] ? "valid" : "idle";
   }
 
-  function handleKeyDown(event: React.KeyboardEvent<HTMLFormElement>) {
+  function handleKeyDown(event: KeyboardEvent<HTMLFormElement>) {
     if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
       event.preventDefault();
       void handleSubmit(onSubmit)();
@@ -169,7 +190,7 @@ export function DepartmentModal({ department, onClose, onSaved }: DepartmentModa
           setFocus,
           rules: CAMPO_POR_MENSAJE,
           focusable: ["name"],
-          fallback: "No se pudo guardar el departamento",
+          fallback: isEdit ? "No se pudo guardar el departamento" : "No se pudo crear el departamento",
         }),
       );
     }
@@ -177,25 +198,49 @@ export function DepartmentModal({ department, onClose, onSaved }: DepartmentModa
 
   return (
     <Modal
-      size="lg"
+      maxWidth="max-w-xl"
+      eyebrow={
+        isEdit
+          ? `Departamento #${department.id} · ${department.sedeName ?? "Sin sede"}`
+          : "Estructura organizacional"
+      }
       title={isEdit ? `Editar ${department.name}` : "Nuevo departamento"}
       description={
         isEdit
-          ? "Actualiza los datos y asignaciones del departamento."
-          : "Define la sede, denominación y configuración de acceso."
+          ? "Actualiza la sede, el nombre y las asignaciones del departamento."
+          : "Define sede, nombre y quién administra el acceso."
       }
       onClose={onClose}
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
-        <FormModalFooter
-          shortcut
-          formId="department-form"
-          isEdit={isEdit}
-          createLabel="Crear departamento"
-          isSubmitting={isSubmitting}
-          onCancel={requestClose}
-        />
+        <div className="flex w-full items-center justify-between gap-3">
+          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
+            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+              Ctrl
+            </kbd>
+            <span>+</span>
+            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+              Enter
+            </kbd>
+            <span className="ml-0.5">para guardar</span>
+          </span>
+          <div className="ml-auto flex items-center gap-2">
+            <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
+              Cancelar
+            </Button>
+            <SubmitValidationButton
+              formId="department-form"
+              ready={departmentFormMissing.length === 0}
+              busy={isSubmitting}
+              missingItems={departmentFormMissing}
+              onFocusField={focusFormField}
+              hintText="Para guardar el departamento, completa lo siguiente:"
+            >
+              {isEdit ? "Guardar cambios" : "Crear departamento"}
+            </SubmitValidationButton>
+          </div>
+        </div>
       }
     >
       <form
@@ -207,10 +252,9 @@ export function DepartmentModal({ department, onClose, onSaved }: DepartmentModa
       >
         {formError && <Alert variant="error">{formError}</Alert>}
 
-        {/* 1. GENERAL */}
-        <FormDivider title="General" tight />
+        <FormDivider title="Identificación" />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
           <Controller
             name="sedeId"
             control={control}
@@ -233,19 +277,19 @@ export function DepartmentModal({ department, onClose, onSaved }: DepartmentModa
 
           <TextField
             size="sm"
-            label="Nombre"
-            placeholder="Ej. Almacén, Ventas"
+            label="Nombre del departamento"
+            placeholder="Ej. Almacén, Ventas, Calidad"
             required
+            autoFocus
             state={stateOf("name")}
             error={errors.name?.message}
             {...register("name")}
           />
         </div>
 
-        {/* 2. CONFIGURACIÓN */}
-        <FormDivider title="Configuración" tight />
+        <FormDivider title="Asignaciones" />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
           <Controller
             name="managerStaffId"
             control={control}
@@ -295,23 +339,22 @@ export function DepartmentModal({ department, onClose, onSaved }: DepartmentModa
           />
         </div>
 
+        <FormDivider title="Visibilidad" />
+
         <Controller
           name="type"
           control={control}
           render={({ field }) => (
             <div className="flex flex-col gap-1">
               <label className="font-heading text-[11.5px] font-semibold text-faint">
-                Tipo <span className="text-brand-red">*</span>
+                Tipo de departamento <span className="text-brand-red">*</span>
               </label>
               <div
                 role="radiogroup"
                 aria-label="Tipo de departamento"
                 className="grid grid-cols-2 gap-1 rounded-lg border border-zinc-200 bg-zinc-50/70 p-0.5"
               >
-                {[
-                  { value: "Publico", label: "Público", icon: Users },
-                  { value: "Privado", label: "Privado", icon: Lock },
-                ].map((item) => {
+                {DEPARTMENT_TYPE_ITEMS.map((item) => {
                   const isSelected = field.value === item.value;
                   const Icon = item.icon;
                   return (
@@ -335,19 +378,25 @@ export function DepartmentModal({ department, onClose, onSaved }: DepartmentModa
                   );
                 })}
               </div>
+              {errors.type?.message && (
+                <p
+                  title={errors.type.message}
+                  className="animate-plf-shake flex items-center gap-1 truncate text-[11px] font-medium leading-none text-brand-red-dark"
+                >
+                  <AlertCircle className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{errors.type.message}</span>
+                </p>
+              )}
             </div>
           )}
         />
 
-        {/* 3. ESTADO (EN EDICIÓN) */}
         {isEdit && (
-          <>
-            <FormDivider title="Estado" tight />
-            <CheckboxField
-              label="Departamento activo"
-              {...register("isActive")}
-            />
-          </>
+          <CheckboxField
+            label="Departamento activo"
+            description="Si se desmarca, deja de usarse en tickets y asignaciones nuevas."
+            {...register("isActive")}
+          />
         )}
       </form>
     </Modal>

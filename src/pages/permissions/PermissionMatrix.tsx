@@ -160,11 +160,31 @@ export function PermissionMatrix({
 
   // La columna del permiso se congela a la izquierda y la cabecera arriba; para
   // que la cabecera se pegue de verdad, el scroll vertical vive en este bloque.
-  const stickyName =
-    "sticky left-0 w-[210px] min-w-[210px] pr-4 sm:w-[340px] sm:min-w-[340px] sm:pr-6";
+  const roleCount = roles.length;
+  /** Pocos roles: reparten el ancho de la tarjeta; muchos: ancho fijo y scroll horizontal. */
+  const fluidRoles = roleCount > 0 && roleCount <= 10;
+  const permissionColWidth = roleCount <= 4 ? 248 : roleCount <= 8 ? 272 : 256;
+  const permissionCol = fluidRoles
+    ? "sticky left-0 pr-4 sm:pr-5"
+    : roleCount <= 4
+      ? "sticky left-0 w-[220px] min-w-[220px] pr-4 sm:w-[260px] sm:min-w-[260px] sm:pr-5"
+      : roleCount <= 8
+        ? "sticky left-0 w-[210px] min-w-[210px] pr-4 sm:w-[300px] sm:min-w-[300px] sm:pr-5"
+        : "sticky left-0 w-[200px] min-w-[200px] pr-3 sm:w-[260px] sm:min-w-[260px] sm:pr-4";
+  const roleCol =
+    roleCount <= 3
+      ? "w-[118px] min-w-[118px]"
+      : roleCount <= 6
+        ? "w-[104px] min-w-[104px]"
+        : roleCount <= 10
+          ? "w-[92px] min-w-[92px]"
+          : "w-[84px] min-w-[84px]";
+  const roleHeaderClass = fluidRoles
+    ? "sticky top-0 z-20 border-b border-line px-2 py-2.5 align-bottom transition-colors"
+    : `sticky top-0 z-20 ${roleCol} border-b border-line px-1.5 py-2.5 align-bottom transition-colors`;
 
   return (
-    <div>
+    <div className="flex min-h-0 flex-1 flex-col">
       <div
         /* La ventana con alto tope y cabecera fija solo a partir de sm: en 390 px
            la fila de criterios ocupa cuatro lineas, el tope dejaba el borde
@@ -177,8 +197,9 @@ export function PermissionMatrix({
         role="group"
         aria-label="Matriz de permisos por rol"
         tabIndex={0}
-        className="overflow-x-auto outline-none focus-visible:ring-3 focus-visible:ring-brand-red/20
-          sm:max-h-[calc(100vh-250px)] sm:overflow-auto"
+        className={`min-h-0 flex-1 outline-none focus-visible:ring-3 focus-visible:ring-brand-red/20 ${
+          fluidRoles ? "overflow-x-hidden overflow-y-auto" : "overflow-auto"
+        }`}
         onBlur={(event) => {
           // Al salir de la rejilla con el teclado, la cruz no puede quedarse encendida.
           if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
@@ -188,14 +209,22 @@ export function PermissionMatrix({
         }}
         onMouseLeave={() => setHint(null)}
       >
-        {/* min-w-full con una columna de relleno al final: la tabla llega al borde
-            del modulo sin que el ancho sobrante estire la columna del permiso. */}
-        <table className="min-w-full border-collapse text-left">
+        <table
+          className={`border-collapse text-left ${fluidRoles ? "w-full table-fixed" : "w-max max-w-full"}`}
+        >
+          {fluidRoles && (
+            <colgroup>
+              <col style={{ width: permissionColWidth }} />
+              {roles.map((role) => (
+                <col key={role.id} />
+              ))}
+            </colgroup>
+          )}
           <thead>
             <tr>
               <th
                 scope="col"
-                className={`${stickyName} sticky top-0 z-30 border-b border-line bg-white py-2.5
+                className={`${permissionCol} sticky top-0 z-30 border-b border-line bg-white py-2.5
                   text-left font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint`}
               >
                 Permiso
@@ -209,8 +238,7 @@ export function PermissionMatrix({
                     key={role.id}
                     scope="col"
                     onMouseEnter={() => setCrosshair((state) => ({ ...state, column: role.id }))}
-                    className={`sticky top-0 z-20 w-[104px] min-w-[104px] border-b border-line px-2 py-2.5
-                      align-bottom transition-colors ${isColumnActive ? "bg-canvas" : "bg-white"}`}
+                    className={`${roleHeaderClass} ${isColumnActive ? "bg-canvas" : "bg-white"}`}
                   >
                     <span className="flex flex-col items-center gap-1 text-center">
                       {/* Regla de la versalita: toda cabecera de columna del panel
@@ -234,8 +262,6 @@ export function PermissionMatrix({
                   </th>
                 );
               })}
-
-              <th className="sticky top-0 z-20 w-full border-b border-line bg-white" />
             </tr>
           </thead>
 
@@ -249,8 +275,8 @@ export function PermissionMatrix({
                       iba mientras sus permisos se quedaban. */}
                   <th
                     scope="colgroup"
-                    colSpan={roles.length + 2}
-                    className="bg-canvas px-0 py-1.5 text-left"
+                    colSpan={roles.length + 1}
+                    className="scroll-mt-3 bg-canvas px-0 py-1.5 text-left"
                   >
                     <span className="sticky left-0 inline-block font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint">
                       {group.module}
@@ -279,7 +305,7 @@ export function PermissionMatrix({
                     >
                       <th
                         scope="row"
-                        className={`${stickyName} z-10 py-2 text-left align-middle font-normal transition-colors
+                        className={`${permissionCol} z-10 py-2 text-left align-middle font-normal transition-colors
                           ${isRowActive ? "bg-canvas" : "bg-white"}`}
                       >
                         <span className="flex flex-col gap-0.5">
@@ -398,8 +424,6 @@ export function PermissionMatrix({
                           </td>
                         );
                       })}
-
-                      <td className={isRowActive ? "bg-canvas" : ""} />
                     </tr>
                   );
                 })}

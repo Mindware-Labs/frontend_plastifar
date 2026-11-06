@@ -25,6 +25,7 @@ import { ListPanel } from "../../components/ui/ListPanel";
 import { Modal } from "../../components/ui/Modal";
 import { Pagination } from "../../components/ui/Pagination";
 import { RowAction } from "../../components/ui/RowAction";
+import { SelectField } from "../../components/ui/Field";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { SelectBox } from "../../components/ui/SelectBox";
 import { TableSkeleton } from "../../components/ui/Skeleton";
@@ -133,6 +134,14 @@ export function DepartmentsPage() {
 
     return options;
   }, [sedesList]);
+
+  const bulkSedeOptions = useMemo(
+    () => [
+      { value: "", label: "Sin sede asignada" },
+      ...(sedesList?.items ?? []).map((s) => ({ value: String(s.id), label: s.name })),
+    ],
+    [sedesList],
+  );
 
   // Manejo de casillas de selección
   const pageIds = useMemo(() => rows.map((d) => d.id), [rows]);
@@ -447,7 +456,7 @@ export function DepartmentsPage() {
                     onChange={(next) => setSelectedSedeId(next)}
                     defaultIcon={<Building className="h-3.5 w-3.5 text-zinc-500" />}
                     options={sedeOptions}
-                    searchable={sedeOptions.length > 6}
+                    searchable
                     searchPlaceholder="Buscar sede…"
                   />
                   {(search || typeChip !== "todos" || chip !== "todos" || selectedSedeId !== "todas") && (
@@ -637,45 +646,38 @@ export function DepartmentsPage() {
       {/* Modal para cambiar sede en lote */}
       {bulkSedeModalOpen && (
         <Modal
+          maxWidth="max-w-md"
           title={`Cambiar sede (${selectedIds.size} departamentos)`}
           description="Elige la sede a la que deseas asignar los departamentos seleccionados."
           onClose={() => setBulkSedeModalOpen(false)}
-        >
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-zinc-700 mb-1.5">
-                Sede destino
-              </label>
-              <select
-                value={selectedBulkSedeId}
-                onChange={(e) => setSelectedBulkSedeId(e.target.value)}
-                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-[13px] text-ink outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red"
-              >
-                <option value="">Sin sede asignada</option>
-                {sedesList?.items.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <Button variant="ghost" onClick={() => setBulkSedeModalOpen(false)}>
+          footer={
+            <div className="ml-auto flex items-center gap-2">
+              <Button type="button" variant="secondary" size="sm" onClick={() => setBulkSedeModalOpen(false)}>
                 Cancelar
               </Button>
               <Button
-                variant="primary"
+                size="sm"
+                isLoading={bulkBusy}
                 onClick={async () => {
                   const sid = selectedBulkSedeId === "" ? null : Number(selectedBulkSedeId);
                   await runBulk("set-sede", sid);
                   setBulkSedeModalOpen(false);
                 }}
-                disabled={bulkBusy}
               >
                 Guardar cambios
               </Button>
             </div>
-          </div>
+          }
+        >
+          <SelectField
+            size="sm"
+            searchable
+            label="Sede destino"
+            value={selectedBulkSedeId}
+            onChange={setSelectedBulkSedeId}
+            placeholder="Sin sede asignada"
+            options={bulkSedeOptions}
+          />
         </Modal>
       )}
 

@@ -15,7 +15,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
-import { ClearFiltersButton, FilterDropdown } from "../../components/ui/FilterDropdown";
+import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
@@ -278,17 +278,6 @@ export function SedesPage() {
                   onChange={setSearch}
                   placeholder="Buscar sede por nombre o dirección…"
                   className="w-[260px] sm:w-[300px]"
-                />
-                <FilterDropdown
-                  title="Estado"
-                  aria-label="Filtrar por estado de la sede"
-                  value={chip}
-                  onChange={(next) => setChip(next as ChipKey)}
-                  options={[
-                    { value: "todos", label: "Todas las sedes" },
-                    { value: "activos", label: "Activas" },
-                    { value: "inactivos", label: "Inactivas" },
-                  ]}
                 />
                 {isFiltering && (
                   <ClearFiltersButton
