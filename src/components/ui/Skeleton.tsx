@@ -1,4 +1,5 @@
 import { MODULE_HEADER_SYMMETRIC_BAND_CLASS, MODULE_HEADER_TITLE_GUTTER_CLASS } from "../app/ModuleHeader";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../shadcn/resizable";
 
 /**
  * Marcador de carga.
@@ -954,6 +955,213 @@ export function EnterpriseFormExecutiveSummarySkeleton() {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Silueta del login (AuthLayout) mientras `useAuth` restaura tokens al abrir la app.
+ */
+export function AuthSessionSkeleton() {
+  return (
+    <div className="relative flex min-h-dvh flex-col items-center justify-between overflow-hidden bg-canvas px-4 py-10 sm:py-14">
+      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute top-0 left-1/2 h-[320px] w-[880px] -translate-x-1/2 bg-[radial-gradient(ellipse_at_top,rgba(228,0,43,0.04),transparent_72%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(#e2e4e8_1px,transparent_1px)] [background-size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_35%,#000_55%,transparent_100%)] opacity-40" />
+      </div>
+      <div className="w-full" aria-hidden />
+      <main className="relative z-10 w-full max-w-[420px] animate-plf-rise">
+        <div
+          className="overflow-hidden rounded-card border border-line bg-white p-7 shadow-card sm:p-9"
+          role="status"
+          aria-label="Restableciendo sesión"
+        >
+          <header className="text-center">
+            <div className="mb-5 flex justify-center">
+              <Skeleton className="h-[34px] w-[140px] rounded-md" />
+            </div>
+            <Skeleton className="mx-auto h-5 w-36 rounded-md" />
+            <Skeleton className="mx-auto mt-2 h-3 w-48 max-w-full rounded" delay={40} />
+          </header>
+          <div className="mt-7 space-y-3.5">
+            <div className="space-y-1.5">
+              <Skeleton className="h-3 w-28 rounded" delay={60} />
+              <Skeleton className="h-10 w-full rounded-lg" delay={80} />
+            </div>
+            <div className="space-y-1.5">
+              <Skeleton className="h-3 w-24 rounded" delay={100} />
+              <Skeleton className="h-10 w-full rounded-lg" delay={120} />
+            </div>
+            <Skeleton className="mt-1 h-11 w-full rounded-lg" delay={140} />
+          </div>
+        </div>
+      </main>
+      <footer className="relative z-10 mt-8 flex flex-col items-center gap-2.5">
+        <Skeleton className="h-3 w-52 rounded" delay={160} />
+        <Skeleton className="h-8 w-[280px] rounded-full" delay={180} />
+      </footer>
+    </div>
+  );
+}
+
+/** Misma composición que `BandejaPage` cuando `data === null` (lista + lectura). */
+function BandejaSessionSkeleton() {
+  return (
+    <div className="flex h-full min-h-0 flex-1 flex-col">
+      <div className="mb-3 flex h-14 shrink-0 items-center justify-between gap-x-4 border-b border-zinc-200/80 px-3 lg:-mx-4 lg:px-4">
+        <div className="flex min-w-0 shrink-0 items-center gap-x-3">
+          <Skeleton className="h-5 w-28 shrink-0 rounded-md" />
+          <span aria-hidden className="hidden h-4 w-px shrink-0 bg-zinc-200/90 sm:inline-block" />
+          <Skeleton className="h-3 w-44 max-w-[min(100%,280px)] rounded" delay={40} />
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Skeleton className="h-8 w-8 rounded-lg" delay={60} />
+          <Skeleton className="h-8 min-w-[7rem] rounded-lg" delay={80} />
+        </div>
+      </div>
+      <div className="min-h-0 flex-1">
+        <ResizablePanelGroup className="h-full overflow-hidden rounded-xl border border-zinc-200/80 bg-white shadow-2xs">
+          <ResizablePanel defaultSize="26%" minSize="20%" maxSize="45%" className="flex flex-col">
+            <div className="flex shrink-0 flex-col gap-2.5 px-3.5 pb-2.5 pt-3">
+              <Skeleton className="h-8 w-full rounded-lg" />
+            </div>
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <InboxListSkeleton rows={9} />
+            </div>
+          </ResizablePanel>
+          <ResizableHandle withHandle className="bg-zinc-200/80" />
+          <ResizablePanel minSize="35%" className="flex flex-col overflow-hidden">
+            <MailReadingPaneSkeleton />
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </div>
+    </div>
+  );
+}
+
+/** Listado de tickets: `ModuleHeader` + barra de criterios + `TicketCardsSkeleton` como en `TicketsPage`. */
+function TicketsListSessionSkeleton() {
+  return (
+    <div className="flex h-full min-h-0 flex-1 flex-col">
+      <div className="mb-3 flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-zinc-200/80 px-3 lg:-mx-4 lg:px-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <Skeleton className="h-[22px] w-28 shrink-0 rounded-md" />
+          <div className="hidden items-center gap-1.5 sm:flex">
+            <Skeleton className="h-7 w-[4.75rem] rounded-lg" delay={20} />
+            <Skeleton className="h-7 w-[5rem] rounded-lg" delay={40} />
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Skeleton className="h-3 w-36 rounded" delay={30} />
+          <Skeleton className="h-8 min-w-[7rem] shrink-0 rounded-lg" delay={50} />
+        </div>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto pb-8">
+        <div className="mb-3.5 grid min-h-8">
+          <div className="col-start-1 row-start-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Skeleton className="h-8 w-[260px] rounded-lg sm:w-[290px]" />
+              <Skeleton className="h-8 w-[132px] rounded-lg" delay={25} />
+              <Skeleton className="h-8 w-[112px] rounded-lg" delay={45} />
+            </div>
+            <Skeleton className="h-8 w-28 shrink-0 rounded-lg" delay={65} />
+          </div>
+        </div>
+        <TicketCardsSkeleton count={9} />
+      </div>
+    </div>
+  );
+}
+
+function GenericModuleSessionSkeleton() {
+  return (
+    <div className="flex h-full min-h-0 flex-1 flex-col">
+      <div className="mb-3 flex h-14 shrink-0 items-center justify-between gap-x-4 border-b border-zinc-200/80 px-3 lg:-mx-4 lg:px-4">
+        <div className="flex min-w-0 shrink-0 items-center gap-x-3">
+          <Skeleton className="h-5 w-40 shrink-0 rounded-md" />
+          <span aria-hidden className="hidden h-4 w-px shrink-0 bg-zinc-200/90 sm:inline-block" />
+          <Skeleton className="h-3 w-32 max-w-full rounded" delay={35} />
+        </div>
+        <Skeleton className="h-8 w-28 shrink-0 rounded-lg" delay={55} />
+      </div>
+      <div className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-line bg-white shadow-card">
+        <div className="shrink-0 border-b border-line px-4 py-3">
+          <Skeleton className="h-4 w-56 max-w-full rounded-md" />
+        </div>
+        <div className="min-h-0 flex-1 overflow-hidden p-2">
+          <TableSkeleton rows={7} columns={5} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function sessionMainSkeleton(pathname: string) {
+  const normalized = pathname.toLowerCase();
+  const segments = pathname.split("/").filter(Boolean);
+
+  if (normalized === "/" || normalized.startsWith("/bandeja")) {
+    return <BandejaSessionSkeleton />;
+  }
+
+  const ticketIdSegment = segments[0] === "tickets" ? segments[1] : undefined;
+  const isTicketDetail =
+    ticketIdSegment !== undefined && /^\d+$/.test(ticketIdSegment) && !normalized.includes("/imprimir");
+  if (isTicketDetail) {
+    return <TicketDetailSkeleton />;
+  }
+
+  if (normalized.startsWith("/tickets") && !normalized.includes("/imprimir")) {
+    return <TicketsListSessionSkeleton />;
+  }
+
+  return <GenericModuleSessionSkeleton />;
+}
+
+/**
+ * Silueta del armazón (Sidebar + main) mientras llega el usuario en rutas protegidas.
+ * El área principal imita bandeja, listado de tickets o ficha según `pathname`.
+ */
+export function AppShellSessionSkeleton({ pathname = "/" }: { pathname?: string } = {}) {
+  return (
+    <div
+      className="flex h-screen bg-canvas print:block print:h-auto"
+      role="status"
+      aria-label="Restableciendo sesión"
+    >
+      <aside className="no-print print:hidden relative flex h-screen w-60 shrink-0 flex-col border-r border-zinc-200/80 bg-white select-none">
+        <div className="flex h-14 shrink-0 items-center justify-between border-b border-zinc-200/80 px-3">
+          <Skeleton className="h-6 w-[7.5rem] rounded-md" />
+          <Skeleton className="h-8 w-8 rounded-lg" delay={30} />
+        </div>
+        <div className="flex flex-1 flex-col gap-4 overflow-hidden p-2.5 pt-3">
+          {[0, 1, 2, 3].map((section) => (
+            <div key={section} className="space-y-2">
+              <Skeleton className="h-2.5 w-20 rounded" delay={section * 45} />
+              {[0, 1, 2].map((row) => (
+                <div key={row} className="flex h-[34px] items-center gap-2.5 rounded-lg px-2.5">
+                  <Skeleton className="size-4 shrink-0 rounded" delay={section * 45 + row * 25} />
+                  <Skeleton className="h-3 flex-1 rounded" delay={section * 45 + row * 25 + 15} />
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+        <div className="shrink-0 border-t border-zinc-200/80 p-3">
+          <div className="flex items-center gap-2.5">
+            <Skeleton className="size-9 shrink-0 rounded-full" />
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <Skeleton className="h-3 w-28 rounded" />
+              <Skeleton className="h-2.5 w-36 rounded" delay={20} />
+            </div>
+          </div>
+        </div>
+      </aside>
+      <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden print:block print:h-auto">
+        <div className="flex min-h-0 flex-1 flex-col px-3 pb-3 lg:px-4 lg:pb-3.5">
+          {sessionMainSkeleton(pathname)}
+        </div>
+      </main>
     </div>
   );
 }

@@ -342,7 +342,6 @@ export function BandejaPage({ folder }: BandejaPageProps) {
     snap: snapCompose,
   } = useSidePanelMotion(composing);
   const [emptyPaneReveal, setEmptyPaneReveal] = useState(false);
-  const composeMountedRef = useRef(composeMounted);
   const [checked, setChecked] = useState<Set<number>>(() => new Set());
   const [busy, setBusy] = useState(false);
   const [starOverrides, setStarOverrides] = useState<Record<number, boolean>>({});
@@ -367,14 +366,6 @@ export function BandejaPage({ folder }: BandejaPageProps) {
   useEffect(() => {
     if (!canMailSend && composing) setComposing(false);
   }, [canMailSend, composing]);
-
-  useEffect(() => {
-    const wasMounted = composeMountedRef.current;
-    composeMountedRef.current = composeMounted;
-    if (wasMounted && !composeMounted && selectedId === null) {
-      setEmptyPaneReveal(true);
-    }
-  }, [composeMounted, selectedId]);
 
   useEffect(() => {
     if (!emptyPaneReveal) return;

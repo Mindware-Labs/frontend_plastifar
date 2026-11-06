@@ -3,9 +3,9 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { usePermissions } from "../hooks/usePermissions";
 import type { PermissionKey } from "../lib/permissions";
-import { Alert } from "./ui/Alert";
-import { Spinner } from "./ui/Spinner";
 import { PrintSheetSkeleton } from "./print/PrintSheetSkeleton";
+import { Alert } from "./ui/Alert";
+import { AppShellSessionSkeleton, AuthSessionSkeleton } from "./ui/Skeleton";
 
 /**
  * Puerta trasera de desarrollo: entra al panel sin credenciales.
@@ -21,18 +21,20 @@ const AUTH_BYPASS = import.meta.env.DEV && import.meta.env.VITE_AUTH_BYPASS === 
 function RestoringSession({
   isPrintRoute = false,
   isLandscape = false,
+  variant = "app",
+  pathname = "/",
 }: {
   isPrintRoute?: boolean;
   isLandscape?: boolean;
+  /** `auth`: pantallas de acceso (login, etc.). `app`: layout con sidebar. */
+  variant?: "auth" | "app";
+  /** Ruta actual: elige la misma escaleta que bandeja / tickets cuando aplica. */
+  pathname?: string;
 }) {
   if (isPrintRoute) {
     return <PrintSheetSkeleton orientation={isLandscape ? "landscape" : "portrait"} />;
   }
-  return (
-    <div className="flex min-h-dvh items-center justify-center bg-canvas">
-      <Spinner size="lg" label="Restableciendo sesión..." />
-    </div>
-  );
+  return variant === "auth" ? <AuthSessionSkeleton /> : <AppShellSessionSkeleton pathname={pathname} />;
 }
 
 /** Exige sesion. Sin ella manda al login recordando a donde se queria ir. */
@@ -45,7 +47,13 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
       location.pathname.includes("/imprimir") || location.search.includes("documento=1");
     const isLandscape =
       location.pathname.includes("/discrepancias") || location.pathname.includes("/retiros");
-    return <RestoringSession isPrintRoute={isPrintRoute} isLandscape={isLandscape} />;
+    return (
+      <RestoringSession
+        isPrintRoute={isPrintRoute}
+        isLandscape={isLandscape}
+        pathname={location.pathname}
+      />
+    );
   }
   if (!user && !AUTH_BYPASS) {
     return <Navigate to="/login" state={{ from: location.pathname + location.search }} replace />;
@@ -58,7 +66,7 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
 export function GuestRoute({ children }: { children: ReactNode }) {
   const { user, isLoading } = useAuth();
 
-  if (isLoading) return <RestoringSession />;
+  if (isLoading) return <RestoringSession variant="auth" />;
   if (user) return <Navigate to="/" replace />;
 
   return <>{children}</>;
