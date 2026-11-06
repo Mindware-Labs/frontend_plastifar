@@ -52,6 +52,7 @@ interface AttachmentPreviewModalProps {
 function previewKind(link: AttachmentLinkResponse, fallback: boolean) {
   // Solo las imagenes que el servidor sirve en linea: un SVG, por ejemplo, se descarga.
   if (link.inline && link.contentType.startsWith("image/")) return "image";
+  if (link.inline && link.contentType.startsWith("video/")) return "video";
   if (link.contentType === "application/pdf" && !fallback) return "pdf";
   return link.inline ? "frame" : "none";
 }
@@ -263,6 +264,17 @@ export function AttachmentPreviewModal({
             src={link.url}
             alt={attachment.fileName}
             className="max-h-full max-w-full object-contain"
+          />
+        </div>
+      ) : kind === "video" ? (
+        <div className="flex h-full items-center justify-center bg-black">
+          <video
+            key={attachment.id}
+            src={link.url}
+            controls
+            playsInline
+            preload="metadata"
+            className="max-h-full max-w-full"
           />
         </div>
       ) : kind === "pdf" ? (
