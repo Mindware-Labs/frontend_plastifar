@@ -71,23 +71,21 @@ export const DEFAULT_PERMISSION_GROUPS: PermissionGroup[] = [
     permissions: [
       { key: "claims.read", label: "Ver las reclamaciones de sus departamentos", hint: "Consultar el formulario PF-FOR-034 de los tickets que puede ver", reserved: false },
       { key: "claims.write", label: "Registrar y editar reclamaciones", hint: "Llenar las secciones I a III del formulario al abrir el ticket", requires: "claims.read", reserved: false },
-      { key: "claims.treat", label: "Tratar reclamaciones", hint: "Completar la sección IV, reservada a Calidad, y cerrar o reabrir la reclamación", requires: "claims.read", reserved: false },
+      { key: "claims.treat", label: "Tratar reclamaciones", hint: "Completar la sección IV, reservada a Calidad", requires: "claims.read", reserved: false },
     ],
   },
   {
     module: "Discrepancias de carga",
     permissions: [
       { key: "discrepancies.read", label: "Ver las investigaciones de sus departamentos", hint: "Consultar e imprimir el formulario PF-FOR-291 de los tickets que puede ver", reserved: false },
-      { key: "discrepancies.write", label: "Investigar discrepancias", hint: "Registrar las líneas y los puntos de seguridad, y dar la investigación por completa", requires: "discrepancies.read", reserved: false },
-      { key: "discrepancies.approve", label: "Aprobar o devolver investigaciones", hint: "Firmar como «Aprobado por» o devolver con nota", requires: "discrepancies.read", reserved: false },
+      { key: "discrepancies.write", label: "Investigar discrepancias", hint: "Registrar las líneas y los puntos de seguridad", requires: "discrepancies.read", reserved: false },
     ],
   },
   {
     module: "Retiros",
     permissions: [
       { key: "withdrawals.read", label: "Ver las solicitudes de retiro de sus departamentos", hint: "Consultar e imprimir el formulario PF-FOR-068 de los tickets que puede ver", reserved: false },
-      { key: "withdrawals.write", label: "Solicitar y registrar retiros", hint: "Crear, editar y cancelar solicitudes, y registrar el retiro efectuado", requires: "withdrawals.read", reserved: false },
-      { key: "withdrawals.approve", label: "Aprobar o rechazar retiros", hint: "Decidir sobre las solicitudes que se deben a un error del vendedor o del almacén", requires: "withdrawals.read", reserved: false },
+      { key: "withdrawals.write", label: "Solicitar retiros", hint: "Crear y editar solicitudes", requires: "withdrawals.read", reserved: false },
     ],
   },
   {

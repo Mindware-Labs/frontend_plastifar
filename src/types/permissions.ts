@@ -55,11 +55,9 @@ export type PermissionKey =
   // Discrepancia de carga, PF-FOR-291 (docs/plan/06, sección 12).
   | "discrepancies.read"
   | "discrepancies.write"
-  | "discrepancies.approve"
   // Retiro de mercancía, PF-FOR-068 (docs/plan/04, sección 12).
   | "withdrawals.read"
   | "withdrawals.write"
-  | "withdrawals.approve"
   // Tareas independientes. Espejo de PermissionCatalog.Tasks*.
   | "tasks.read"
   | "tasks.create"
