@@ -1,8 +1,11 @@
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
+import { useAuthLockout } from "../hooks/useAuthLockout";
 import { usePermissions } from "../hooks/usePermissions";
+import { AuthLayout } from "../layouts/AuthLayout";
 import type { PermissionKey } from "../lib/permissions";
+import { AuthLockNotice } from "./auth/AuthLockNotice";
 import { PrintSheetSkeleton } from "./print/PrintSheetSkeleton";
 import { Alert } from "./ui/Alert";
 import { AppShellSessionSkeleton, AuthSessionSkeleton } from "./ui/Skeleton";
@@ -41,6 +44,7 @@ function RestoringSession({
 export function ProtectedRoute({ children }: { children: ReactNode }) {
   const { user, isLoading } = useAuth();
   const location = useLocation();
+  const lockSeconds = useAuthLockout();
 
   if (isLoading) {
     const isPrintRoute =
@@ -57,6 +61,15 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   }
   if (!user && !AUTH_BYPASS) {
     return <Navigate to="/login" state={{ from: location.pathname + location.search }} replace />;
+  }
+
+  // Bloqueo por intentos fallidos: ninguna vista del panel se pinta mientras dure, aunque haya sesion.
+  if (lockSeconds > 0) {
+    return (
+      <AuthLayout title="Acceso bloqueado" subtitle="El panel vuelve a estar disponible al terminar la cuenta regresiva">
+        <AuthLockNotice seconds={lockSeconds} />
+      </AuthLayout>
+    );
   }
 
   return <>{children}</>;

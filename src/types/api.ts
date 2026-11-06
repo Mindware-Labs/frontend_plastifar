@@ -191,6 +191,17 @@ export interface ApiMessage {
   message: string;
 }
 
+/** Sin correo solo se consulta la IP de origen. */
+export interface LockoutStatusRequest {
+  email?: string;
+}
+
+export interface LockoutStatusResponse {
+  locked: boolean;
+  retryAfterSeconds?: number;
+  lockedUntil?: string;
+}
+
 export interface EmailAttachmentResponse {
   id: number;
   fileName: string;

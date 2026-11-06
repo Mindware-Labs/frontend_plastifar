@@ -3,6 +3,8 @@ import type {
   ApiMessage,
   ChangePasswordRequest,
   ForgotPasswordRequest,
+  LockoutStatusRequest,
+  LockoutStatusResponse,
   LoginRequest,
   LoginResponse,
   ResetPasswordRequest,
@@ -44,6 +46,12 @@ export const authApi = {
 
   changePassword: (data: ChangePasswordRequest) =>
     apiRequest<ApiMessage>("/api/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  lockoutStatus: (data: LockoutStatusRequest) =>
+    apiRequest<LockoutStatusResponse>("/api/auth/lockout-status", {
       method: "POST",
       body: JSON.stringify(data),
     }),

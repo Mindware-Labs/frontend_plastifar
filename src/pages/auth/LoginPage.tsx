@@ -4,11 +4,14 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
-import { ApiError } from "../../api/client";
+import { ApiError, isAuthLockout } from "../../api/client";
+import { AuthLockNotice } from "../../components/auth/AuthLockNotice";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { PasswordField, TextField, type FieldState } from "../../components/ui/Field";
 import { useAuth } from "../../context/useAuth";
+import { useAuthLockout } from "../../hooks/useAuthLockout";
+import { authLockout } from "../../lib/authLockout";
 import { AuthLayout } from "../../layouts/AuthLayout";
 
 const schema = z.object({
@@ -39,6 +42,8 @@ export function LoginPage() {
   const [announcement, setAnnouncement] = useState("");
   const [stale, setStale] = useState<FormValues | null>(null);
   const [emailBlurError, setEmailBlurError] = useState<string | null>(null);
+  const lockSeconds = useAuthLockout({ sync: true });
+  const locked = lockSeconds > 0;
 
   useEffect(() => {
     if (!settle) return;
@@ -69,6 +74,7 @@ export function LoginPage() {
   }
 
   async function onSubmit(values: FormValues) {
+    if (locked) return;
     setAnnouncement("");
     try {
       await login(values.email, values.password);
@@ -77,6 +83,13 @@ export function LoginPage() {
       const status = err instanceof ApiError ? err.status : 0;
       const message = err instanceof ApiError ? err.message.toLowerCase() : "";
 
+      if (isAuthLockout(err)) {
+        authLockout.lockFor(err.retryAfterSeconds, values.email);
+        setStale(values);
+        setPhase("idle");
+        setAnnouncement("Acceso bloqueado temporalmente por demasiados intentos fallidos.");
+        return;
+      }
       if (status === 429) {
         fail("limited", values, "Demasiados intentos. Espera unos minutos antes de volver a intentarlo.");
         return;
@@ -155,7 +168,11 @@ export function LoginPage() {
   let buttonToneLabel: string | undefined;
   let isButtonDisabled = false;
 
-  if (emailBlurError) {
+  if (locked) {
+    buttonTone = "ink";
+    buttonToneLabel = "Acceso bloqueado";
+    isButtonDisabled = true;
+  } else if (emailBlurError) {
     buttonTone = "ink";
     buttonToneLabel = emailBlurError;
     isButtonDisabled = true;
@@ -190,7 +207,9 @@ export function LoginPage() {
       }
     >
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-3.5">
-        {phase === "limited" && (
+        {locked && <AuthLockNotice seconds={lockSeconds} />}
+
+        {!locked && phase === "limited" && (
           <Alert variant="info" className="text-[13px]">
             <span className="font-medium">Demasiados intentos de acceso.</span> Por seguridad, espera unos minutos o{" "}
             <Link
@@ -241,13 +260,23 @@ export function LoginPage() {
           error={errors.password?.message}
           hint={
             <span className="flex justify-end">
-              <Link
-                to="/forgot-password"
-                state={{ email: staleEmail || getValues("email") }}
-                className="font-medium text-brand-red-dark hover:underline underline-offset-2"
-              >
-                ¿Olvidaste tu contraseña?
-              </Link>
+              {locked ? (
+                <span
+                  aria-disabled="true"
+                  title="Disponible cuando termine el bloqueo"
+                  className="cursor-not-allowed font-medium text-faint"
+                >
+                  ¿Olvidaste tu contraseña?
+                </span>
+              ) : (
+                <Link
+                  to="/forgot-password"
+                  state={{ email: staleEmail || getValues("email") }}
+                  className="font-medium text-brand-red-dark hover:underline underline-offset-2"
+                >
+                  ¿Olvidaste tu contraseña?
+                </Link>
+              )}
             </span>
           }
           {...passwordReg}

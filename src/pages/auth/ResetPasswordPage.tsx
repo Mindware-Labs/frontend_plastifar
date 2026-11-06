@@ -5,12 +5,15 @@ import { Controller, useForm, useWatch } from "react-hook-form";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { authApi } from "../../api/auth";
-import { ApiError } from "../../api/client";
+import { ApiError, isAuthLockout } from "../../api/client";
+import { AuthLockNotice } from "../../components/auth/AuthLockNotice";
 import { OtpCodeInput } from "../../components/auth/OtpCodeInput";
 import { Alert } from "../../components/ui/Alert";
 import { Button, type ButtonTone } from "../../components/ui/Button";
 import { PasswordField, TextField, type FieldState } from "../../components/ui/Field";
 import { PasswordStrength } from "../../components/ui/PasswordStrength";
+import { useAuthLockout } from "../../hooks/useAuthLockout";
+import { authLockout } from "../../lib/authLockout";
 import { evaluatePassword, passwordSchema } from "../../lib/password";
 import { AuthLayout, authBackLinkClass } from "../../layouts/AuthLayout";
 
@@ -71,6 +74,8 @@ export function ResetPasswordPage() {
   const [announcement, setAnnouncement] = useState("");
   const [passwordPhase, setPasswordPhase] = useState<PasswordPhase>("idle");
   const [stalePassword, setStalePassword] = useState<PasswordFormValues | null>(null);
+  const lockSeconds = useAuthLockout({ sync: true });
+  const locked = lockSeconds > 0;
 
   useEffect(() => {
     if (!settle) return;
@@ -126,6 +131,7 @@ export function ResetPasswordPage() {
   }
 
   async function handleResendCode() {
+    if (locked) return;
     const email = codeForm.getValues("email");
     if (!email) {
       setToast({ message: "Ingresa tu correo para reenviar el código", variant: "error" });
@@ -139,6 +145,10 @@ export function ResetPasswordPage() {
       setResendCooldown(RESEND_COOLDOWN_SECONDS);
       setToast({ message: `Reenviamos el código a ${email}`, variant: "success" });
     } catch (err) {
+      if (isAuthLockout(err)) {
+        authLockout.lockFor(err.retryAfterSeconds, email);
+        return;
+      }
       setToast({
         message: err instanceof ApiError ? err.message : "No se pudo reenviar el código",
         variant: "error",
@@ -149,6 +159,7 @@ export function ResetPasswordPage() {
   }
 
   async function onSubmitCode(values: CodeFormValues) {
+    if (locked) return;
     setToast(null);
     setAnnouncement("");
     try {
@@ -161,6 +172,11 @@ export function ResetPasswordPage() {
     } catch (err) {
       const status = err instanceof ApiError ? err.status : 0;
       setStaleCode(values);
+      if (isAuthLockout(err)) {
+        authLockout.lockFor(err.retryAfterSeconds, values.email);
+        setAnnouncement("Acceso bloqueado temporalmente por demasiados intentos fallidos.");
+        return;
+      }
       if (status === 429) {
         setCodePhase("limited");
         setAnnouncement("Demasiados intentos. Espera unos minutos antes de volver a intentarlo.");
@@ -193,7 +209,7 @@ export function ResetPasswordPage() {
   }
 
   async function onSubmitPassword(values: PasswordFormValues) {
-    if (!verified) return;
+    if (!verified || locked) return;
 
     setAnnouncement("");
     try {
@@ -203,6 +219,11 @@ export function ResetPasswordPage() {
       const status = err instanceof ApiError ? err.status : 0;
       const code = err instanceof ApiError ? err.code : undefined;
       setStalePassword(values);
+      if (isAuthLockout(err)) {
+        authLockout.lockFor(err.retryAfterSeconds, verified.email);
+        setAnnouncement("Acceso bloqueado temporalmente por demasiados intentos fallidos.");
+        return;
+      }
       setSettle(true);
       if (status === 429) {
         setPasswordPhase("limited");
@@ -234,7 +255,10 @@ export function ResetPasswordPage() {
 
   let passwordTone: ButtonTone = "primary";
   let passwordToneLabel: string | undefined;
-  if (passwordPhase !== "idle") {
+  if (locked) {
+    passwordTone = "ink";
+    passwordToneLabel = "Acceso bloqueado";
+  } else if (passwordPhase !== "idle") {
     passwordTone = "ink";
     passwordToneLabel = passwordToneLabels[passwordPhase];
   } else if (newPassword && missingRules > 0) {
@@ -276,6 +300,8 @@ export function ResetPasswordPage() {
           noValidate
           className="flex flex-col gap-3.5"
         >
+          {locked && <AuthLockNotice seconds={lockSeconds} />}
+
           <PasswordField
             label={isInvite ? "Contraseña" : "Nueva contraseña"}
             autoComplete="new-password"
@@ -309,6 +335,7 @@ export function ResetPasswordPage() {
           <Button
             type="submit"
             isLoading={passwordForm.formState.isSubmitting}
+            disabled={locked}
             tone={passwordTone}
             toneLabel={passwordToneLabel}
             className="mt-1 w-full"
@@ -360,7 +387,9 @@ export function ResetPasswordPage() {
             : "Ingresa el código de 6 dígitos que recibiste por correo"
       }
     >
-      {toast && (
+      {locked && <AuthLockNotice seconds={lockSeconds} className="mb-3.5" />}
+
+      {!locked && toast && (
         <Alert variant={toast.variant === "success" ? "success" : "error"} className="mb-3.5">
           {toast.message}
         </Alert>
@@ -425,7 +454,7 @@ export function ResetPasswordPage() {
                   <button
                     type="button"
                     onClick={handleResendCode}
-                    disabled={isResending}
+                    disabled={isResending || locked}
                     className="rounded-md font-medium text-brand-red-dark underline-offset-2 transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isResending ? "Reenviando…" : "Reenviar código"}
@@ -439,8 +468,9 @@ export function ResetPasswordPage() {
         <Button
           type="submit"
           isLoading={codeForm.formState.isSubmitting}
-          tone={codePhase === "idle" ? "primary" : codePhase === "verified" ? "success" : "ink"}
-          toneLabel={codePhase === "idle" ? undefined : codeToneLabels[codePhase]}
+          disabled={locked}
+          tone={locked ? "ink" : codePhase === "idle" ? "primary" : codePhase === "verified" ? "success" : "ink"}
+          toneLabel={locked ? "Acceso bloqueado" : codePhase === "idle" ? undefined : codeToneLabels[codePhase]}
           className="mt-1 w-full"
         >
           {codeForm.formState.isSubmitting

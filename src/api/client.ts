@@ -1,3 +1,4 @@
+import { authLockout } from "../lib/authLockout";
 import { API_URL } from "../lib/env";
 import { decodeAccessToken } from "../lib/jwt";
 import { markAllStale } from "../lib/queryClient";
@@ -6,17 +7,27 @@ import { tokenStore } from "./tokenStore";
 
 const BASE_URL = API_URL;
 
+/** Codigo del 429 por intentos fallidos; el del limitador de peticiones no lo trae. */
+export const AUTH_LOCKED = "auth_locked";
+
 export class ApiError extends Error {
   status: number;
   /** Codigo estable del servidor, para decidir sin depender del texto del mensaje. */
   code?: string;
+  /** Segundos de espera de un 429, del cuerpo o de la cabecera Retry-After. */
+  retryAfterSeconds?: number;
 
-  constructor(status: number, message: string, code?: string) {
+  constructor(status: number, message: string, code?: string, retryAfterSeconds?: number) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
+}
+
+export function isAuthLockout(err: unknown): err is ApiError {
+  return err instanceof ApiError && err.status === 429 && err.code === AUTH_LOCKED;
 }
 
 /** Formas de error que devuelve la API: las propias y las ProblemDetails de ASP.NET. */
@@ -25,6 +36,7 @@ interface ErrorBody {
   code?: string;
   title?: string;
   errors?: Record<string, string[]>;
+  retryAfterSeconds?: number;
 }
 
 async function requestRefresh(refreshToken: string): Promise<boolean> {
@@ -40,6 +52,9 @@ async function requestRefresh(refreshToken: string): Promise<boolean> {
       tokenStore.setTokens(null, null);
       return false;
     }
+
+    // Un 429 por bloqueo se registra para cerrar las vistas; el refresh token se conserva.
+    if (response.status === 429) await readError(response);
 
     // 5xx, 429 u otro tropiezo del servidor: el refresh token sigue valiendo para reintentar.
     if (!response.ok) return false;
@@ -103,7 +118,13 @@ async function readError(response: Response): Promise<ApiError> {
     body?.title ??
     `Error ${response.status}`;
 
-  return new ApiError(response.status, message, body?.code);
+  const header = Number(response.headers.get("Retry-After"));
+  const retryAfter = body?.retryAfterSeconds ?? (Number.isFinite(header) && header > 0 ? header : undefined);
+  const error = new ApiError(response.status, message, body?.code, retryAfter);
+
+  // Cualquier endpoint puede informar el bloqueo (login, recuperacion o una sesion desde una IP bloqueada).
+  if (isAuthLockout(error)) authLockout.lockFor(error.retryAfterSeconds);
+  return error;
 }
 
 /** Arma el query string omitiendo lo vacio, para no enviar filtros sin valor. */

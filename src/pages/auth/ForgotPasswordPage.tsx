@@ -5,10 +5,13 @@ import { useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { authApi } from "../../api/auth";
-import { ApiError } from "../../api/client";
+import { ApiError, isAuthLockout } from "../../api/client";
+import { AuthLockNotice } from "../../components/auth/AuthLockNotice";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { TextField, type FieldState } from "../../components/ui/Field";
+import { useAuthLockout } from "../../hooks/useAuthLockout";
+import { authLockout } from "../../lib/authLockout";
 import { AuthLayout, authBackLinkClass } from "../../layouts/AuthLayout";
 
 const schema = z.object({
@@ -22,6 +25,8 @@ export function ForgotPasswordPage() {
   const location = useLocation();
   const [formError, setFormError] = useState<string | null>(null);
   const prefilledEmail = (location.state as { email?: string } | null)?.email ?? "";
+  const lockSeconds = useAuthLockout({ sync: true });
+  const locked = lockSeconds > 0;
 
   const {
     register,
@@ -39,11 +44,16 @@ export function ForgotPasswordPage() {
   }
 
   async function onSubmit(values: FormValues) {
+    if (locked) return;
     setFormError(null);
     try {
       await authApi.forgotPassword(values);
       navigate("/reset-password", { state: { email: values.email } });
     } catch (err) {
+      if (isAuthLockout(err)) {
+        authLockout.lockFor(err.retryAfterSeconds, values.email);
+        return;
+      }
       setFormError(err instanceof ApiError ? err.message : "Algo salió mal");
     }
   }
@@ -54,7 +64,8 @@ export function ForgotPasswordPage() {
       subtitle="Te enviaremos un código de 6 dígitos al correo asociado a tu cuenta"
     >
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-3.5">
-        {formError && <Alert variant="error">{formError}</Alert>}
+        {locked && <AuthLockNotice seconds={lockSeconds} />}
+        {!locked && formError && <Alert variant="error">{formError}</Alert>}
 
         <TextField
           size="sm"
@@ -70,7 +81,14 @@ export function ForgotPasswordPage() {
           {...register("email")}
         />
 
-        <Button type="submit" isLoading={isSubmitting} className="mt-1 w-full">
+        <Button
+          type="submit"
+          isLoading={isSubmitting}
+          disabled={locked}
+          tone={locked ? "ink" : "primary"}
+          toneLabel={locked ? "Recuperación bloqueada" : undefined}
+          className="mt-1 w-full"
+        >
           {isSubmitting ? "Enviando…" : "Enviar código"}
         </Button>
       </form>
