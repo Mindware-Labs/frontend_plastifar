@@ -340,14 +340,14 @@ export function ProductAddSearch({
               closePanel();
             }
           }}
-          className={`${controlBase} ${controlSizes.sm} pl-8 pr-[4.75rem] font-medium text-ink placeholder:font-normal placeholder:text-zinc-400
+          className={`${controlBase} ${controlSizes.sm} pl-8 ${term.length > 0 ? "pr-10" : "pr-3"} font-medium text-ink placeholder:font-normal placeholder:text-zinc-400
             border-line-strong hover:border-hairline-hover focus:border-brand-red focus:ring-3 focus:ring-brand-red/10
             transition-[border-color,background-color,box-shadow] duration-280 ease-plf-spring motion-reduce:transition-none
             ${open ? "border-zinc-300 bg-zinc-50/80 shadow-2xs" : ""}`}
         />
 
-        <div className="pointer-events-none absolute inset-y-0 right-1.5 flex w-[4.25rem] items-center justify-end gap-0.5">
-          {term.length > 0 ? (
+        {term.length > 0 ? (
+          <div className="pointer-events-none absolute inset-y-0 right-1.5 flex items-center">
             <button
               type="button"
               aria-label="Limpiar búsqueda"
@@ -357,25 +357,8 @@ export function ProductAddSearch({
             >
               <X className="size-3" strokeWidth={2.5} />
             </button>
-          ) : (
-            <span className="size-5.5 shrink-0" aria-hidden />
-          )}
-
-          <button
-            type="button"
-            onClick={() => closePanel()}
-            title="Cerrar lista (Esc)"
-            aria-hidden={!open}
-            tabIndex={open ? 0 : -1}
-            className={`pointer-events-auto inline-flex min-w-[2.75rem] origin-center items-center justify-center gap-0.5 rounded bg-zinc-100 px-1.5 py-0.5 text-[11px] font-semibold text-zinc-700
-              transition-[opacity,transform,background-color] duration-200 ease-plf-spring motion-reduce:transition-none
-              hover:bg-zinc-200 cursor-pointer
-              ${open ? "pointer-events-auto scale-100 opacity-100" : "pointer-events-none scale-[0.94] opacity-0"}`}
-          >
-            <Check className="size-2.5" strokeWidth={2.5} />
-            Listo
-          </button>
-        </div>
+          </div>
+        ) : null}
       </div>
 
       {mounted && anchor
@@ -509,7 +492,7 @@ export function ProductAddSearch({
                 <button
                   type="button"
                   onClick={() => closePanel()}
-                  className="inline-flex shrink-0 items-center gap-1 rounded-md bg-zinc-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-2xs hover:bg-zinc-800 active:scale-[0.98] transition-all cursor-pointer"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-md bg-brand-red px-2.5 py-1 text-[11px] font-semibold text-white shadow-2xs hover:bg-brand-red-dark active:scale-[0.98] transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25"
                 >
                   <Check className="size-3" strokeWidth={2.5} />
                   Listo
