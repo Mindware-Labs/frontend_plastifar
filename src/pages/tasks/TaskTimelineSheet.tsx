@@ -9,7 +9,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { createPortal } from "../../lib/portal";
 import { dialogHeaderShellClass, dialogHeaderStackClass } from "../../components/ui/dialogHeaderStyles";
 import { Button } from "../../components/ui/Button";
 import { SegmentedFilter } from "../../components/ui/SegmentedFilter";

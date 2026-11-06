@@ -1,6 +1,7 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useCallback, useState } from "react";
+import { useCallback, useContext, useState } from "react";
 import { ApiError } from "../api/client";
+import { KEPT_VIEW_QUERY, KeptViewContext } from "../lib/keptViews";
 
 interface PagedData {
   page: number;
@@ -60,12 +61,14 @@ export function usePagedList<TQuery extends { page: number }, TData extends Page
   }
 
   const queryJson = JSON.stringify({ ...criteria, page });
+  const kept = useContext(KeptViewContext);
 
   const query = useQuery({
     queryKey: [...(queryKey ?? ["paged-list", fallbackError]), "paged", queryJson],
     queryFn: () => fetch(JSON.parse(queryJson) as TQuery),
     enabled,
     placeholderData: keepPreviousData,
+    ...(kept ? KEPT_VIEW_QUERY : {}),
   });
 
   /*

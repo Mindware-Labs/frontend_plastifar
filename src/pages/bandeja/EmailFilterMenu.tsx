@@ -1,6 +1,6 @@
 import { ChevronDown } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { createPortal } from "../../lib/portal";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import { useMenuKeyboard } from "../../hooks/useMenuKeyboard";
 import type { EmailListResponse } from "../../types/api";

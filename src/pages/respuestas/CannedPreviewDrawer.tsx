@@ -12,7 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useId, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
+import { createPortal } from "../../lib/portal";
 import { Button } from "../../components/ui/Button";
 import { dialogHeaderShellClass, dialogHeaderStackClass } from "../../components/ui/dialogHeaderStyles";
 import { useDialogMotion } from "../../hooks/useDialogMotion";

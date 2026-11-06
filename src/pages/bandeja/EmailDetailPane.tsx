@@ -598,7 +598,11 @@ export function EmailDetailPane({
     });
   }, [replyOpen, emailId, replyBlocks, replyText, replyCc, replyBcc, forwardTo, isForward]);
 
+  // Solo al cambiar de correo: al volver a la vista viva el editor abierto sigue abierto.
+  const shownEmailIdRef = useRef(emailId);
   useEffect(() => {
+    if (shownEmailIdRef.current === emailId) return;
+    shownEmailIdRef.current = emailId;
     setThreadHistoryExpanded(false);
     setOpenReplyId(null);
   }, [emailId]);

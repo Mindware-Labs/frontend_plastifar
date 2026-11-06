@@ -1,6 +1,6 @@
 import { Columns3, Check } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { createPortal } from "../../lib/portal";
 
 export interface ColumnOption {
   id: string;

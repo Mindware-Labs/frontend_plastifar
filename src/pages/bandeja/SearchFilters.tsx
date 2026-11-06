@@ -1,6 +1,6 @@
 import { Calendar, Paperclip, SlidersHorizontal, X } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
-import { createPortal } from "react-dom";
+import { createPortal } from "../../lib/portal";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import { Button } from "../../components/ui/Button";
 import { CheckboxField } from "../../components/ui/Field";

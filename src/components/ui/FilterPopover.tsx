@@ -1,6 +1,6 @@
 import { SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { createPortal } from "../../lib/portal";
 
 const ANCHO = 332;
 /** Margen contra el borde inferior de la ventana antes de que el panel scrollee. */

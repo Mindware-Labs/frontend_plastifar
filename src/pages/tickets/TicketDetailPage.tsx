@@ -417,8 +417,12 @@ export function TicketDetailPage() {
       : "datos"
   );
 
+  // Solo cuando ?tab= cambia: al volver a la vista viva se respeta la pestaña que se dejó abierta.
+  const appliedUrlTabRef = useRef<string | null>(null);
   useEffect(() => {
     const tab = searchParams.get("tab") as TicketDetailTab | null;
+    if (tab === appliedUrlTabRef.current) return;
+    appliedUrlTabRef.current = tab;
     if (tab && ["datos", "conversacion", "tareas", "notas", "formularios", "reclamacion"].includes(tab)) {
       setActiveTab(tab);
     }

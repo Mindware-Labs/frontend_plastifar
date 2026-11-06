@@ -5,14 +5,14 @@ import {
   LogOut,
   PanelLeft,
 } from "lucide-react";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import {
   resolveSidebarNavTargetKey,
   useSidebarNavIndicator,
   type SidebarIndicatorMotion,
   type SidebarNavIndicatorRect,
 } from "../../hooks/useSidebarNavIndicator";
-import { Link, NavLink, useLocation } from "react-router-dom";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/useAuth";
 import { useEmailCounts } from "../../context/useEmailCounts";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
@@ -21,6 +21,7 @@ import { useHasOpenedNotifications } from "../../hooks/useNotifyPrefs";
 import { usePermissions } from "../../hooks/usePermissions";
 import { formatDisplayName, formatInitials } from "../../lib/format";
 import { SIDEBAR_NAV, type NavGroup } from "../../lib/navigation";
+import { navTargetFor } from "../../lib/keptViews";
 import { Logo } from "../Logo";
 import { ChangePasswordModal } from "./ChangePasswordModal";
 import { NotificationsModal } from "./NotificationsModal";
@@ -172,6 +173,7 @@ export function Sidebar() {
   }, [visibleGroups]);
 
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const [preferCollapsed, setPreferCollapsed] = useState(readCollapsed);
 
   /** Bajo `lg` la barra se pliega al riel, se prefiera o no. */
@@ -300,6 +302,15 @@ export function Sidebar() {
   } = useSidebarNavIndicator(activeNavKey, navLayoutKey, pathname);
 
   /** Icono rojo al settled; durante el viaje lo lleva el indicador medido. */
+  // Las secciones de Correo y de «Tickets y Tareas» abren donde la persona se quedó; un clic con modificador no se toca.
+  function openWhereLeft(event: MouseEvent<HTMLAnchorElement>, to: string) {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const target = navTargetFor(to, pathname);
+    if (target === to) return;
+    event.preventDefault();
+    navigate(target);
+  }
+
   function showsAccentActive(isActive: boolean) {
     return isActive && indicatorMotion !== "travel";
   }
@@ -391,6 +402,7 @@ export function Sidebar() {
                       ref={registerTarget(`expanded:child:${child.to}`)}
                       to={child.to}
                       end={child.end}
+                      onClick={(event) => openWhereLeft(event, child.to)}
                       className={({ isActive }) =>
                         `group relative z-[2] flex h-[32px] items-center gap-2.5 rounded-lg px-2.5 text-[12.5px] transition-[color] duration-150 outline-none select-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
                           isActive
@@ -560,6 +572,7 @@ export function Sidebar() {
               <Link
                 ref={registerTarget(`collapsed:rail:${group.label}`)}
                 to={group.to ?? group.children![0].to}
+                onClick={(event) => openWhereLeft(event, group.to ?? group.children![0].to)}
                 aria-label={group.label}
                 onMouseEnter={(event) => openFlyout(group, event.currentTarget)}
                 onMouseLeave={scheduleClose}
@@ -664,7 +677,10 @@ export function Sidebar() {
                   to={child.to}
                   end={child.end}
                   data-motion-item
-                  onClick={() => setFlyoutOpen(false)}
+                  onClick={(event) => {
+                    setFlyoutOpen(false);
+                    openWhereLeft(event, child.to);
+                  }}
                   className={({ isActive }) =>
                     `group relative flex h-[32px] items-center gap-2.5 rounded-lg px-2.5 text-[12.5px] transition-all duration-150 focus-visible:ring-2 focus-visible:ring-brand-red/25 outline-none ${
                       isActive

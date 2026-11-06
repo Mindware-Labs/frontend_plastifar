@@ -21,7 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { createPortal } from "../../lib/portal";
 import { dialogHeaderShellClass, dialogHeaderStackClass } from "../../components/ui/dialogHeaderStyles";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";

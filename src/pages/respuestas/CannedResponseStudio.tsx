@@ -12,7 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { createPortal } from "../../lib/portal";
 import { cannedApi, cannedCategoriesApi } from "../../api/canned";
 import { ApiError } from "../../api/client";
 import { Alert } from "../../components/ui/Alert";

@@ -1,6 +1,6 @@
 import { X } from "lucide-react";
 import { useId, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { createPortal } from "../../lib/portal";
 import { useDialogBehavior } from "../../hooks/useDialogBehavior";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
 

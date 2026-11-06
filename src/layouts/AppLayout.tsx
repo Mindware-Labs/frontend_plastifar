@@ -1,4 +1,3 @@
-import { Outlet } from "react-router-dom";
 import { InboxAlerts } from "../components/app/InboxAlerts";
 import { Sidebar } from "../components/app/Sidebar";
 import { ReceiptStack } from "../components/app/ReceiptStack";
@@ -6,6 +5,7 @@ import { EmailCountsProvider } from "../context/EmailCountsContext";
 import { NotificationsProvider } from "../context/NotificationsContext";
 import { ReceiptProvider } from "../context/ReceiptContext";
 import { BreadcrumbLabelContext } from "../context/useBreadcrumb";
+import { KeepAliveOutlet } from "./KeepAliveOutlet";
 import { PageChromeProvider } from "./PageChromeContext";
 import { usePageChromeStore } from "./usePageChrome";
 
@@ -57,7 +57,7 @@ function Shell() {
                 tarjetas— flotan encima en blanco. Esa diferencia minima de
                 valor es lo que las despega sin necesitar una sombra pesada. */}
             <div className="flex min-h-0 flex-1 flex-col px-3 pb-3 lg:px-4 lg:pb-3.5 print:block print:h-auto print:min-h-0 print:p-0 print:overflow-visible">
-              <Outlet />
+              <KeepAliveOutlet />
             </div>
           </BreadcrumbLabelContext.Provider>
 

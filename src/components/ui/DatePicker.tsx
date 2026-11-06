@@ -8,7 +8,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { createPortal } from "../../lib/portal";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 
 export interface DatePickerProps {

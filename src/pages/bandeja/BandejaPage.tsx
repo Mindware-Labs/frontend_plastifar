@@ -8,7 +8,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { createPortal } from "../../lib/portal";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import { useSidePanelMotion } from "../../hooks/useSidePanelMotion";
 import { useMenuKeyboard } from "../../hooks/useMenuKeyboard";
@@ -399,8 +399,13 @@ export function BandejaPage({ folder }: BandejaPageProps) {
 
   useLoadErrorReceipt(error, "bandeja-list", refresh);
 
+  // Al volver a la vista viva no se republican contadores viejos: solo los de una respuesta nueva.
+  const publishedCountsRef = useRef<EmailListResponse["folderCounts"] | null>(null);
   useEffect(() => {
-    if (data?.folderCounts) setFolderCounts(data.folderCounts);
+    const counts = data?.folderCounts;
+    if (!counts || counts === publishedCountsRef.current) return;
+    publishedCountsRef.current = counts;
+    setFolderCounts(counts);
   }, [data?.folderCounts, setFolderCounts]);
 
   // El aviso llega en cualquier momento: se guarda la recarga vigente para no resuscribirse.

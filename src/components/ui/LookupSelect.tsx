@@ -1,6 +1,6 @@
 import { Check, ChevronDown, Search, X } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { createPortal } from "../../lib/portal";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import {

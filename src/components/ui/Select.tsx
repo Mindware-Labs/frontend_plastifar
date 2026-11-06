@@ -1,6 +1,6 @@
 import { Building, Check, ChevronDown, Search } from "lucide-react";
 import { useEffect, useId, useRef, useState, useCallback } from "react";
-import { createPortal } from "react-dom";
+import { createPortal } from "../../lib/portal";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import {
   controlSizes,

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { CircleAlert, Info, ShieldCheck, X } from "lucide-react";
-import { createPortal } from "react-dom";
+import { createPortal } from "../../lib/portal";
 
 export interface ToastProps {
   message: string | null;

@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronUp, Clock } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { createPortal } from "../../lib/portal";
 import { useDisclosureMotion } from "../../hooks/useDisclosureMotion";
 import type { FieldState } from "./fieldStyles";
 

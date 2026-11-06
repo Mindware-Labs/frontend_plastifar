@@ -263,20 +263,26 @@ export function TaskDetailPage() {
       });
   }
 
+  // Al volver a la vista viva el efecto corre otra vez: la misma tarea se relee sin vaciar la ficha.
+  const loadedTaskIdRef = useRef<number | null>(null);
   useEffect(() => {
     if (!Number.isFinite(id)) return;
     let active = true;
-    setLoading(true);
-    setTask(null);
+    const reload = loadedTaskIdRef.current === id;
+    if (!reload) {
+      setLoading(true);
+      setTask(null);
+    }
     setError(null);
     tasksApi
       .get(id)
       .then((data) => {
         if (!active) return;
+        loadedTaskIdRef.current = id;
         setTask(data);
       })
       .catch((err) => {
-        if (!active) return;
+        if (!active || reload) return;
         setTask(null);
         setError(err instanceof ApiError ? err.message : "No se pudo cargar la tarea");
       })
@@ -288,8 +294,12 @@ export function TaskDetailPage() {
     };
   }, [id]);
 
+  // Solo cuando ?tab= cambia: al volver a la vista viva se respeta la pestaña que se dejó abierta.
+  const appliedUrlTabRef = useRef<string | null>(null);
   useEffect(() => {
     const tab = searchParams.get("tab") as TaskDetailTab | null;
+    if (tab === appliedUrlTabRef.current) return;
+    appliedUrlTabRef.current = tab;
     if (tab && ["datos", "notas", "formularios", "reclamacion"].includes(tab)) {
       setActiveTab(tab);
     }

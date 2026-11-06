@@ -3,7 +3,7 @@ import { GlobalWorkerOptions, TextLayer, getDocument } from "pdfjs-dist";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { createPortal } from "../../lib/portal";
 import { Spinner } from "../../components/ui/Spinner";
 import { findRanges, revealRange } from "./pdfSearch";
 import { dividerClass, iconButtonClass } from "./toolbarStyles";

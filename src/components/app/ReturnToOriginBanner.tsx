@@ -1,6 +1,6 @@
 import { ArrowLeft, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { createPortal } from "../../lib/portal";
 import { useNavigate } from "react-router-dom";
 import {
   clearEnterpriseListReturn,

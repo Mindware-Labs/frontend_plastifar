@@ -1,5 +1,5 @@
 import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { createPortal } from "../../lib/portal";
 
 interface TooltipProps {
   content: ReactNode;

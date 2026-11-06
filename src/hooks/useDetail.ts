@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useState, type SetStateAction } from "react";
+import { useCallback, useContext, useState, type SetStateAction } from "react";
 import { ApiError } from "../api/client";
+import { KEPT_VIEW_TTL_MS, KeptViewContext } from "../lib/keptViews";
 
 interface Messages {
   /**
@@ -31,7 +32,9 @@ export function useDetail<T>(id: number, fetch: (id: number) => Promise<T>, mess
   const queryClient = useQueryClient();
   const queryKey = [messages.resource, id] as const;
 
-  const query = useQuery({ queryKey, queryFn: () => fetch(id) });
+  // En una vista viva solo se alarga la vida en caché: la ficha espera su lectura de montaje y un staleTime la saltaría.
+  const kept = useContext(KeptViewContext);
+  const query = useQuery({ queryKey, queryFn: () => fetch(id), ...(kept ? { gcTime: KEPT_VIEW_TTL_MS } : {}) });
 
   const [reloading, setReloading] = useState(false);
 
