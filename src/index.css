@@ -953,6 +953,20 @@ input::-ms-clear {
   will-change: transform, opacity, filter;
 }
 .animate-plf-seal-pop { animation: plf-seal-pop 0.42s var(--ease-plf-spring) both; }
+
+/* La campana se mece al llegar una notificación: atrae la mirada sin parpadear en bucle. */
+@keyframes plf-bell-ring {
+  0% { transform: rotate(0); }
+  12% { transform: rotate(16deg); }
+  26% { transform: rotate(-13deg); }
+  40% { transform: rotate(9deg); }
+  54% { transform: rotate(-6deg); }
+  68% { transform: rotate(3deg); }
+  82% { transform: rotate(-1deg); }
+  100% { transform: rotate(0); }
+}
+
+.animate-plf-bell-ring { animation: plf-bell-ring 0.9s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; transform-origin: 50% 2px; }
 .animate-plf-list-row-in { animation: plf-list-row-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-plf-list-row-out { animation: plf-list-row-out 0.28s cubic-bezier(0.4, 0, 0.2, 1) both; }
 .animate-plf-settle { animation: plf-settle 0.34s cubic-bezier(0.16, 1, 0.3, 1) both; }
@@ -1408,6 +1422,7 @@ input::-ms-clear {
   .animate-plf-settle,
   .animate-plf-otp-confirm,
   .animate-plf-seal-pop,
+  .animate-plf-bell-ring,
   .animate-plf-receipt-in,
   .animate-plf-check-in,
   .animate-plf-check-breathe,

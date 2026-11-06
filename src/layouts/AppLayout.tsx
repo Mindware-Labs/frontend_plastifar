@@ -3,6 +3,7 @@ import { InboxAlerts } from "../components/app/InboxAlerts";
 import { Sidebar } from "../components/app/Sidebar";
 import { ReceiptStack } from "../components/app/ReceiptStack";
 import { EmailCountsProvider } from "../context/EmailCountsContext";
+import { NotificationsProvider } from "../context/NotificationsContext";
 import { ReceiptProvider } from "../context/ReceiptContext";
 import { BreadcrumbLabelContext } from "../context/useBreadcrumb";
 import { PageChromeProvider } from "./PageChromeContext";
@@ -11,11 +12,13 @@ import { usePageChromeStore } from "./usePageChrome";
 export function AppLayout() {
   return (
     <EmailCountsProvider>
-      <ReceiptProvider>
-        <PageChromeProvider>
-          <Shell />
-        </PageChromeProvider>
-      </ReceiptProvider>
+      <NotificationsProvider>
+        <ReceiptProvider>
+          <PageChromeProvider>
+            <Shell />
+          </PageChromeProvider>
+        </ReceiptProvider>
+      </NotificationsProvider>
     </EmailCountsProvider>
   );
 }

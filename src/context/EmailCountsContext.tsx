@@ -6,6 +6,7 @@ import { tokenStore } from "../api/tokenStore";
 import { API_URL } from "../lib/env";
 import { decodeAccessToken } from "../lib/jwt";
 import type {
+  AppNotification,
   ComposingPresence,
   EmailAssignment,
   EmailFolderCounts,
@@ -21,6 +22,7 @@ import {
   type AssignmentListener,
   type ComposingListener,
   type Listener,
+  type NotificationListener,
   type TicketAssignmentListener,
   type TicketNewMessageListener,
   type TicketSlaListener,
@@ -57,6 +59,8 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
   const ticketStatusListeners = useRef(new Set<TicketStatusChangeListener>());
   const ticketMessageListeners = useRef(new Set<TicketNewMessageListener>());
   const ticketSlaListeners = useRef(new Set<TicketSlaListener>());
+  const notificationListeners = useRef(new Set<NotificationListener>());
+  const notificationChangeListeners = useRef(new Set<Listener>());
   const connectionRef = useRef<HubConnection | null>(null);
 
   const refresh = useCallback(() => {
@@ -109,6 +113,16 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
   const onTicketSlaAlert = useCallback((listener: TicketSlaListener) => {
     ticketSlaListeners.current.add(listener);
     return () => ticketSlaListeners.current.delete(listener) as unknown as void;
+  }, []);
+
+  const onNotification = useCallback((listener: NotificationListener) => {
+    notificationListeners.current.add(listener);
+    return () => notificationListeners.current.delete(listener) as unknown as void;
+  }, []);
+
+  const onNotificationsChanged = useCallback((listener: Listener) => {
+    notificationChangeListeners.current.add(listener);
+    return () => notificationChangeListeners.current.delete(listener) as unknown as void;
   }, []);
 
   // Si el canal esta caido el aviso se pierde: es una cortesia, no un dato.
@@ -178,6 +192,14 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
       ticketSlaListeners.current.forEach((listener) => listener(notice));
     }
 
+    function notificationArrived(notification: AppNotification) {
+      notificationListeners.current.forEach((listener) => listener(notification));
+    }
+
+    function notificationsChanged() {
+      notificationChangeListeners.current.forEach((listener) => listener());
+    }
+
     // Sin fijar transporte: si el WebSocket no pasa por el proxy, SignalR baja a SSE o long polling solo.
     const connection = new HubConnectionBuilder()
       .withUrl(`${API_URL}/hubs/inbox`, { accessTokenFactory: freshAccessToken })
@@ -194,11 +216,14 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
     connection.on("tickets:status_changed", ticketStatusChanged);
     connection.on("tickets:new_message", ticketNewMessage);
     connection.on("tickets:sla_alert", ticketSlaAlert);
+    connection.on("notifications:new", notificationArrived);
+    connection.on("notifications:changed", notificationsChanged);
 
     // Mientras estuvo caido pudo entrar correo o haber cambios en tickets: al volver se recarga sin esperar el proximo aviso.
     connection.onreconnected(() => {
       announce();
       ticketChanged();
+      notificationsChanged();
     });
 
     let mounted = true;
@@ -222,6 +247,7 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
         retryDelay = RETRY_MIN_MS;
         announce();
         ticketChanged();
+        notificationsChanged();
       } catch {
         scheduleStart();
       }
@@ -246,6 +272,8 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
       connection.off("tickets:status_changed", ticketStatusChanged);
       connection.off("tickets:new_message", ticketNewMessage);
       connection.off("tickets:sla_alert", ticketSlaAlert);
+      connection.off("notifications:new", notificationArrived);
+      connection.off("notifications:changed", notificationsChanged);
       connectionRef.current = null;
       void connection.stop();
     };
@@ -268,6 +296,8 @@ export function EmailCountsProvider({ children }: { children: ReactNode }) {
         onTicketStatusChanged,
         onTicketNewMessage,
         onTicketSlaAlert,
+        onNotification,
+        onNotificationsChanged,
       }}
     >
       {children}

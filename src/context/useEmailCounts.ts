@@ -1,5 +1,6 @@
 import { createContext, useContext } from "react";
 import type {
+  AppNotification,
   ComposingPresence,
   EmailAssignment,
   EmailFolderCounts,
@@ -18,6 +19,7 @@ export type TicketAssignmentListener = (notice: TicketAssignmentNotice) => void;
 export type TicketStatusChangeListener = (notice: TicketStatusChangeNotice) => void;
 export type TicketNewMessageListener = (notice: TicketNewMessageNotice) => void;
 export type TicketSlaListener = (notice: TicketSlaNotice) => void;
+export type NotificationListener = (notification: AppNotification) => void;
 
 export interface EmailCountsValue {
   counts: EmailFolderCounts | null;
@@ -45,6 +47,10 @@ export interface EmailCountsValue {
   onTicketNewMessage: (listener: TicketNewMessageListener) => () => void;
   /** Alerta de SLA (vencido o por vencer). */
   onTicketSlaAlert: (listener: TicketSlaListener) => () => void;
+  /** Notificación nueva guardada para esta persona. */
+  onNotification: (listener: NotificationListener) => () => void;
+  /** Otra pestaña marcó notificaciones como leídas, o el canal volvió tras una caída. */
+  onNotificationsChanged: (listener: Listener) => () => void;
 }
 
 export const EmailCountsContext = createContext<EmailCountsValue>({
@@ -62,6 +68,8 @@ export const EmailCountsContext = createContext<EmailCountsValue>({
   onTicketStatusChanged: () => () => undefined,
   onTicketNewMessage: () => () => undefined,
   onTicketSlaAlert: () => () => undefined,
+  onNotification: () => () => undefined,
+  onNotificationsChanged: () => () => undefined,
 });
 
 export function useEmailCounts() {

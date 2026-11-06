@@ -1,5 +1,5 @@
 import {
-  Bell,
+  BellRing,
   ChevronDown,
   KeyRound,
   LogOut,
@@ -24,6 +24,7 @@ import { SIDEBAR_NAV, type NavGroup } from "../../lib/navigation";
 import { Logo } from "../Logo";
 import { ChangePasswordModal } from "./ChangePasswordModal";
 import { NotificationsModal } from "./NotificationsModal";
+import { NotificationsBell, NotificationsPanel } from "./NotificationsPanel";
 
 /** Indicador único siempre visible: fondo + marca (sin duplicar en cada fila). */
 function sidebarIndicatorMotionClass(motion: SidebarIndicatorMotion, motionReady: boolean) {
@@ -181,6 +182,7 @@ export function Sidebar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [editingAlerts, setEditingAlerts] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const hasOpenedAlerts = useHasOpenedNotifications();
 
   // El contenido del desplegable sobrevive al cierre para que la salida tenga qué animar.
@@ -749,7 +751,7 @@ export function Sidebar() {
                   data-motion-item
                   className="group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[12.5px] font-medium text-zinc-700 transition-colors outline-none hover:bg-zinc-100 hover:text-zinc-900 focus-visible:bg-zinc-100 focus-visible:text-zinc-900"
                 >
-                  <Bell className="h-3.5 w-3.5 text-zinc-400 group-hover:text-zinc-700 transition-colors" />
+                  <BellRing className="h-3.5 w-3.5 text-zinc-400 group-hover:text-zinc-700 transition-colors" />
                   <span>Avisos</span>
                   {!hasOpenedAlerts && (
                     <span className="ml-auto rounded-full bg-brand-red/10 px-1.5 py-0.5 font-heading text-[9.5px] font-bold text-brand-red">
@@ -787,6 +789,8 @@ export function Sidebar() {
             </div>
           )}
 
+          {/* Perfil y campana en la misma franja; plegada, la campana sube sobre el avatar. */}
+          <div className={`flex items-center gap-1 ${collapsed ? "flex-col-reverse" : ""}`}>
           {/* Gatillo del perfil con transición ultra fluida */}
           <button
             type="button"
@@ -794,7 +798,9 @@ export function Sidebar() {
             aria-haspopup="menu"
             aria-expanded={menuOpen}
             title={collapsed ? `${displayName} · ${user?.email}` : undefined}
-            className={`group flex w-full items-center rounded-lg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 cursor-pointer ${
+            className={`group flex min-w-0 flex-1 items-center rounded-lg transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 cursor-pointer ${
+              collapsed ? "w-full" : ""
+            } ${
               menuOpen
                 ? "bg-zinc-100 text-zinc-900"
                 : "hover:bg-zinc-100/80 text-zinc-700"
@@ -830,6 +836,16 @@ export function Sidebar() {
               />
             </div>
           </button>
+
+          <NotificationsBell
+            open={notificationsOpen}
+            collapsed={collapsed}
+            onToggle={() => {
+              setMenuOpen(false);
+              setNotificationsOpen((value) => !value);
+            }}
+          />
+          </div>
         </div>
       </div>
 
@@ -864,6 +880,15 @@ export function Sidebar() {
 
       {changingPassword && <ChangePasswordModal onClose={() => setChangingPassword(false)} />}
       {editingAlerts && <NotificationsModal onClose={() => setEditingAlerts(false)} />}
+      <NotificationsPanel
+        open={notificationsOpen}
+        anchorRef={menuRef}
+        onClose={() => setNotificationsOpen(false)}
+        onOpenSettings={() => {
+          setNotificationsOpen(false);
+          setEditingAlerts(true);
+        }}
+      />
     </aside>
   );
 }

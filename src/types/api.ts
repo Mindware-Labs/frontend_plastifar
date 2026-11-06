@@ -988,3 +988,35 @@ export interface StaffActivityResponse {
   counts: StaffActivityCounts;
 }
 
+
+export type NotificationKind =
+  | "TicketAssigned"
+  | "TicketStatusChanged"
+  | "TicketClientReply"
+  | "TicketInternalNote"
+  | "TicketReply"
+  | "TicketSlaWarning"
+  | "TicketSlaBreach"
+  | "EmailAssigned"
+  | "EmailReceived";
+
+/** Notificación guardada para la persona conectada. */
+export interface AppNotification {
+  id: number;
+  kind: NotificationKind;
+  title: string;
+  body: string | null;
+  /** Ruta del panel a la que lleva. */
+  link: string;
+  ticketId: number | null;
+  emailId: number | null;
+  actorName: string | null;
+  createdAt: string;
+  readAt: string | null;
+}
+
+export interface NotificationPage {
+  items: AppNotification[];
+  unreadCount: number;
+  hasMore: boolean;
+}
