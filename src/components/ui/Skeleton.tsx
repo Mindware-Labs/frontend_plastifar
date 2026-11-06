@@ -158,7 +158,10 @@ export function TicketCardsSkeleton({ count = 9 }: { count?: number }) {
                 <Skeleton className="size-5 rounded-full" delay={baseDelay + 140} />
                 <Skeleton className="h-3 w-24 rounded" delay={baseDelay + 155} />
               </div>
-              <Skeleton className="h-3 w-16 rounded" delay={baseDelay + 165} />
+              <div className="flex shrink-0 items-center gap-2">
+                <Skeleton className="h-4 w-16 rounded-md" delay={baseDelay + 160} />
+                <Skeleton className="h-3 w-14 rounded" delay={baseDelay + 165} />
+              </div>
             </div>
           </div>
         );

@@ -120,6 +120,13 @@ function TicketCard({ ticket: t, checked, department, onToggleSelect, onOpen }: 
   const clientCode = t.clientCode && t.clientCode !== "-" ? t.clientCode : null;
   const productsSummary = formatTicketProductsSummary(t.products);
   const productCount = t.products?.length ?? 0;
+  /** En el chip se ve código · nombre (o solo nombre); el hover muestra la lista completa. */
+  const productsChipLabel =
+    productCount === 0
+      ? null
+      : productCount === 1
+        ? (productsSummary ?? "")
+        : `${productCount} productos`;
 
   return (
     <article
@@ -277,26 +284,24 @@ function TicketCard({ ticket: t, checked, department, onToggleSelect, onOpen }: 
         </div>
       </div>
 
-      {/* Zona 4: Pie Operativo Simétrico (Responsable a la izquierda; Productos y Actividad a la derecha) */}
+      {/* Zona 4: Pie operativo (Responsable; productos código · nombre; actividad) */}
       <div className="mt-3 flex h-7 items-center justify-between gap-2 border-t border-line-soft pt-2.5">
         <div className="min-w-0 flex-1">
           <AssigneeCell id={t.assignedStaffId} name={t.assignedStaffName} />
         </div>
 
-        <div className="flex shrink-0 items-center gap-2 text-[11.5px] text-subtle">
-          {productsSummary && (
+        <div className="flex min-w-0 shrink-0 items-center gap-2 text-[11.5px] text-subtle">
+          {productsChipLabel && (
             <span
-              className="inline-flex max-w-[130px] items-center gap-1 truncate rounded-md border border-line bg-canvas px-1.5 py-0.5 text-[10.5px] font-medium text-subtle"
-              title={productsSummary}
+              className="inline-flex max-w-[130px] min-w-0 items-center gap-1 truncate rounded-md border border-line bg-canvas px-1.5 py-0.5 text-[10.5px] font-medium text-subtle"
+              title={productsSummary ?? undefined}
             >
               <Package aria-hidden className="size-3 shrink-0 text-faint" />
-              <span className="truncate">
-                {productCount === 1 ? productsSummary : `${productCount} prod.`}
-              </span>
+              <span className="min-w-0 truncate">{productsChipLabel}</span>
             </span>
           )}
           <span
-            className="inline-flex items-center gap-1 whitespace-nowrap text-[11.5px] font-medium tabular-nums text-subtle"
+            className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[11.5px] font-medium tabular-nums text-subtle"
             title={`Última actividad: ${activity.full}`}
           >
             <Clock aria-hidden className="size-3 shrink-0 text-faint" />
