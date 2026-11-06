@@ -4,7 +4,6 @@ import { Button } from "../../../components/ui/Button";
 import { CheckboxField, SelectField, TextAreaField } from "../../../components/ui/Field";
 import { FileDropzone } from "../../../components/ui/FileDropzone";
 import { Modal } from "../../../components/ui/Modal";
-import { labelClass, textareaClass } from "./ticketDetailShared";
 import type { StatusTransitionOption } from "./ticketTransitions";
 import type { TicketStatusUpdateFlow } from "./useTicketStatusUpdate";
 

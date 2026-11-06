@@ -40,7 +40,6 @@ import { usePagedList } from "../../hooks/usePagedList";
 import { formatActivityDate, formatSlaRemaining } from "../../lib/format";
 import type {
   DepartmentResponse,
-  TicketCounts,
   TicketListItemResponse,
   TicketListResponse,
   TicketQuery,
@@ -54,20 +53,6 @@ import { TICKETS_LIST_ROUTES, type TicketOriginFilter } from "./ticketLegacy";
 
 type TicketFilterKey = "todos" | "abiertos" | "por-vencer" | "vencidos" | "espera" | "cerrados";
 type SortKey = "numero" | "asunto" | "cliente" | "departamento" | "prioridad" | "estado" | "sla" | "actividad";
-
-interface TicketFilter {
-  key: TicketFilterKey;
-  label: string;
-  countKey: keyof TicketCounts;
-}
-
-const filters: TicketFilter[] = [
-  { key: "todos", label: "Todos", countKey: "all" },
-  { key: "abiertos", label: "Abiertos", countKey: "open" },
-  { key: "vencidos", label: "Vencidos", countKey: "overdue" },
-  { key: "espera", label: "En espera del cliente", countKey: "waitingOnClient" },
-  { key: "cerrados", label: "Cerrados", countKey: "closed" },
-];
 
 // Múltiplos de 3 para mantener la simetría exacta de la cuadrícula 3×3 en escritorio.
 const CARD_PAGE_SIZES = [9, 18, 27, 45];

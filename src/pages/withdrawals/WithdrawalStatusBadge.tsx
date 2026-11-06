@@ -9,9 +9,9 @@ export function normalizeWithdrawalStatus(status: WithdrawalStatus | string): st
 }
 
 const styles: StatusStyles<string> = {
-  Registrado: { tone: "blue", icon: CheckCircle2 },
-  Registrada: { tone: "blue", icon: CheckCircle2 },
-  Solicitado: { tone: "blue", icon: CheckCircle2 },
+  Registrado: { tone: "neutral", icon: CheckCircle2 },
+  Registrada: { tone: "neutral", icon: CheckCircle2 },
+  Solicitado: { tone: "neutral", icon: CheckCircle2 },
   Aprobado: { tone: "warn", icon: Check },
   Rechazado: { tone: "red", icon: X },
   Retirado: { tone: "green", icon: PackageCheck },

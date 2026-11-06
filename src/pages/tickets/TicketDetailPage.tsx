@@ -256,13 +256,6 @@ function getAvailableTransitions(status: string): StatusTransitionOption[] {
   }
 }
 
-const labelClass = "font-heading text-[11.5px] font-semibold text-zinc-500";
-
-const textareaClass =
-  "w-full resize-none rounded-lg border border-zinc-200/80 bg-white px-3 py-2 text-[12.5px] leading-relaxed " +
-  "text-zinc-900 outline-none transition-all placeholder:text-zinc-400 hover:border-zinc-300 " +
-  "focus:border-brand-red focus:ring-2 focus:ring-brand-red/15";
-
 const attachLabelClass =
   "inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-lg border border-zinc-200/80 bg-white px-2.5 " +
   "text-[11.5px] font-medium text-zinc-600 shadow-2xs transition-all duration-300 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 active:scale-95";

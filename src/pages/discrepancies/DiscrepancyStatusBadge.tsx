@@ -9,8 +9,8 @@ export function normalizeDiscrepancyStatus(status: DiscrepancyStatus | string): 
 }
 
 const styles: StatusStyles<string> = {
-  Registrada: { tone: "blue", icon: CheckCircle2 },
-  "En investigación": { tone: "blue", icon: CheckCircle2 },
+  Registrada: { tone: "neutral", icon: CheckCircle2 },
+  "En investigación": { tone: "neutral", icon: CheckCircle2 },
   Completada: { tone: "warn", icon: ShieldCheck },
   Aprobada: { tone: "green", icon: Check },
   Devuelta: { tone: "red", icon: RotateCcw },

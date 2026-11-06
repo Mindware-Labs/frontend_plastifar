@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { LookupField } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
@@ -47,6 +47,7 @@ export function StaffSalesRepClientModal({
           formId="staff-sales-rep-client-form"
           isEdit={false}
           createLabel="Confirmar cliente"
+          isSubmitting={false}
           onCancel={requestClose}
         />
       }
