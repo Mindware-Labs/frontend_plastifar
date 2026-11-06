@@ -91,7 +91,7 @@ export function TableSkeleton({
 
 /**
  * Esqueleto simétrico de la cuadrícula de tickets (3×3 por defecto).
- * Reproduce las 4 zonas arquitectónicas de cada tarjeta para evitar cualquier salto de layout.
+ * Reproduce las zonas de cada tarjeta, con el mismo alto, para evitar cualquier salto de layout.
  */
 export function TicketCardsSkeleton({ count = 9 }: { count?: number }) {
   return (
@@ -115,9 +115,11 @@ export function TicketCardsSkeleton({ count = 9 }: { count?: number }) {
                 <Skeleton className="size-4.5 rounded-[5px]" delay={baseDelay} />
                 <Skeleton className="h-4 w-28 rounded-md" delay={baseDelay + 20} />
               </div>
-              <div className="flex items-center gap-1.5">
-                <Skeleton className="h-5 w-14 rounded-md" delay={baseDelay + 40} />
-                <Skeleton className="h-5 w-20 rounded-md" delay={baseDelay + 60} />
+              <div className="flex h-5 items-center gap-2">
+                <Skeleton className="h-3 w-12 rounded" delay={baseDelay + 40} />
+                <span aria-hidden className="h-3 w-px bg-line" />
+                <Skeleton className="size-2 rounded-full" delay={baseDelay + 50} />
+                <Skeleton className="h-3 w-14 rounded" delay={baseDelay + 60} />
               </div>
             </div>
 
@@ -127,41 +129,44 @@ export function TicketCardsSkeleton({ count = 9 }: { count?: number }) {
               <Skeleton className="h-3.5 w-[68%] rounded" delay={baseDelay + 70} />
             </div>
 
-            {/* Zona 3: Panel Hundido Simétrico (Cliente + Departamento + 50/50 Motivo y SLA) */}
+            {/* Panel: cliente, departamento y productos al mismo eje; motivo | SLA en banda blanca */}
             <div className="mt-3 overflow-hidden rounded-inset border border-line bg-canvas/85 divide-y divide-line">
-              <div className="grid h-8.5 grid-cols-[76px_1fr] items-center gap-2.5 px-3">
+              <div className="grid h-7 grid-cols-[5.75rem_minmax(0,1fr)] items-center gap-2 px-3">
                 <Skeleton className="h-2.5 w-14 rounded" delay={baseDelay + 80} />
                 <div className="flex items-center justify-between gap-2">
                   <Skeleton className="h-3 w-36 rounded" delay={baseDelay + 95} />
                   <Skeleton className="h-4 w-12 rounded" delay={baseDelay + 110} />
                 </div>
               </div>
-              <div className="grid h-8.5 grid-cols-[76px_1fr] items-center gap-2.5 px-3">
+              <div className="grid h-7 grid-cols-[5.75rem_minmax(0,1fr)] items-center gap-2 px-3">
                 <Skeleton className="h-2.5 w-12 rounded" delay={baseDelay + 100} />
                 <Skeleton className="h-3 w-44 rounded" delay={baseDelay + 115} />
               </div>
-              <div className="grid h-[46px] grid-cols-2 divide-x divide-line bg-white/50">
-                <div className="flex flex-col justify-center gap-1.5 px-3">
-                  <Skeleton className="h-2 w-12 rounded" delay={baseDelay + 120} />
-                  <Skeleton className="h-3 w-24 rounded" delay={baseDelay + 135} />
+              <div className="grid h-7 grid-cols-[5.75rem_minmax(0,1fr)] items-center gap-2 px-3">
+                <Skeleton className="h-2.5 w-16 rounded" delay={baseDelay + 120} />
+                <div className="flex items-center justify-between gap-2">
+                  <Skeleton className="h-3 w-28 rounded" delay={baseDelay + 130} />
+                  <Skeleton className="h-4 w-10 rounded" delay={baseDelay + 140} />
                 </div>
-                <div className="flex flex-col justify-center gap-1.5 px-3">
-                  <Skeleton className="h-2 w-16 rounded" delay={baseDelay + 130} />
-                  <Skeleton className="h-3.5 w-20 rounded" delay={baseDelay + 145} />
+              </div>
+              <div className="grid h-10 grid-cols-2 divide-x divide-line bg-white/50">
+                <div className="flex flex-col justify-center gap-1 px-3">
+                  <Skeleton className="h-2 w-12 rounded" delay={baseDelay + 150} />
+                  <Skeleton className="h-3 w-24 rounded" delay={baseDelay + 160} />
+                </div>
+                <div className="flex flex-col justify-center gap-1 px-3">
+                  <Skeleton className="h-2 w-16 rounded" delay={baseDelay + 155} />
+                  <Skeleton className="h-3.5 w-20 rounded" delay={baseDelay + 165} />
                 </div>
               </div>
             </div>
 
-            {/* Zona 4: Pie operativo simétrico */}
-            <div className="mt-3 flex h-7 items-center justify-between gap-2 border-t border-line-soft pt-2.5">
-              <div className="flex items-center gap-2">
-                <Skeleton className="size-5 rounded-full" delay={baseDelay + 140} />
-                <Skeleton className="h-3 w-24 rounded" delay={baseDelay + 155} />
+            <div className="mt-2 flex h-6 items-center justify-between gap-3 border-t border-line-soft">
+              <div className="flex items-center gap-1.5">
+                <Skeleton className="size-[18px] rounded-full" delay={baseDelay + 170} />
+                <Skeleton className="h-3 w-24 rounded" delay={baseDelay + 180} />
               </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <Skeleton className="h-4 w-16 rounded-md" delay={baseDelay + 160} />
-                <Skeleton className="h-3 w-14 rounded" delay={baseDelay + 165} />
-              </div>
+              <Skeleton className="h-3 w-16 rounded" delay={baseDelay + 185} />
             </div>
           </div>
         );

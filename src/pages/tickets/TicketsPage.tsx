@@ -9,7 +9,7 @@ import {
   Ticket as TicketIcon,
   X,
 } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { animateCardGridPageTurn, consumePageDirection } from "../../hooks/motion";
 import { ListSortMenu } from "../../components/ui/ListSortMenu";
 import { useNavigate } from "react-router-dom";
@@ -42,12 +42,13 @@ import type {
   DepartmentResponse,
   TicketListItemResponse,
   TicketListResponse,
+  TicketProductResponse,
   TicketQuery,
   TicketStaffOptionResponse,
 } from "../../types/api";
 import { usePermissions } from "../../hooks/usePermissions";
 import { CreateTicketModal } from "./CreateTicketModal";
-import { AssigneeCell, PriorityCell, SlaCell, StatusCell } from "./ticketCells";
+import { AssigneeCell, CardPriorityStatus, SlaCell } from "./ticketCells";
 import { TicketSelectionBar } from "./TicketSelectionBar";
 import { TICKETS_LIST_ROUTES, type TicketOriginFilter } from "./ticketLegacy";
 
@@ -101,16 +102,85 @@ interface TicketCardProps {
   onOpen: (id: number) => void;
 }
 
+/** Eje compartido de las tres franjas de hecho. Cabe «Productos» en versalitas de 10px. */
+const FACT_ROW_CLASS =
+  "grid h-7 grid-cols-[5.75rem_minmax(0,1fr)] items-center gap-2 px-3";
+
+function CodeBadge({ children }: { children: string }) {
+  return (
+    <span className="shrink-0 rounded border border-line bg-white px-1.5 py-0.5 font-heading text-[10px] font-bold leading-none tabular-nums text-subtle">
+      {children}
+    </span>
+  );
+}
+
+function FactRow({
+  mark,
+  label,
+  title,
+  children,
+}: {
+  mark: ReactNode;
+  label: string;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={FACT_ROW_CLASS} title={title}>
+      <div className="flex items-center gap-1.5 text-faint">
+        <span className="flex size-3 shrink-0 items-center justify-center">{mark}</span>
+        <span className="whitespace-nowrap font-heading text-[10px] font-bold uppercase leading-none tracking-[0.06em]">
+          {label}
+        </span>
+      </div>
+      <div className="min-w-0">{children}</div>
+    </div>
+  );
+}
+
 /**
- * Ficha arquitectónica simétrica de ticket.
+ * La fila repite el gesto del cliente: el nombre ocupa el espacio y el código
+ * se queda entero a la derecha. Si hay más de uno, el recuento acompaña al código
+ * y el título de la fila enumera el resto, sin partir nombres a la mitad.
+ */
+function ProductValue({ products }: { products: TicketProductResponse[] | undefined }) {
+  const list = products ?? [];
+  const summary = formatTicketProductsSummary(list);
+
+  if (list.length === 0) {
+    return <span className="block truncate text-[12px] font-normal leading-[16px] text-faint">Sin productos</span>;
+  }
+
+  const [first, ...rest] = list;
+  const extraLabel =
+    rest.length > 0 ? `${rest.length} ${rest.length === 1 ? "producto más" : "productos más"}. ${summary ?? ""}` : undefined;
+
+  return (
+    <span className="flex min-w-0 items-center justify-between gap-2">
+      <span className="truncate text-[12px] font-medium leading-[16px] text-ink">{first.productName}</span>
+      <span className="flex shrink-0 items-center gap-1">
+        {rest.length > 0 && (
+          <span title={summary ?? undefined} aria-label={extraLabel}>
+            <CodeBadge>+{rest.length}</CodeBadge>
+          </span>
+        )}
+        {first.productCode ? <CodeBadge>{first.productCode}</CodeBadge> : null}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * Ficha de ticket. El alto exterior medido sigue en 278px: el borde de la tarjeta
+ * suma 2px al presupuesto interior, que no cambió.
  *
- * Diseñada en cuatro zonas de altura determinista para que las 9 tarjetas de la
- * cuadrícula 3×3 mantengan una alineación horizontal y vertical idéntica:
- * 1. Barra superior (`h-6`): Selección + Código íntegro a la izquierda; Prioridad + Estado a la derecha.
- * 2. Núcleo de asunto (`h-[40px]`): Hasta 2 líneas en Onest (`line-clamp-2`) con altura bloqueada.
- * 3. Panel hundido (`rounded-inset`): 2 franjas de ancho completo (Cliente con código y Departamento con ruta)
- *    + 1 franja inferior bisecada al 50/50 (Motivo | Compromiso SLA).
- * 4. Pie operativo (`h-7`): Responsable con avatar a la izquierda; Productos + Actividad a la derecha.
+ * Presupuesto interior, idéntico al anterior:
+ * 16 + 24 + 10 + 40 + 12 + 126 + 8 + 24 + 16 = 276.
+ * 1. Cabecera `h-6`: código a la izquierda; prioridad y estado a la derecha.
+ * 2. Asunto `h-[40px]`: dos líneas de 20px, alineadas por arriba entre tarjetas.
+ * 3. Panel `126px`: tres franjas de 28px (cliente, departamento, productos) sobre el mismo eje,
+ *    y una banda blanca de 40px partida al 50% (motivo | SLA). El borde del panel suma 2px.
+ * 4. Pie `h-6`: responsable a la izquierda, actividad a la derecha.
  */
 function TicketCard({ ticket: t, checked, department, onToggleSelect, onOpen }: TicketCardProps) {
   const [copied, setCopied] = useState(false);
@@ -119,14 +189,7 @@ function TicketCard({ ticket: t, checked, department, onToggleSelect, onOpen }: 
   const client = t.clientName && t.clientName !== "Sin cliente" ? t.clientName : null;
   const clientCode = t.clientCode && t.clientCode !== "-" ? t.clientCode : null;
   const productsSummary = formatTicketProductsSummary(t.products);
-  const productCount = t.products?.length ?? 0;
-  /** En el chip se ve código · nombre (o solo nombre); el hover muestra la lista completa. */
-  const productsChipLabel =
-    productCount === 0
-      ? null
-      : productCount === 1
-        ? (productsSummary ?? "")
-        : `${productCount} productos`;
+  const topic = t.topicName?.trim() ? t.topicName : null;
 
   return (
     <article
@@ -142,26 +205,25 @@ function TicketCard({ ticket: t, checked, department, onToggleSelect, onOpen }: 
           onOpen(t.id);
         }
       }}
-      className={`group relative flex flex-col justify-between rounded-card border bg-white p-4 outline-none transition-all duration-180 ${
+      className={`group relative flex min-w-0 flex-col justify-between rounded-card border bg-white p-4 outline-none transition-all duration-180 ${
         checked
           ? "border-brand-red/45 ring-2 ring-brand-red/12 shadow-card"
           : "border-line shadow-card hover:border-hairline-hover/70 focus-visible:ring-2 focus-visible:ring-brand-red/25"
       }`}
     >
-      {/* Zona 1: Cabecera de Identidad y Estado (Simetría bilateral) */}
-      <div className="flex h-6 items-center justify-between gap-2">
+      <div className="flex h-6 items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           <SelectBox
             checked={checked}
             label={`Seleccionar ${t.number}`}
             onToggle={() => onToggleSelect(t.id)}
           />
-          <span className="font-heading text-[12.5px] font-bold tabular-nums tracking-[0.01em] text-ink">
+          <span className="truncate font-heading text-[12.5px] font-bold tabular-nums tracking-[0.01em] text-ink">
             {t.number}
           </span>
           <button
             type="button"
-            title={`Copiar código ${t.number}`}
+            title={copied ? "Código copiado" : `Copiar código ${t.number}`}
             aria-label={`Copiar código ${t.number}`}
             onClick={(event) => {
               event.stopPropagation();
@@ -184,14 +246,9 @@ function TicketCard({ ticket: t, checked, department, onToggleSelect, onOpen }: 
           )}
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
-          <PriorityCell priority={t.priority} />
-          <span aria-hidden className="h-3 w-px bg-line" />
-          <StatusCell status={t.status} />
-        </div>
+        <CardPriorityStatus priority={t.priority} status={t.status} />
       </div>
 
-      {/* Zona 2: Núcleo del Asunto (Altura bloqueada de 40px = 2 líneas exactas para alineación de fila) */}
       <div className="mt-2.5 flex h-[40px] items-start">
         <h3
           className="line-clamp-2 font-heading text-[13.5px] font-bold leading-[20px] tracking-[-0.012em] text-ink transition-colors group-hover:text-brand-red"
@@ -201,80 +258,67 @@ function TicketCard({ ticket: t, checked, department, onToggleSelect, onOpen }: 
         </h3>
       </div>
 
-      {/* Zona 3: Panel Hundido Simétrico (Cliente + Departamento a ancho completo + Bisección 50/50 Motivo/SLA) */}
       <div className="mt-3 overflow-hidden rounded-inset border border-line bg-canvas/85 divide-y divide-line">
-        {/* Fila 1: Cliente (ancho completo, eje de rótulo fijo en 78px y código a la derecha) */}
-        <div
-          className="grid h-8.5 grid-cols-[78px_1fr] items-center gap-2.5 px-3"
-          title={client ? `${client}${clientCode ? ` (#${clientCode})` : ""}` : "Sin cliente asignado"}
-        >
-          <div className="flex items-center gap-1.5">
+        <FactRow
+          mark={
             <span
               aria-hidden
-              className={`h-2 w-2 shrink-0 rounded-full ${
-                client ? getClientDotColor(client) : "bg-zinc-300"
-              }`}
+              className={`size-1.5 rounded-full ${client ? getClientDotColor(client) : "bg-zinc-300"}`}
             />
-            <span className="font-heading text-[10px] font-bold uppercase tracking-[0.06em] text-faint">
-              Cliente
-            </span>
-          </div>
-
-          <div className="flex min-w-0 items-center justify-between gap-2">
+          }
+          label="Cliente"
+          title={client ? `${client}${clientCode ? ` (#${clientCode})` : ""}` : "Sin cliente asignado"}
+        >
+          <span className="flex min-w-0 items-center justify-between gap-2">
             <span
-              className={`truncate text-[12px] ${
+              className={`truncate text-[12px] leading-[16px] ${
                 client ? "font-semibold text-ink" : "font-normal text-faint"
               }`}
             >
               {client ?? "Sin cliente"}
             </span>
-            {clientCode && (
-              <span className="shrink-0 rounded border border-line bg-white px-1.5 py-0.5 font-heading text-[10px] font-bold leading-none tabular-nums text-subtle">
-                #{clientCode}
-              </span>
-            )}
-          </div>
-        </div>
+            {clientCode && <CodeBadge>#{clientCode}</CodeBadge>}
+          </span>
+        </FactRow>
 
-        {/* Fila 2: Departamento (ancho completo, mismo eje de rótulo de 78px) */}
-        <div
-          className="grid h-8.5 grid-cols-[78px_1fr] items-center gap-2.5 px-3"
+        <FactRow
+          mark={<Building2 aria-hidden className="size-3" />}
+          label="Depto."
           title={department ?? "Sin departamento"}
         >
-          <div className="flex items-center gap-1.5">
-            <Building2 aria-hidden className="size-3 shrink-0 text-faint" />
-            <span className="font-heading text-[10px] font-bold uppercase tracking-[0.06em] text-faint">
-              Depto.
-            </span>
-          </div>
-
-          <div className="flex min-w-0 items-center justify-between gap-2">
-            <span
-              className={`truncate text-[12px] ${
-                department ? "font-medium text-ink" : "font-normal text-faint"
-              }`}
-            >
-              {department ?? "Sin departamento"}
-            </span>
-          </div>
-        </div>
-
-        {/* Fila 3: Bisección Simétrica 50/50 (Motivo | Compromiso SLA) */}
-        <div className="grid h-[48px] grid-cols-2 divide-x divide-line bg-white/55">
-          <div
-            className="flex min-w-0 flex-col justify-center gap-0.5 px-3"
-            title={t.topicName ?? "Sin motivo"}
+          <span
+            className={`block truncate text-[12px] leading-[16px] ${
+              department ? "font-medium text-ink" : "font-normal text-faint"
+            }`}
           >
-            <span className="font-heading text-[10px] font-bold uppercase tracking-[0.06em] text-faint">
+            {department ?? "Sin departamento"}
+          </span>
+        </FactRow>
+
+        <FactRow
+          mark={<Package aria-hidden className="size-3" />}
+          label="Productos"
+          title={productsSummary ?? "Sin productos"}
+        >
+          <ProductValue products={t.products} />
+        </FactRow>
+
+        <div className="grid h-10 grid-cols-2 divide-x divide-line bg-white/55">
+          <div className="flex min-w-0 flex-col justify-center gap-0.5 px-3" title={topic ?? "Sin motivo"}>
+            <span className="truncate font-heading text-[10px] font-bold uppercase leading-[12px] tracking-[0.06em] text-faint">
               Motivo
             </span>
-            <span className="truncate text-[11.5px] font-medium text-ink">
-              {t.topicName ?? "Sin motivo"}
+            <span
+              className={`truncate text-[12px] leading-[16px] ${
+                topic ? "font-medium text-ink" : "font-normal text-faint"
+              }`}
+            >
+              {topic ?? "Sin motivo"}
             </span>
           </div>
 
-          <div className="flex min-w-0 flex-col justify-center gap-0.5 px-3">
-            <span className="font-heading text-[10px] font-bold uppercase tracking-[0.06em] text-faint">
+          <div className="flex min-w-0 flex-col justify-center gap-0.5 px-3" title="Compromiso SLA">
+            <span className="truncate font-heading text-[10px] font-bold uppercase leading-[12px] tracking-[0.06em] text-faint">
               Compromiso SLA
             </span>
             <div className="flex min-w-0 items-center">
@@ -284,30 +328,17 @@ function TicketCard({ ticket: t, checked, department, onToggleSelect, onOpen }: 
         </div>
       </div>
 
-      {/* Zona 4: Pie operativo (Responsable; productos código · nombre; actividad) */}
-      <div className="mt-3 flex h-7 items-center justify-between gap-2 border-t border-line-soft pt-2.5">
+      <div className="mt-2 flex h-6 items-center justify-between gap-3 border-t border-line-soft">
         <div className="min-w-0 flex-1">
           <AssigneeCell id={t.assignedStaffId} name={t.assignedStaffName} />
         </div>
-
-        <div className="flex min-w-0 shrink-0 items-center gap-2 text-[11.5px] text-subtle">
-          {productsChipLabel && (
-            <span
-              className="inline-flex max-w-[130px] min-w-0 items-center gap-1 truncate rounded-md border border-line bg-canvas px-1.5 py-0.5 text-[10.5px] font-medium text-subtle"
-              title={productsSummary ?? undefined}
-            >
-              <Package aria-hidden className="size-3 shrink-0 text-faint" />
-              <span className="min-w-0 truncate">{productsChipLabel}</span>
-            </span>
-          )}
-          <span
-            className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[11.5px] font-medium tabular-nums text-subtle"
-            title={`Última actividad: ${activity.full}`}
-          >
-            <Clock aria-hidden className="size-3 shrink-0 text-faint" />
-            {activity.compact}
-          </span>
-        </div>
+        <span
+          className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[12px] font-medium tabular-nums leading-none text-subtle"
+          title={`Última actividad: ${activity.full}`}
+        >
+          <Clock aria-hidden className="size-3 shrink-0 text-faint" />
+          {activity.compact}
+        </span>
       </div>
     </article>
   );
