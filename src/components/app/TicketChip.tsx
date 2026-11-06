@@ -19,10 +19,7 @@ interface TicketChipProps {
   onSettled?: () => void;
   /** El formulario de creación está abierto: el chip queda pulsado. */
   active?: boolean;
-  /** Creación en curso: el sello gira. */
-  busy?: boolean;
   onCreate?: () => void;
-  className?: string;
 }
 
 const SETTLE_MS = 2400;
@@ -69,9 +66,7 @@ export function TicketChip({
   justCreated = false,
   onSettled,
   active = false,
-  busy = false,
   onCreate,
-  className = "",
 }: TicketChipProps) {
   const confirming = justCreated;
 
@@ -93,7 +88,7 @@ export function TicketChip({
     return (
       <span
         title={`Ticket ${formatTicketCode(ticketId)}`}
-        className={`inline-flex h-4 shrink-0 items-center gap-1 rounded-[5px] border border-zinc-200 bg-white pl-1 pr-1.5 font-heading text-[9.5px] font-bold tabular-nums tracking-[0.02em] text-zinc-700 ${className}`}
+        className={`inline-flex h-4 shrink-0 items-center gap-1 rounded-[5px] border border-zinc-200 bg-white pl-1 pr-1.5 font-heading text-[9.5px] font-bold tabular-nums tracking-[0.02em] text-zinc-700`}
       >
         <span aria-hidden className="size-1.5 rounded-full bg-brand-red" />
         {formatTicketCode(ticketId)}
@@ -106,21 +101,15 @@ export function TicketChip({
       <button
         type="button"
         onClick={onCreate}
-        disabled={busy}
-        aria-busy={busy || undefined}
         data-active={active}
-        className={`${rootClass} h-7 cursor-pointer gap-2 pl-1 pr-2.5 active:scale-[0.98] motion-reduce:active:scale-100 disabled:cursor-progress ${
+        className={`${rootClass} h-7 cursor-pointer gap-2 pl-1 pr-2.5 active:scale-[0.98] motion-reduce:active:scale-100 ${
           active ? pressedClass : restingClass
-        } ${className}`}
+        }`}
       >
         <Seal tone="rest">
-          {busy ? (
-            <span className="size-3 animate-spin rounded-full border-[1.5px] border-current border-t-transparent" />
-          ) : (
-            <TicketPlus className="size-3" strokeWidth={2.25} />
-          )}
+          <TicketPlus className="size-3" strokeWidth={2.25} />
         </Seal>
-        <span className="text-[12px] font-medium leading-none">{busy ? "Creando…" : "Crear ticket"}</span>
+        <span className="text-[12px] font-medium leading-none">Crear ticket</span>
       </button>
     );
   }
@@ -138,7 +127,7 @@ export function TicketChip({
       data-confirming={confirming}
       className={`${rootClass} h-7 gap-2 pl-1 pr-2 active:scale-[0.98] motion-reduce:active:scale-100 ${
         confirming ? createdClass : restingClass
-      } ${className}`}
+      }`}
     >
       <Seal tone={confirming ? "created" : "rest"}>
         {confirming ? <Check className="size-3" strokeWidth={3} /> : <Ticket className="size-3" strokeWidth={2.25} />}

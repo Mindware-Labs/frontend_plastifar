@@ -59,7 +59,7 @@ import { claimQualitySectionTone, getClaimQualitySectionLabel } from "../../lib/
 import { ClaimStatusBadge, normalizeClaimStatus } from "../claims/ClaimStatusBadge";
 import { DiscrepancyFormModal } from "../discrepancies/DiscrepancyFormModal";
 import { DiscrepancyStatusBadge, normalizeDiscrepancyStatus } from "../discrepancies/DiscrepancyStatusBadge";
-import { HcaModal } from "../quality/HcaModal";
+import { HcaFormModal } from "../quality/HcaFormModal";
 import { HcaStatusBadge, PlanItemStatusBadge } from "../quality/StatusBadges";
 import { WithdrawalFormModal } from "../withdrawals/WithdrawalFormModal";
 import { WithdrawalStatusBadge, normalizeWithdrawalStatus } from "../withdrawals/WithdrawalStatusBadge";
@@ -944,7 +944,7 @@ export function TicketFormsTab({
   if (hcaModalOpen) {
     return (
       <div className={inlineFormShellClass}>
-        <HcaModal
+        <HcaFormModal
           inline
           sheet={editingHca}
           productLines={productLines}

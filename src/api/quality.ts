@@ -9,18 +9,9 @@ import type {
   SheetListResponse,
 } from "../types/quality";
 
-export interface ClosureCondition {
-  id: string;
-  label: string;
-  met: boolean;
-  missing: string;
-}
-
 export interface SheetDetailResponse {
   sheet: CorrectiveActionSheet;
   planItems: ActionPlanItem[];
-  closureConditions: ClosureCondition[];
-  canClose: boolean;
 }
 
 export interface SaveSheetRequest {
@@ -81,15 +72,6 @@ export interface ActionPlanListResponse {
   total: number;
   totalPages: number;
   counts: PlanItemCounts;
-}
-
-export interface SaveCreditRequestRequest {
-  clientId: number;
-  amount: number;
-  currency: string;
-  reason: string;
-  invoiceRef: string | null;
-  ticketId: number | null;
 }
 
 export const qualityApi = {

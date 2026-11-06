@@ -75,13 +75,9 @@ export interface MerchandiseWithdrawal {
   lines: WithdrawalLine[];
 }
 
-/** Lo que la persona puede hacer ahora, ya calculado por el servidor. */
+/** Ficha de la solicitud de retiro. */
 export interface WithdrawalDetail {
   withdrawal: MerchandiseWithdrawal;
-  canEdit: boolean;
-  canDecide: boolean;
-  canComplete: boolean;
-  canCancel: boolean;
 }
 
 export interface WithdrawalSummary {
@@ -121,7 +117,3 @@ export interface SaveWithdrawalRequest {
   lines: WithdrawalLineInput[];
 }
 
-export interface CompleteWithdrawalRequest {
-  customerSignerName: string;
-  lines: { lineId: number; withdrawnQuantity: number }[];
-}

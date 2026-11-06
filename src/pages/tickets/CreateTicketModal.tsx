@@ -52,7 +52,6 @@ export interface CreateTicketModalProps {
   emailId?: number;
   initialSubject?: string;
   initialMessage?: string;
-  initialClientId?: number;
   /** Correo del cliente en el hilo: remitente si entró; destinatario si salió Plastifar primero. */
   senderEmail?: string;
   senderName?: string;
@@ -135,7 +134,6 @@ export function CreateTicketModal({
   emailId,
   initialSubject,
   initialMessage,
-  initialClientId,
   senderEmail,
   senderName,
   emailDirection = "inbound",
@@ -170,7 +168,7 @@ export function CreateTicketModal({
     resolver: zodResolver(schema),
     mode: "onTouched",
     defaultValues: {
-      clientId: initialClientId ? String(initialClientId) : "",
+      clientId: "",
       contactId: "",
       topicId: "",
       subject: initialSubject ?? "",

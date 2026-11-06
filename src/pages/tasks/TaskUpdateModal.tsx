@@ -29,7 +29,6 @@ interface TaskUpdateModalProps {
   task: TaskDetail;
   onClose: () => void;
   onUpdated: (task: TaskDetail, mode: TaskUpdateMode) => void;
-  initialMode?: TaskUpdateMode;
 }
 
 function FormDivider({ title }: { title: string }) {
@@ -112,16 +111,10 @@ export function TaskUpdateModal({
   task,
   onClose,
   onUpdated,
-  initialMode = "progress",
 }: TaskUpdateModalProps) {
   const showProgress = task.canComment;
   const showComplete = task.canComplete;
-  const defaultMode: TaskUpdateMode =
-    initialMode === "complete" && showComplete
-      ? "complete"
-      : showProgress
-        ? "progress"
-        : "complete";
+  const defaultMode: TaskUpdateMode = showProgress ? "progress" : "complete";
 
   const [mode, setMode] = useState<TaskUpdateMode>(defaultMode);
   const [formError, setFormError] = useState<string | null>(null);

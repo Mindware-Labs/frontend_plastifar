@@ -1,8 +1,3 @@
-/** Ticket migrado desde el sistema anterior (número OST-* y/o LegacyTicketId en backend). */
-export function isLegacyTicket(ticket: { number: string; legacyTicketId?: number | null }): boolean {
-  if (ticket.legacyTicketId != null) return true;
-  return /^OST-/i.test(ticket.number.trim());
-}
 
 export type TicketOriginFilter = "plastifar" | "legacy";
 

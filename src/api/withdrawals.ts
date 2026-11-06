@@ -1,6 +1,5 @@
 import { apiRequest, toQuery } from "./client";
 import type {
-  CompleteWithdrawalRequest,
   SaveWithdrawalRequest,
   WithdrawalDetail,
   WithdrawalSummary,
@@ -59,23 +58,5 @@ export const withdrawalsApi = {
     apiRequest<WithdrawalDetail>(`/api/withdrawals/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
-    }),
-
-  decide: (id: number, approve: boolean, note: string | null) =>
-    apiRequest<WithdrawalDetail>(`/api/withdrawals/${id}/decision`, {
-      method: "POST",
-      body: JSON.stringify({ approve, note }),
-    }),
-
-  complete: (id: number, data: CompleteWithdrawalRequest) =>
-    apiRequest<WithdrawalDetail>(`/api/withdrawals/${id}/complete`, {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  cancel: (id: number, reason: string) =>
-    apiRequest<WithdrawalDetail>(`/api/withdrawals/${id}/cancel`, {
-      method: "POST",
-      body: JSON.stringify({ reason }),
     }),
 };

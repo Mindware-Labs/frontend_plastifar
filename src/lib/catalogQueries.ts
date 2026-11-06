@@ -1,10 +1,8 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
-import { departmentsApi } from "../api/departments";
 import { fetchAllPages } from "../api/paging";
 import { productLinesApi } from "../api/productLines";
 import { rolesApi } from "../api/roles";
 import { settingsApi } from "../api/settings";
-import { staffApi } from "../api/staff";
 import { ticketTopicsApi } from "../api/ticketTopics";
 import { queryClient } from "./queryClient";
 
@@ -73,25 +71,6 @@ export const catalogs = {
         fetchAllPages((page, pageSize) => settingsApi.holidays.list({ page, pageSize, status: "activos" })),
       staleTime: CATALOG_STALE_TIME,
     }),
-
-  /** `departmentsApi.list()` sin opciones: los departamentos activos, en arbol plano. */
-  departments: () =>
-    queryOptions({
-      queryKey: ["catalog", "departments"] as const,
-      queryFn: () => departmentsApi.list(),
-      staleTime: CATALOG_STALE_TIME,
-    }),
-
-  /** Personal activo ordenado por nombre: vendedores, responsables, asignables. */
-  activeStaff: () =>
-    queryOptions({
-      queryKey: ["catalog", "staff", "activos"] as const,
-      queryFn: () =>
-        fetchAllPages((page, pageSize) =>
-          staffApi.list({ page, pageSize, status: "activos", sort: "nombre", dir: "asc" }),
-        ),
-      staleTime: CATALOG_STALE_TIME,
-    }),
 };
 
 /**
@@ -104,10 +83,6 @@ export const fetchCatalog = queryClient.fetchQuery.bind(queryClient);
 
 export function usePlantsCatalog() {
   return useQuery(catalogs.plants());
-}
-
-export function useProductLinesCatalog() {
-  return useQuery(catalogs.productLines());
 }
 
 export function useActiveTicketTopicsCatalog() {

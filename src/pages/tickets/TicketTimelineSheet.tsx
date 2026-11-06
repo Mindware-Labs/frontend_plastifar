@@ -56,7 +56,6 @@ export interface TicketTimelineSheetProps {
   onOpenAttachment: (attachments: TicketAttachmentResponse[], attachmentId: number) => void;
   onClose: () => void;
   onSelectTab?: (tab: TicketDetailTab) => void;
-  initialFilter?: TimelineFilter;
 }
 
 function getDayKey(dateStr: string): string {
@@ -103,12 +102,11 @@ export function TicketTimelineSheet({
   onOpenAttachment,
   onClose,
   onSelectTab,
-  initialFilter = "all",
 }: TicketTimelineSheetProps) {
   const { isExiting, requestClose, scrimRef, panelRef } = useDialogMotion(onClose, { variant: "drawer" });
   const titleId = useId();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const [filter, setFilter] = useState<TimelineFilter>(initialFilter);
+  const [filter, setFilter] = useState<TimelineFilter>("all");
   const [sortOrder, setSortOrder] = useState<TimelineSortOrder>("asc");
   const [copiedNumber, setCopiedNumber] = useState(false);
 

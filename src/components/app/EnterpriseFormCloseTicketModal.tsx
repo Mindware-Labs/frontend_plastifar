@@ -17,10 +17,7 @@ export interface EnterpriseFormCloseTicketModalProps {
   descriptionText?: string;
   defaultReason?: string;
   extraAlert?: ReactNode;
-  receiptTitle?: string;
   receiptDetail?: string;
-  /** Cuando el formulario se abrió desde una tarea, el copy habla de tarea y usa su código. */
-  formHostKind?: "ticket" | "task";
   onClose: () => void;
   onSuccess: () => void;
   onTicketStatusChanged?: () => void;
@@ -39,15 +36,12 @@ export function EnterpriseFormCloseTicketModal({
   descriptionText,
   defaultReason,
   extraAlert,
-  receiptTitle,
   receiptDetail,
-  formHostKind = "ticket",
   onClose,
   onSuccess,
   onTicketStatusChanged,
 }: EnterpriseFormCloseTicketModalProps) {
   const receipts = useReceipts();
-  const hostLabel = formHostKind === "task" ? "tarea" : "ticket";
   const [closing, setClosing] = useState(false);
   const [verdicts, setVerdicts] = useState<Array<{ id: number; name: string }>>([]);
   const [selectedVerdictId, setSelectedVerdictId] = useState<string>("");
@@ -84,9 +78,7 @@ export function EnterpriseFormCloseTicketModal({
 
   const resolvedDescription =
     descriptionText ??
-    `El formulario ha sido registrado exitosamente. Puedes dar por concluido y cerrar esta ${hostLabel} indicando el veredicto oficial y el comentario de resolución.`;
-  const resolvedReceiptTitle =
-    receiptTitle ?? (formHostKind === "task" ? "Tarea completada" : "Ticket cerrado y solucionado");
+    `El formulario ha sido registrado exitosamente. Puedes dar por concluido y cerrar este ticket indicando el veredicto oficial y el comentario de resolución.`;
 
   const handleConfirmClose = async () => {
     if (ticketId <= 0) {
@@ -110,10 +102,10 @@ export function EnterpriseFormCloseTicketModal({
 
       receipts.done({
         action: "cerrar-ticket",
-        title: resolvedReceiptTitle,
+        title: "Ticket cerrado y solucionado",
         detail:
           receiptDetail ||
-          `La ${hostLabel} ha sido marcada como solucionada en base a ${recordNumber}.`,
+          `El ticket ha sido marcado como solucionado en base a ${recordNumber}.`,
       });
 
       onTicketStatusChanged?.();
@@ -121,9 +113,9 @@ export function EnterpriseFormCloseTicketModal({
     } catch (err) {
       receipts.failed({
         action: "error-cerrar-ticket",
-        title: `No se pudo cerrar la ${hostLabel}`,
+        title: "No se pudo cerrar el ticket",
         detail:
-          err instanceof ApiError ? err.message : `Error al actualizar el estado de la ${hostLabel}`,
+          err instanceof ApiError ? err.message : "Error al actualizar el estado del ticket",
       });
     } finally {
       setClosing(false);
@@ -133,7 +125,7 @@ export function EnterpriseFormCloseTicketModal({
 
   return (
     <Modal
-      title={`¿Deseas cerrar esta ${hostLabel} ahora?`}
+      title="¿Deseas cerrar este ticket ahora?"
       eyebrow={`${formCode} · Resolución de caso`}
       onClose={onClose}
       maxWidth="max-w-xl"
@@ -146,7 +138,7 @@ export function EnterpriseFormCloseTicketModal({
             size="sm"
             onClick={onClose}
           >
-            {formHostKind === "task" ? "Mantener tarea abierta" : "Mantener ticket abierto"}
+            Mantener ticket abierto
           </Button>
           <Button
             type="button"
@@ -156,7 +148,7 @@ export function EnterpriseFormCloseTicketModal({
             onClick={handleConfirmClose}
           >
             <CheckCircle2 className="mr-1.5 size-4" />
-            {closing ? "Cerrando..." : formHostKind === "task" ? "Sí, completar tarea" : "Sí, cerrar ticket"}
+            {closing ? "Cerrando..." : "Sí, cerrar ticket"}
           </Button>
         </div>
       }

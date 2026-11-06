@@ -69,7 +69,6 @@ export const emailsApi = {
 
   markRead: (id: number) => apiRequest<void>(`/api/emails/${id}/read`, { method: "POST" }),
 
-
   // Limpia el "recien asignada" de quien la abre; a nadie mas le toca verla desaparecer.
   markAssignmentSeen: (id: number) => apiRequest<void>(`/api/emails/${id}/assign/seen`, { method: "POST" }),
 
@@ -131,8 +130,6 @@ export const emailsApi = {
       method: "POST",
       body: JSON.stringify({ body, parentId: parentId ?? null }),
     }),
-
-  removeNote: (noteId: number) => apiRequest<void>(`/api/emails/notes/${noteId}`, { method: "DELETE" }),
 
   contacts: (q: string) => apiRequest<ContactResponse[]>(`/api/emails/contacts${toQuery({ q })}`),
 

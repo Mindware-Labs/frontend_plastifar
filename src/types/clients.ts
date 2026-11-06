@@ -2,13 +2,6 @@
 
 export type ClientType = "Distribuidor" | "Mayorista" | "Detallista" | "Institucional";
 
-export const CLIENT_TYPES: ClientType[] = [
-  "Distribuidor",
-  "Mayorista",
-  "Detallista",
-  "Institucional",
-];
-
 /** La organizacion que compra a Plastifar. */
 export interface Client {
   id: number;

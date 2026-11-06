@@ -1,10 +1,8 @@
 import { apiRequest, toQuery } from "./client";
-import type { SaveCreditRequestRequest } from "./quality";
 import type {
   DiscrepancyDetail,
   DiscrepancySummary,
   SaveDiscrepancyRequest,
-  SecurityItem,
 } from "../types/discrepancies";
 
 export interface DiscrepancyQuery {
@@ -50,8 +48,6 @@ export const discrepanciesApi = {
   listByTicket: (ticketId: number) =>
     apiRequest<DiscrepancyDetail[]>(`/api/tickets/${ticketId}/discrepancies`),
 
-  securityItems: () => apiRequest<SecurityItem[]>("/api/discrepancies/security-items"),
-
   create: (ticketId: number, data: SaveDiscrepancyRequest) =>
     apiRequest<DiscrepancyDetail>(`/api/tickets/${ticketId}/discrepancies`, {
       method: "POST",
@@ -61,25 +57,6 @@ export const discrepanciesApi = {
   update: (id: number, data: SaveDiscrepancyRequest) =>
     apiRequest<DiscrepancyDetail>(`/api/discrepancies/${id}`, {
       method: "PUT",
-      body: JSON.stringify(data),
-    }),
-
-  complete: (id: number) =>
-    apiRequest<DiscrepancyDetail>(`/api/discrepancies/${id}/complete`, { method: "POST" }),
-
-  decide: (id: number, approve: boolean, note: string | null) =>
-    apiRequest<DiscrepancyDetail>(`/api/discrepancies/${id}/decision`, {
-      method: "POST",
-      body: JSON.stringify({ approve, note }),
-    }),
-
-  reopen: (id: number) =>
-    apiRequest<DiscrepancyDetail>(`/api/discrepancies/${id}/reopen`, { method: "POST" }),
-
-  /** Regla 12: la solicitud de crédito de una línea apta, con el vínculo de vuelta. */
-  createCreditRequest: (lineId: number, data: SaveCreditRequestRequest) =>
-    apiRequest<DiscrepancyDetail>(`/api/discrepancies/lines/${lineId}/credit-request`, {
-      method: "POST",
       body: JSON.stringify(data),
     }),
 };

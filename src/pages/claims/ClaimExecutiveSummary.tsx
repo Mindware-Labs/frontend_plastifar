@@ -9,7 +9,6 @@ import {
   Stethoscope,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Button } from "../../components/ui/Button";
 import { formatDay, formatInstant } from "../../lib/dates";
 import { isTaskCaseReference } from "../../lib/formCaseReference";
 import { formatAmount, formatPrice, formatQuantity } from "../../lib/numbers";
@@ -20,17 +19,11 @@ import { ClaimStatusBadge } from "./ClaimStatusBadge";
 interface ClaimExecutiveSummaryProps {
   claim: CustomerClaim;
   closureConditions?: ClaimClosureCondition[];
-  canOpenHca?: boolean;
-  onStartHca?: () => void;
-  isOpeningHca?: boolean;
 }
 
 export function ClaimExecutiveSummary({
   claim,
   closureConditions,
-  canOpenHca,
-  onStartHca,
-  isOpeningHca,
 }: ClaimExecutiveSummaryProps) {
   const kpiLabelClass = "font-heading text-[10px] font-semibold text-zinc-500";
   const sectionTitleClass = "font-heading text-[11px] font-semibold text-zinc-700";
@@ -339,11 +332,6 @@ export function ClaimExecutiveSummary({
                     <ClipboardList className="h-3 w-3 text-zinc-400" />
                     HCA {claim.hcaNumber}
                   </span>
-                ) : claim.requiresCorrectiveAction === true && canOpenHca && !isClosed && onStartHca ? (
-                  <Button size="sm" variant="secondary" onClick={onStartHca} isLoading={isOpeningHca}>
-                    <ClipboardList className="h-3 w-3 mr-1" />
-                    Abrir HCA
-                  </Button>
                 ) : null}
               </div>
             </div>

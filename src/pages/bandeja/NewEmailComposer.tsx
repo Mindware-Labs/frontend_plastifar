@@ -28,7 +28,7 @@ import {
   optionalRecipientFieldValidationItems,
   recipientFieldValidationItems,
 } from "../../lib/recipientValidation";
-import { type ValidationItem } from "./sendValidation";
+import { type ValidationItem } from "../../lib/validationItems";
 import { ComposerFieldMotionRow } from "./ComposerFieldMotionRow";
 import { ComposerSendSuccessLayer } from "./ComposerSendSuccessLayer";
 import {

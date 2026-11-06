@@ -75,7 +75,6 @@ interface Props {
   hostTaskStatus?: string;
   onClose: () => void;
   onSaved: (detail: WithdrawalDetail) => void;
-  onConflict?: (message: string) => void;
 }
 
 interface LineDraft {
@@ -182,7 +181,6 @@ export function WithdrawalFormModal({
   hostTaskStatus,
   onClose,
   onSaved,
-  onConflict,
 }: Props) {
   const receipts = useReceipts();
   const isEditing = Boolean(withdrawal);
@@ -582,11 +580,6 @@ export function WithdrawalFormModal({
       }
     } catch (e) {
       if (e instanceof ApiError) {
-        if (e.status === 409 && onConflict) {
-          onConflict(e.message);
-          requestClose();
-          return;
-        }
         setBanner(e.message);
       } else {
         setBanner("No se pudo guardar la solicitud de retiro. Inténtalo de nuevo.");

@@ -94,7 +94,7 @@ import {
   optionalRecipientFieldValidationItems,
   recipientFieldValidationItems,
 } from "../../lib/recipientValidation";
-import { type ValidationItem } from "./sendValidation";
+import { type ValidationItem } from "../../lib/validationItems";
 
 /** Que adjunto se esta mirando: puede ser del correo o de una respuesta nuestra. */
 interface PreviewTarget {

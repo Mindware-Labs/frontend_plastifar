@@ -56,7 +56,6 @@ const DEPARTMENT_TYPE_ITEMS = [
 
 interface DepartmentModalProps {
   department?: DepartmentResponse;
-  all?: DepartmentResponse[];
   onClose: () => void;
   onSaved: (name: string) => void;
 }

@@ -62,10 +62,6 @@ export function readEnterpriseFormDraft<T extends Record<string, unknown>>(
   return null;
 }
 
-export function hasEnterpriseFormDraft(key: string | null | undefined): boolean {
-  return readEnterpriseFormDraft(key) !== null;
-}
-
 export function writeEnterpriseFormDraft(
   key: string | null | undefined,
   payload: Record<string, unknown>,

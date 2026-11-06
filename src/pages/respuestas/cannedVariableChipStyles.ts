@@ -12,5 +12,3 @@ export const CANNED_VAR_CHIP_REMOVE =
 export const CANNED_VAR_CHIP_PICKER =
   "inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-200/90 bg-white px-2.5 py-1 font-sans text-[11.5px] font-medium text-zinc-700 shadow-2xs transition-all hover:border-brand-red/35 hover:bg-brand-red/[0.04] hover:text-brand-red focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 active:scale-[0.99]";
 
-export const CANNED_VAR_CHIP_PICKER_HINT =
-  "font-sans text-[10.5px] font-normal text-zinc-400";

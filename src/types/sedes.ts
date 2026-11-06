@@ -8,8 +8,6 @@ export interface Sede {
   updatedAt?: string | null;
 }
 
-export type SedeResponse = Sede;
-
 export interface SaveSedeRequest {
   name: string;
   address?: string | null;

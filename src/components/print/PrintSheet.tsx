@@ -301,7 +301,6 @@ export function PrintSheet({
             </Button>
           )}
 
-
           <Button
             type="button"
             size="sm"
@@ -349,48 +348,6 @@ export function PrintSheet({
 }
 
 export { PrintSheetSkeleton };
-
-/** Lo que se ve mientras el registro no llegó, o si no se pudo cargar: Skeleton completo en vez de spinner. */
-export function PrintPending({
-  error,
-  orientation = "portrait",
-  backLabel = "Volver",
-}: {
-  error: string | null;
-  orientation?: "portrait" | "landscape";
-  backLabel?: string;
-}) {
-  if (error) {
-    return (
-      <div className="flex min-h-screen flex-col font-sans text-zinc-900 bg-zinc-100/70">
-        <header className="sticky top-0 z-30 flex h-14 w-full shrink-0 items-center justify-between border-b border-zinc-200/90 bg-white/95 px-4 sm:px-6 backdrop-blur-md shadow-2xs">
-          <button
-            type="button"
-            onClick={() => (window.history.length > 1 ? window.history.back() : window.close())}
-            className="inline-flex h-8.5 items-center gap-2 rounded-lg border border-zinc-200/90 bg-white px-3 text-xs font-semibold text-zinc-700 shadow-2xs transition-all hover:bg-zinc-50 hover:border-zinc-300 hover:text-zinc-900 active:scale-95 cursor-pointer shrink-0"
-          >
-            <ArrowLeft className="size-3.5 text-zinc-500" />
-            <span>{backLabel}</span>
-          </button>
-        </header>
-        <main className="flex-1 flex items-center justify-center p-6">
-          <div className="max-w-md w-full rounded-xl border border-rose-200 bg-white p-6 shadow-sm text-center">
-            <p className="text-sm font-semibold text-rose-800">{error}</p>
-            <button
-              type="button"
-              onClick={() => window.location.reload()}
-              className="mt-4 inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-zinc-700 shadow-2xs hover:bg-zinc-50 hover:border-zinc-300 active:scale-95 cursor-pointer transition-all"
-            >
-              Reintentar
-            </button>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  return <PrintSheetSkeleton orientation={orientation} backLabel={backLabel} />;
-}
 
 /** Celda con etiqueta en negrita, como las del formulario en papel. */
 export function PrintCell({ label, children, className = "" }: { label: string; children?: ReactNode; className?: string }) {

@@ -82,7 +82,6 @@ interface EmailFilterMenuProps {
   counts?: EmailListResponse["counts"];
   assignedUnseen?: number;
   onSelect: (key: TicketFilter) => void;
-  className?: string;
 }
 
 function EmailFilterMenu({
@@ -91,7 +90,6 @@ function EmailFilterMenu({
   counts,
   assignedUnseen,
   onSelect,
-  className = "",
 }: EmailFilterMenuProps) {
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState<{ top: number; left: number; originX: number } | null>(null);
@@ -150,7 +148,7 @@ function EmailFilterMenu({
   const hasUnseen = Boolean(assignedUnseen && assignedUnseen > 0);
 
   return (
-    <div className={`relative min-w-0 w-full ${className}`}>
+    <div className="relative min-w-0 w-full">
       <button
         ref={triggerRef}
         type="button"

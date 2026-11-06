@@ -16,18 +16,12 @@ export interface TicketProductDraft {
 interface TicketProductsFieldProps {
   value: TicketProductDraft[];
   onChange: (value: TicketProductDraft[]) => void;
-  disabled?: boolean;
-  hint?: string;
-  pickerLabel?: string;
 }
 
 /** Selector de productos del catálogo para tickets: buscador único + chips con los artículos vinculados. */
 export function TicketProductsField({
   value,
   onChange,
-  disabled,
-  hint,
-  pickerLabel = "Agregar producto",
 }: TicketProductsFieldProps) {
   const addFieldId = useId();
   const [addError, setAddError] = useState<string | null>(null);
@@ -125,24 +119,17 @@ export function TicketProductsField({
 
   return (
     <div className="flex flex-col gap-3">
-      {hint ? (
-        <p className="text-[11px] leading-snug text-zinc-400">{hint}</p>
-      ) : null}
-
-      {!disabled ? (
-        <ProductAddSearch
-          id={addFieldId}
-          label={pickerLabel}
-          disabled={disabled}
-          selectedProducts={value}
-          excludeProductIds={value.map((r) => r.productId)}
-          onPick={handlePick}
-          onRemove={handleRemove}
-          onDuplicate={() =>
-            setAddError("Ese producto ya está en el ticket.")
-          }
-        />
-      ) : null}
+      <ProductAddSearch
+        id={addFieldId}
+        label="Agregar producto"
+        selectedProducts={value}
+        excludeProductIds={value.map((r) => r.productId)}
+        onPick={handlePick}
+        onRemove={handleRemove}
+        onDuplicate={() =>
+          setAddError("Ese producto ya está en el ticket.")
+        }
+      />
 
       {value.length > 0 ? (
         <div className="flex flex-col gap-2 rounded-lg border border-line-soft bg-zinc-50/40 p-2.5">
@@ -152,7 +139,7 @@ export function TicketProductsField({
                 ? "1 artículo vinculado"
                 : `${value.length} artículos vinculados`}
             </span>
-            {!disabled && value.length > 1 ? (
+            {value.length > 1 ? (
               <button
                 type="button"
                 onClick={handleClearAll}
@@ -192,17 +179,15 @@ export function TicketProductsField({
                       rowLabel(row)
                     )}
                   </span>
-                  {!disabled && (
-                    <button
-                      type="button"
-                      className="flex size-5 shrink-0 items-center justify-center rounded text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 cursor-pointer"
-                      aria-label={`Quitar ${row.productName || row.productCode || row.productId}`}
-                      disabled={exiting}
-                      onClick={() => handleRemove(row.productId)}
-                    >
-                      <X className="size-3" strokeWidth={2.25} />
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className="flex size-5 shrink-0 items-center justify-center rounded text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 cursor-pointer"
+                    aria-label={`Quitar ${row.productName || row.productCode || row.productId}`}
+                    disabled={exiting}
+                    onClick={() => handleRemove(row.productId)}
+                  >
+                    <X className="size-3" strokeWidth={2.25} />
+                  </button>
                 </li>
               );
             })}

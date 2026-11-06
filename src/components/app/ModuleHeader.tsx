@@ -24,8 +24,6 @@ export interface ModuleHeaderSection {
 interface ModuleHeaderProps {
   /** Enlace opcional para volver atrás (p. ej. a la tabla o listado principal). */
   backTo?: string;
-  /** Acción de retorno opcional (en vez de un enlace de navegación). */
-  onBack?: () => void;
   /** Texto del tooltip y aria-label del botón volver. */
   backLabel?: string;
   /** Titulo de la pagina. */
@@ -40,28 +38,20 @@ interface ModuleHeaderProps {
    * tira; el resto de la navegacion no se duplica aqui.
    */
   sections?: ModuleHeaderSection[];
-  /**
-   * La regla que gobierna la pantalla, en su propia linea bajo el titulo.
-   */
-  note?: ReactNode;
   /** Accion principal de la pagina. */
   action?: ReactNode;
-  className?: string;
 }
 
 export function ModuleHeader({
   backTo,
-  onBack,
   backLabel,
   title,
   badge,
   summary,
   sections,
-  note,
   action,
-  className = "",
 }: ModuleHeaderProps) {
-  const hasHeading = title !== undefined || summary !== undefined || backTo !== undefined || onBack !== undefined;
+  const hasHeading = title !== undefined || summary !== undefined || backTo !== undefined;
   const location = useLocation();
 
   const sectionItems: SegmentedTabItem[] | null = useMemo(() => {
@@ -94,26 +84,11 @@ export function ModuleHeader({
   }, [sections, location.pathname]);
 
   return (
-    <div
-      className={`shrink-0 border-b border-zinc-200/80 -mx-3 lg:-mx-4 px-3 lg:px-4 mb-3 ${
-        note ? "min-h-14 py-2" : "h-14"
-      } ${className}`}
-    >
+    <div className="shrink-0 border-b border-zinc-200/80 -mx-3 lg:-mx-4 px-3 lg:px-4 mb-3 h-14">
       <div className="flex h-full items-center justify-between gap-x-4">
         {hasHeading ? (
           <div className="flex shrink-0 items-center gap-x-3">
-            {onBack ? (
-              <button
-                type="button"
-                onClick={onBack}
-                title={backLabel ?? "Volver"}
-                aria-label={backLabel ?? "Volver"}
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200/90 bg-white px-2.5 text-xs font-semibold text-zinc-700 hover:text-zinc-900 hover:border-zinc-300 hover:bg-zinc-50 transition-all shadow-2xs shrink-0 cursor-pointer"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                {backLabel && <span>{backLabel}</span>}
-              </button>
-            ) : backTo ? (
+            {backTo ? (
               <Link
                 to={backTo}
                 title={backLabel ?? "Volver"}
@@ -154,10 +129,6 @@ export function ModuleHeader({
           {action && <div className="flex items-center gap-2 shrink-0">{action}</div>}
         </div>
       </div>
-
-      {note && (
-        <p className="mt-1 max-w-[72ch] text-[12.5px] leading-relaxed text-subtle">{note}</p>
-      )}
     </div>
   );
 }

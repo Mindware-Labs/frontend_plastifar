@@ -124,10 +124,7 @@ export function DiscrepancySummaryDrawer({
         </ErrorRetry>
       ) : detail ? (
         <div className="pb-2">
-          <DiscrepancyExecutiveSummary
-            discrepancy={detail.discrepancy}
-            completionConditions={detail.completionConditions}
-          />
+          <DiscrepancyExecutiveSummary discrepancy={detail.discrepancy} />
         </div>
       ) : null}
     </Drawer>

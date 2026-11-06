@@ -42,7 +42,6 @@ export interface TaskTimelineSheetProps {
   timeline: TaskTimelineItem[];
   onClose: () => void;
   onSelectTab?: (tab: TaskDetailTab) => void;
-  initialFilter?: TimelineFilter;
 }
 
 /** Cronología completa de la tarea, notas internas y eventos entrelazados, en un cajón lateral (estilo tickets). */
@@ -51,12 +50,11 @@ export function TaskTimelineSheet({
   timeline,
   onClose,
   onSelectTab,
-  initialFilter = "all",
 }: TaskTimelineSheetProps) {
   const { isExiting, requestClose, scrimRef, panelRef } = useDialogMotion(onClose, { variant: "drawer" });
   const titleId = useId();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const [filter, setFilter] = useState<TimelineFilter>(initialFilter);
+  const [filter, setFilter] = useState<TimelineFilter>("all");
 
   useEffect(() => {
     const overlay = openOverlay();

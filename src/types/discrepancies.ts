@@ -40,11 +40,6 @@ export interface SecurityCheck {
   result: SecurityCheckResult | null;
 }
 
-export interface SecurityItem {
-  number: number;
-  text: string;
-}
-
 export interface LoadDiscrepancy {
   id: number;
   number: string;
@@ -77,17 +72,8 @@ export interface LoadDiscrepancy {
   checks: SecurityCheck[];
 }
 
-export interface DiscrepancyCompletionCondition {
-  id: string;
-  label: string;
-  met: boolean;
-  missing: string;
-}
-
 export interface DiscrepancyDetail {
   discrepancy: LoadDiscrepancy;
-  completionConditions: DiscrepancyCompletionCondition[];
-  canComplete: boolean;
 }
 
 export interface DiscrepancySummary {

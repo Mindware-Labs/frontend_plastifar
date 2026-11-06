@@ -1,7 +1,7 @@
 // Formato y fechas del modulo de Calidad, sin React dentro. Las reglas de
 // negocio (condiciones de cierre, separacion entre quien pide y quien aprueba
 // un credito) las resuelve el servidor; este archivo ya no las duplica.
-import type { ActionPlanItem, CorrectiveActionSheet, HcaStatus } from "../types/quality";
+import type { ActionPlanItem } from "../types/quality";
 
 /**
  * República Dominicana es UTC−4 todo el año: no hay horario de verano desde
@@ -35,73 +35,14 @@ export function daysUntil(dueDate: string, from = today()): number {
   return Math.round((due - base) / 86_400_000);
 }
 
-/**
- * Cerrada nunca está vencida: el vencimiento es del compromiso, no del
- * registro. El «hoy» por defecto es el día de la operación, el mismo con el que
- * el servidor arma la pastilla «Vencidas»: si fueran dos días distintos, el
- * contador y la fila se contradirían durante las últimas horas de cada día.
- */
-export function isSheetOverdue(sheet: CorrectiveActionSheet, from = today()): boolean {
-  return sheet.status !== "Cerrada" && daysUntil(sheet.dueDate, from) < 0;
-}
-
 export function isPlanItemOverdue(item: ActionPlanItem, from = today()): boolean {
   return (
     item.status !== "Cumplida" && item.status !== "Anulada" && daysUntil(item.dueDate, from) < 0
   );
 }
 
-/** «Vence en 4 días», «Venció hace 2 días», «Vence hoy». */
-export function describeDue(dueDate: string, from = today()): string {
-  const days = daysUntil(dueDate, from);
-  if (days === 0) return "Vence hoy";
-  if (days > 0) return days === 1 ? "Vence mañana" : `Vence en ${days} días`;
-  const late = Math.abs(days);
-  return late === 1 ? "Venció ayer" : `Venció hace ${late} días`;
-}
-
-/**
- * La misma cuenta atras, en version corta para una celda de tabla: «hace 18 d»,
- * «en 2 d», «hoy».
- *
- * No es un capricho de ancho. En el listado, la columna «Estado» ya dice si la
- * hoja esta vencida y el color del texto lo repite; gastar ahi «Venció hace 18
- * días» es escribir tres veces el mismo hecho, y esos ~60 px eran justo los que
- * empujaban la tabla fuera del panel. En una ficha, donde no hay pastilla al
- * lado que lo diga, sigue usandose `describeDue` entero.
- */
-export function describeDueShort(dueDate: string, from = today()): string {
-  const days = daysUntil(dueDate, from);
-  if (days === 0) return "hoy";
-  return days > 0 ? `en ${days} d` : `hace ${Math.abs(days)} d`;
-}
-
 /** Una accion resuelta es la que ya no bloquea: cumplida o anulada con justificacion. */
 export function isPlanItemSettled(item: ActionPlanItem): boolean {
   return item.status === "Cumplida" || item.status === "Anulada";
-}
-
-/**
- * Siguiente estado al que puede avanzar la HCA, y que se lo impide.
- * `Cerrada` no sale de aqui: el cierre tiene su propio dialogo y sus tres
- * condiciones.
- */
-export function nextStatus(sheet: CorrectiveActionSheet): {
-  status: HcaStatus | null;
-  blockedBy: string | null;
-} {
-  switch (sheet.status) {
-    case "Abierta":
-      return { status: "En análisis", blockedBy: null };
-    case "En análisis":
-      // docs/plan/05, regla 4: la puerta a ejecución es la lista de causas, no el texto único.
-      return sheet.causes.length === 0
-        ? { status: "En ejecución", blockedBy: "Registra al menos una causa antes de pasar a ejecución." }
-        : { status: "En ejecución", blockedBy: null };
-    case "En ejecución":
-      return { status: "En verificación", blockedBy: null };
-    default:
-      return { status: null, blockedBy: null };
-  }
 }
 

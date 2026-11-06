@@ -1,10 +1,5 @@
 // Cálculo y texto de la solicitud de retiro de mercancía (PF-FOR-068), espejo de WithdrawalRules.
 
-import type { WithdrawalStatus } from "../types/withdrawals";
-
-/** Máximo admisible en el valor de una línea y en el total: numeric(14,2) en la base. */
-export const MAX_WITHDRAWAL_AMOUNT = 999_999_999_999.99;
-
 /** Tope de cantidad solicitada, cantidad retirada y precio unitario por línea. */
 export const MAX_LINE_INPUT = 1_000_000_000;
 
@@ -41,24 +36,6 @@ export function computeLineValue(quantity: number | null, unitPrice: number | nu
 export function computeTotal(values: (number | null)[]): number {
   const cents = values.reduce<number>((sum, value) => sum + (value === null ? 0 : Math.round(value * 100)), 0);
   return cents / 100;
-}
-
-/** Lo que cada estado permite, en palabras (8.1). */
-export function describeStatus(status: WithdrawalStatus, requiresApproval: boolean): string {
-  switch (status) {
-    case "Solicitado":
-      return requiresApproval
-        ? "Solicitada; por indicar un error de origen, necesita aprobación antes del retiro."
-        : "Solicitada; Almacén puede registrar el retiro.";
-    case "Aprobado":
-      return "Aprobada; a la espera de que Almacén registre el retiro.";
-    case "Rechazado":
-      return "Rechazada. Es un estado final.";
-    case "Retirado":
-      return "Retirada. Es el estado final y ya no se edita.";
-    default:
-      return "Cancelada. Es un estado final.";
-  }
 }
 
 /** Parte una fecha ISO YYYY-MM-DD en día, mes y año para la casilla FECHA del PF-FOR-068. */

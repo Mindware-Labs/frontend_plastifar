@@ -55,44 +55,6 @@ export function consumePageDirection(): PageMotionDirection {
 }
 
 /**
- * Transición suave de filas (`tbody > tr`) al paginar o filtrar una tabla.
- *
- * - Sin velo blanco (`opacity-60`) ni parpadeo: parte de opacidad alta (`0.42`)
- *   y desplaza solo en el eje vertical (`±5px`) para no alterar nunca el ancho
- *   útil de los contenedores `.overflow-x-auto`.
- * - La cabecera (`thead`) queda completamente quieta.
- */
-export function animateTablePageTurn(
-  tbody: HTMLTableSectionElement,
-  direction: PageMotionDirection = "settle",
-) {
-  if (prefersReducedMotion() || typeof Element.prototype.animate !== "function") return;
-
-  const rows = Array.from(tbody.querySelectorAll<HTMLTableRowElement>(":scope > tr"));
-  if (rows.length === 0) return;
-
-  const dy = direction === "prev" ? -5 : 5;
-
-  rows.forEach((row, index) => {
-    row.getAnimations().forEach((anim) => anim.cancel());
-    const delay = Math.min(index * 12, 72);
-    const anim = row.animate(
-      [
-        { opacity: 0.42, transform: `translate3d(0, ${dy}px, 0)` },
-        { opacity: 1, transform: "none" },
-      ],
-      {
-        duration: 210,
-        delay,
-        easing: "cubic-bezier(0.16, 1, 0.3, 1)",
-        fill: "backwards",
-      },
-    );
-    anim.onfinish = () => anim.cancel();
-  });
-}
-
-/**
  * Transición direccional suave para cuadrículas de tarjetas (ej. 3×3 en Tickets).
  *
  * - Desliza con una brisa direccional corta (`+8px` al avanzar, `-8px` al retroceder)

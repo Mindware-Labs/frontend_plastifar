@@ -10,7 +10,6 @@ interface RecipientInputProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
-  className?: string;
   autoFocus?: boolean;
   inputRef?: RefObject<HTMLInputElement | null>;
   /** Texto con direcciones mal formadas (tiempo real). */
@@ -40,7 +39,6 @@ export function RecipientInput({
   value,
   onChange,
   placeholder,
-  className = "",
   autoFocus,
   inputRef,
   invalid = false,
@@ -128,7 +126,7 @@ export function RecipientInput({
         aria-expanded={open}
         aria-autocomplete="list"
         aria-invalid={invalid || undefined}
-        className={`w-full bg-transparent text-[12.5px] outline-none font-medium ${className} ${
+        className={`w-full bg-transparent text-[12.5px] outline-none font-medium ${
           invalid
             ? "text-brand-red placeholder:text-red-300/80 caret-brand-red"
             : "text-zinc-900 placeholder:text-zinc-400"

@@ -175,11 +175,6 @@ export interface BulkDepartmentRequest {
 /** Espejo del enum `DepartmentType` del servidor, que viaja como texto. */
 export type DepartmentType = "Publico" | "Privado";
 
-export const DEPARTMENT_TYPES: { value: DepartmentType; label: string }[] = [
-  { value: "Publico", label: "Público" },
-  { value: "Privado", label: "Privado" },
-];
-
 /** Alta o movimiento de un departamento (`parentId` redefine la jerarquía de permisos). */
 export interface SaveDepartmentRequest {
   name: string;
@@ -380,7 +375,6 @@ export interface EmptyTrashResponse {
   kept: number;
 }
 
-
 export interface StaffOptionResponse {
   id: number;
   name: string;
@@ -520,8 +514,6 @@ export interface TicketQuery {
   search?: string;
   /** todos | abiertos | por-vencer | vencidos | espera | cerrados */
   status?: string;
-  /** Pestaña de bandeja (GET /api/tickets/inbox-tabs). */
-  inboxTabId?: string;
   departmentId?: number;
   assignedStaffId?: number;
   priority?: string;
@@ -638,19 +630,6 @@ export interface TicketDetailResponse {
   topicSuggestedForm?: string | null;
   topicSuggestedFormLabel?: string | null;
   accessLevel?: "full" | "readOnly" | null;
-}
-
-export interface TicketInboxTabResponse {
-  id: string;
-  departmentId: number | null;
-  label: string;
-  /** full | readOnly | global */
-  mode: string;
-  ticketCount?: number | null;
-}
-
-export interface TicketInboxTabsResponse {
-  tabs: TicketInboxTabResponse[];
 }
 
 export interface AssignTicketRequest {
@@ -876,9 +855,6 @@ export interface BulkActionResult {
   totalRequested: number;
 }
 
-
-
-
 /** Motivo del catálogo de tickets, tal como lo lista su pantalla de administración. */
 export interface TicketTopicResponse {
   id: number;
@@ -987,7 +963,6 @@ export interface StaffActivityResponse {
   totalPages: number;
   counts: StaffActivityCounts;
 }
-
 
 export type NotificationKind =
   | "TicketAssigned"

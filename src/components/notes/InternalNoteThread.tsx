@@ -31,7 +31,6 @@ interface InternalNoteThreadProps<T extends InternalNoteThreadItem> {
   notes: T[];
   currentStaffId?: number;
   canReply?: boolean;
-  emptyState?: ReactNode;
   onReply: (parentId: number, body: string) => Promise<void>;
   /** Contenido extra bajo el cuerpo (adjuntos, etc.). */
   renderExtra?: (note: T) => ReactNode;
@@ -326,7 +325,6 @@ export function InternalNoteThread<T extends InternalNoteThreadItem>({
   notes,
   currentStaffId,
   canReply = true,
-  emptyState,
   onReply,
   renderExtra,
   density = "comfortable",
@@ -429,7 +427,7 @@ export function InternalNoteThread<T extends InternalNoteThreadItem>({
     [onReply, replyMotion, replyKeyFor],
   );
 
-  if (roots.length === 0) return emptyState ?? null;
+  if (roots.length === 0) return null;
 
   return (
     <div className="space-y-3">

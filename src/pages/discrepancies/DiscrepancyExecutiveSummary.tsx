@@ -3,12 +3,11 @@ import { Link } from "react-router-dom";
 import { formatDay, formatInstant } from "../../lib/dates";
 import { NOTIFICATION_ITEM } from "../../lib/discrepancies";
 import { formatQuantity } from "../../lib/numbers";
-import type { DiscrepancyCompletionCondition, LoadDiscrepancy } from "../../types/discrepancies";
+import type { LoadDiscrepancy } from "../../types/discrepancies";
 import { DiscrepancyStatusBadge, SecurityFindingBadge } from "./DiscrepancyStatusBadge";
 
 interface DiscrepancyExecutiveSummaryProps {
   discrepancy: LoadDiscrepancy;
-  completionConditions?: DiscrepancyCompletionCondition[];
 }
 
 export function DiscrepancyExecutiveSummary({

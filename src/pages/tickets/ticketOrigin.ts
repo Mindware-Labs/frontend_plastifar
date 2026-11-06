@@ -11,4 +11,3 @@ export function originLabel(channel: string): { label: string; hint: string } {
       };
 }
 
-export const isEmailChannel = (channel: string) => channel.toLowerCase() === "correo";

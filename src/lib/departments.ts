@@ -207,40 +207,6 @@ export function departmentPaths(departments: DepartmentLike[]): Map<number, stri
   );
 }
 
-/**
- * Un departamento y toda su descendencia.
- *
- * Es la pieza que necesita un filtro para que «VENTAS INTERNACIONALES» traiga
- * también lo de Florida y lo de Cuba. Se deja resuelta aquí, pero quién la usa
- * —y si los permisos se heredan igual— lo decide la regla de negocio.
- */
-export function departmentWithDescendants(
-  departments: DepartmentLike[],
-  id: number,
-): number[] {
-  const hijosDe = new Map<number, number[]>();
-  for (const d of departments) {
-    if (d.parentId == null) continue;
-    const grupo = hijosDe.get(d.parentId);
-    if (grupo) grupo.push(d.id);
-    else hijosDe.set(d.parentId, [d.id]);
-  }
-
-  const salida: number[] = [];
-  const pendientes = [id];
-  const vistos = new Set<number>();
-
-  while (pendientes.length > 0) {
-    const actual = pendientes.pop() as number;
-    if (vistos.has(actual)) continue;
-    vistos.add(actual);
-    salida.push(actual);
-    pendientes.push(...(hijosDe.get(actual) ?? []));
-  }
-
-  return salida;
-}
-
 /* ==================================================================
    LA FORMA DEL ORGANIGRAMA, PARA QUIEN DECIDE PERMISOS
    ==================================================================

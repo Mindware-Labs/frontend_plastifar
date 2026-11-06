@@ -20,7 +20,6 @@ const sectionDividerTitleClass =
   "shrink-0 font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400 select-none";
 
 export interface SlaPolicyFieldProps {
-  label?: string;
   required?: boolean;
   policies: SlaPolicy[] | null;
   loading?: boolean;
@@ -28,13 +27,8 @@ export interface SlaPolicyFieldProps {
   onChange: (policyId: string) => void;
   error?: string;
   state?: FieldState;
-  emptyHint?: string;
-  searchPlaceholder?: string;
-  /** Oculta la etiqueta visible (p. ej. cuando la sección ya tiene título). */
-  hideLabel?: boolean;
   /** Título tipo FormDivider + etiqueta de campo con buscador. */
   embeddedSection?: boolean;
-  sectionTitle?: string;
   fieldLabel?: string;
   /** Borde superior tipo FormDivider (formulario de tareas). */
   sectionBorder?: boolean;
@@ -44,7 +38,6 @@ export interface SlaPolicyFieldProps {
 }
 
 export function SlaPolicyField({
-  label = "Política SLA",
   required = true,
   policies,
   loading = false,
@@ -52,11 +45,7 @@ export function SlaPolicyField({
   onChange,
   error,
   state = "idle",
-  emptyHint = "Configura políticas activas en Ajustes → SLA.",
-  searchPlaceholder = "Buscar política…",
-  hideLabel = false,
   embeddedSection = false,
-  sectionTitle = "Política SLA",
   fieldLabel = "Compromiso SLA",
   sectionBorder = false,
   readOnly = false,
@@ -66,8 +55,7 @@ export function SlaPolicyField({
   const [searchExpanded, setSearchExpanded] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const ariaLabel = embeddedSection ? fieldLabel : label;
-  const visibleLabel = embeddedSection ? fieldLabel : label;
+  const visibleLabel = embeddedSection ? fieldLabel : "Política SLA";
 
   const ring =
     state === "error" || error
@@ -108,7 +96,7 @@ export function SlaPolicyField({
   function renderSectionDivider() {
     return (
       <div className="flex items-center gap-2">
-        <span className={sectionDividerTitleClass}>{sectionTitle}</span>
+        <span className={sectionDividerTitleClass}>Política SLA</span>
         <div className="h-px flex-1 bg-zinc-100" aria-hidden />
       </div>
     );
@@ -155,8 +143,8 @@ export function SlaPolicyField({
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder={searchPlaceholder}
-            aria-label={searchPlaceholder}
+            placeholder="Buscar política…"
+            aria-label="Buscar política…"
             className={`w-full rounded-md border border-zinc-200 bg-white pl-7 pr-2 text-[12px] text-zinc-800 placeholder:text-zinc-400 outline-none transition-colors focus:border-zinc-400 focus:ring-2 focus:ring-zinc-400/20 [&::-webkit-search-cancel-button]:hidden ${expandedInputH}`}
           />
         </div>
@@ -182,12 +170,9 @@ export function SlaPolicyField({
           }`}
           aria-hidden={searchExpanded && showSearchControl}
         >
-          {!hideLabel && (
-            <span className="min-w-0 truncate font-heading text-[11.5px] font-semibold text-faint">
-              {visibleLabel} {required && <span className="text-brand-red">*</span>}
-            </span>
-          )}
-          {hideLabel && !embeddedSection && <span className="min-w-0 flex-1" aria-hidden />}
+          <span className="min-w-0 truncate font-heading text-[11.5px] font-semibold text-faint">
+            {visibleLabel} {required && <span className="text-brand-red">*</span>}
+          </span>
           {renderSearchButton()}
         </div>
         {searchExpanded && showSearchControl && renderSearchOverlay(expandedInputH, closeBtnClass)}
@@ -226,11 +211,9 @@ export function SlaPolicyField({
             </span>
           </>
         ) : (
-          !hideLabel && (
-            <span className="font-heading text-[11.5px] font-semibold text-faint">
-              {visibleLabel} {required && <span className="text-brand-red">*</span>}
-            </span>
-          )
+          <span className="font-heading text-[11.5px] font-semibold text-faint">
+            {visibleLabel} {required && <span className="text-brand-red">*</span>}
+          </span>
         )}
         <div className="flex h-20 items-center justify-center rounded-lg border border-zinc-200 bg-zinc-50/80">
           <Loader2 className="h-4 w-4 animate-spin text-zinc-400" aria-hidden />
@@ -251,14 +234,12 @@ export function SlaPolicyField({
             </span>
           </>
         ) : (
-          !hideLabel && (
-            <span className="font-heading text-[11.5px] font-semibold text-faint">
-              {label} {required && <span className="text-brand-red">*</span>}
-            </span>
-          )
+          <span className="font-heading text-[11.5px] font-semibold text-faint">
+            {visibleLabel} {required && <span className="text-brand-red">*</span>}
+          </span>
         )}
         <p className="rounded-lg border border-dashed border-zinc-200 bg-zinc-50/60 px-3 py-2.5 text-[12px] leading-relaxed text-zinc-500">
-          {emptyHint}
+          Configura políticas activas en Ajustes → SLA.
         </p>
       </div>
     );
@@ -335,7 +316,7 @@ export function SlaPolicyField({
 
       <div
         role={readOnly ? undefined : "radiogroup"}
-        aria-label={readOnly ? undefined : ariaLabel}
+        aria-label={readOnly ? undefined : visibleLabel}
         className={`rounded-lg border bg-zinc-50/70 p-1 ${readOnly ? "border-zinc-200" : ring}`}
       >
         {policiesToShow.length === 0 ? (

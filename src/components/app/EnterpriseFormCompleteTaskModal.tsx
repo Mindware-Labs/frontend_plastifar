@@ -14,7 +14,6 @@ export interface EnterpriseFormCompleteTaskModalProps {
   taskNumber: string;
   formCode: string;
   recordNumber: string;
-  descriptionText?: string;
   defaultComment?: string;
   onClose: () => void;
   onSuccess: () => void;
@@ -27,7 +26,6 @@ export function EnterpriseFormCompleteTaskModal({
   taskNumber,
   formCode,
   recordNumber,
-  descriptionText,
   defaultComment,
   onClose,
   onSuccess,
@@ -52,10 +50,6 @@ export function EnterpriseFormCompleteTaskModal({
   }, [open, initialComment]);
 
   if (!open) return null;
-
-  const resolvedDescription =
-    descriptionText ??
-    "El formulario quedó registrado. Puedes completar la tarea ahora con un comentario de cierre, igual que al usar «Completar tarea» en la ficha.";
 
   const handleConfirmComplete = async () => {
     const trimmed = comment.trim();
@@ -121,7 +115,7 @@ export function EnterpriseFormCompleteTaskModal({
             </div>
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
               <h4 className="font-heading text-sm font-bold tracking-tight text-zinc-900">{recordNumber}</h4>
-              <p className="text-xs leading-relaxed text-zinc-600">{resolvedDescription}</p>
+              <p className="text-xs leading-relaxed text-zinc-600">El formulario quedó registrado. Puedes completar la tarea ahora con un comentario de cierre, igual que al usar «Completar tarea» en la ficha.</p>
             </div>
           </div>
         </div>

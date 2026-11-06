@@ -322,11 +322,3 @@ export async function captureElementAsCanvas(
   }
 }
 
-/** Captura en formato DataURL PNG para compatibilidad. */
-export async function captureElementAsPng(
-  element: HTMLElement,
-  orientation: "portrait" | "landscape",
-): Promise<string> {
-  const canvas = await captureElementAsCanvas(element, orientation);
-  return canvas.toDataURL("image/png");
-}

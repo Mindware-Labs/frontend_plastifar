@@ -67,24 +67,18 @@ function Seal({ tone, children }: { tone: "rest" | "created"; children: React.Re
 
 interface TaskChipProps {
   tasks: EmailLinkedTask[];
-  size?: "md" | "xs";
   justCreatedId?: number | null;
   onSettled?: () => void;
   active?: boolean;
-  busy?: boolean;
   onCreate?: () => void;
-  className?: string;
 }
 
 export function TaskChip({
   tasks,
-  size = "md",
   justCreatedId = null,
   active = false,
-  busy = false,
   onCreate,
   onSettled,
-  className = "",
 }: TaskChipProps) {
   const openTasks = useMemo(() => tasks.filter((t) => isOpenStatus(t.status)), [tasks]);
   const primary = openTasks[0] ?? tasks[0] ?? null;
@@ -101,40 +95,21 @@ export function TaskChip({
     return () => window.clearTimeout(timer);
   }, [justCreatedId]);
 
-  if (size === "xs") {
-    if (!primary) return null;
-    return (
-      <span
-        title={`Tarea ${primary.number}`}
-        className={`inline-flex h-4 shrink-0 items-center gap-1 rounded-[5px] border border-zinc-200 bg-white pl-1 pr-1.5 font-heading text-[9.5px] font-bold tabular-nums tracking-[0.02em] text-zinc-700 ${className}`}
-      >
-        <span aria-hidden className="size-1.5 rounded-full bg-brand-red" />
-        {primary.number}
-      </span>
-    );
-  }
-
   if (!primary) {
     if (!onCreate) return null;
     return (
       <button
         type="button"
         onClick={onCreate}
-        disabled={busy}
-        aria-busy={busy || undefined}
         data-active={active}
-        className={`${rootClass} h-7 cursor-pointer gap-2 pl-1 pr-2.5 active:scale-[0.98] motion-reduce:active:scale-100 disabled:cursor-progress ${
+        className={`${rootClass} h-7 cursor-pointer gap-2 pl-1 pr-2.5 active:scale-[0.98] motion-reduce:active:scale-100 ${
           active ? pressedClass : restingClass
-        } ${className}`}
+        }`}
       >
         <Seal tone="rest">
-          {busy ? (
-            <span className="size-3 animate-spin rounded-full border-[1.5px] border-current border-t-transparent" />
-          ) : (
-            <ListTodo className="size-3" strokeWidth={2.25} />
-          )}
+          <ListTodo className="size-3" strokeWidth={2.25} />
         </Seal>
-        <span className="text-[12px] font-medium leading-none">{busy ? "Creando…" : "Crear tarea"}</span>
+        <span className="text-[12px] font-medium leading-none">Crear tarea</span>
       </button>
     );
   }
@@ -154,7 +129,7 @@ export function TaskChip({
         data-confirming={confirming}
         className={`${rootClass} h-7 gap-2 pl-1 pr-2 active:scale-[0.98] motion-reduce:active:scale-100 ${
           confirming ? createdClass : restingClass
-        } ${className}`}
+        }`}
       >
         <Seal tone={confirming ? "created" : "rest"}>
           {confirming ? (
@@ -193,7 +168,7 @@ export function TaskChip({
             <button
               type="button"
               aria-label="Ver tareas vinculadas a este correo"
-              className={`${rootClass} h-7 cursor-pointer gap-2 pl-1 pr-2.5 ${mutedClass} ${className}`}
+              className={`${rootClass} h-7 cursor-pointer gap-2 pl-1 pr-2.5 ${mutedClass}`}
             >
               <span className="flex size-5 items-center justify-center rounded-md bg-zinc-200/80 text-zinc-600">
                 <ListTodo className="size-3" strokeWidth={2.25} />

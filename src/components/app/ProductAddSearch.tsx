@@ -28,7 +28,6 @@ interface PanelAnchor {
 export interface ProductAddSearchProps {
   id?: string;
   label?: string;
-  disabled?: boolean;
   selectedProducts?: TicketProductDraft[];
   excludeProductIds?: number[];
   onPick: (option: LookupOption) => void;
@@ -43,7 +42,6 @@ export interface ProductAddSearchProps {
 export function ProductAddSearch({
   id,
   label,
-  disabled,
   selectedProducts = [],
   excludeProductIds = [],
   onPick,
@@ -124,7 +122,6 @@ export function ProductAddSearch({
   }
 
   function openPanel() {
-    if (disabled) return;
     measure();
     setOpen(true);
   }
@@ -296,7 +293,6 @@ export function ProductAddSearch({
           type="text"
           role="combobox"
           autoComplete="off"
-          disabled={disabled}
           aria-expanded={open}
           aria-controls={open ? listId : undefined}
           aria-autocomplete="list"

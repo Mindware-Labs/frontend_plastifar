@@ -3,11 +3,10 @@ import React, { useMemo } from "react";
 interface FormattedTicketBodyProps {
   text?: string | null;
   html?: string | null;
-  className?: string;
 }
 
 /** Renderizado estructurado del cuerpo del ticket con soporte para prosa y listas. */
-export function FormattedTicketBody({ text, html, className = "" }: FormattedTicketBodyProps) {
+export function FormattedTicketBody({ text, html }: FormattedTicketBodyProps) {
   const content = useMemo(() => {
     if (text && text.trim().length > 0) {
       return text;
@@ -70,7 +69,7 @@ export function FormattedTicketBody({ text, html, className = "" }: FormattedTic
   const isKeyValueLine = (line: string) => /^[A-Za-zÁ-ÿ0-9\s#_-]{2,30}:\s*.+$/.test(line);
 
   return (
-    <div className={`w-full space-y-2 break-words leading-relaxed text-zinc-800 ${className}`}>
+    <div className="w-full space-y-2 break-words leading-relaxed text-zinc-800">
       {blocks.map((block, bIndex) => {
         const lines = block
           .split("\n")

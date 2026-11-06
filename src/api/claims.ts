@@ -71,16 +71,4 @@ export const claimsApi = {
     apiRequest<ClaimDetail>(`/api/claims/${id}/quality-section/waive`, {
       method: "POST",
     }),
-
-  close: (id: number, observations: string | null) =>
-    apiRequest<ClaimDetail>(`/api/claims/${id}/close`, {
-      method: "POST",
-      body: JSON.stringify({ observations }),
-    }),
-
-  reopen: (id: number, reason: string) =>
-    apiRequest<ClaimDetail>(`/api/claims/${id}/reopen`, {
-      method: "POST",
-      body: JSON.stringify({ reason }),
-    }),
 };

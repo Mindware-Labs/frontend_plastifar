@@ -33,7 +33,6 @@ import {
   useRef,
   useState,
   type ComponentType,
-  type ReactNode,
 } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ReturnToOriginBanner } from "../../components/app/ReturnToOriginBanner";
@@ -157,10 +156,9 @@ function EditTicketFormDivider({ title }: { title: string }) {
 interface EditTicketSectionHeadingProps {
   icon: ComponentType<{ className?: string; strokeWidth?: number }>;
   title: string;
-  aside?: ReactNode;
 }
 
-function EditTicketSectionHeading({ icon: Icon, title, aside }: EditTicketSectionHeadingProps) {
+function EditTicketSectionHeading({ icon: Icon, title }: EditTicketSectionHeadingProps) {
   return (
     <div className="flex h-5 items-center justify-between gap-3">
       <div className="flex items-center gap-2">
@@ -172,7 +170,6 @@ function EditTicketSectionHeading({ icon: Icon, title, aside }: EditTicketSectio
         </span>
         <span className="font-heading text-[10.5px] font-bold uppercase tracking-[0.08em] text-ink">{title}</span>
       </div>
-      {aside && <span className="text-[11px] text-zinc-400">{aside}</span>}
     </div>
   );
 }

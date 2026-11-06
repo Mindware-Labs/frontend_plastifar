@@ -604,4 +604,3 @@ export function PermissionsView({ headerExtra, title, onMatrixLoaded }: Permissi
   );
 }
 
-export const PermissionsPage = PermissionsView;

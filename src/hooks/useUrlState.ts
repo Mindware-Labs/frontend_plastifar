@@ -108,11 +108,6 @@ const numberCodec: Codec<number> = {
   serialize: (value) => String(value),
 };
 
-const listCodec: Codec<string[]> = {
-  parse: (raw) => (raw === "" ? [] : raw.split(",")),
-  serialize: (value) => value.join(","),
-};
-
 /**
  * Filtro de texto o de opcion en `?key=`. Con `allowed`, un valor desconocido
  * en la URL (un enlace viejo, uno editado a mano) cae al valor por defecto.
@@ -147,7 +142,3 @@ export function useUrlNumber(key: string | undefined, fallback: number, allowed?
   });
 }
 
-/** Seleccion multiple en `?key=a,b,c`. */
-export function useUrlList(key: string, fallback: string[] = []) {
-  return useUrlValue<string[]>(key, fallback, listCodec);
-}

@@ -112,7 +112,6 @@ export interface ClaimClosureCondition {
 export interface ClaimDetail {
   claim: CustomerClaim;
   closureConditions: ClaimClosureCondition[];
-  canClose: boolean;
 }
 
 /** Fila del listado (sección 11). */

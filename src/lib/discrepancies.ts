@@ -1,7 +1,6 @@
 // Texto y búsquedas de la investigación de discrepancia de carga, sin React.
 import { ticketsApi } from "../api/tickets";
 import type { LookupResult } from "../components/ui/LookupSelect";
-import type { DiscrepancyStatus } from "../types/discrepancies";
 
 /** Control documental de la cabecera del PF-FOR-291, tal como está en la plantilla. */
 export const DISCREPANCY_FORM_CONTROL = {
@@ -14,19 +13,6 @@ export const DISCREPANCY_FORM_CONTROL = {
 
 /** El punto 9 no evalúa la carga: pregunta si se notificó, y solo aplica con un positivo del 1 al 8. */
 export const NOTIFICATION_ITEM = 9;
-
-export function describeStatus(status: DiscrepancyStatus): string {
-  switch (status) {
-    case "En investigación":
-      return "Monitoreo la está llenando; se da por completa cuando están las líneas y los puntos de seguridad.";
-    case "Completada":
-      return "Realizada; a la espera de que quien aprueba la firme o la devuelva.";
-    case "Aprobada":
-      return "Aprobada. Es el estado final y ya no se edita.";
-    default:
-      return "Devuelta con nota; se reabre para corregirla.";
-  }
-}
 
 const ticketCache = new Map<number, { label: string; clientName: string | null; clientId: number | null }>();
 

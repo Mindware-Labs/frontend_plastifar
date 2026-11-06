@@ -5,7 +5,6 @@ interface EnterpriseFormSaveDraftConfirmModalProps {
   open: boolean;
   formCode: string;
   ticketLabel?: string;
-  saving?: boolean;
   onClose: () => void;
   onConfirm: () => void;
 }
@@ -15,7 +14,6 @@ export function EnterpriseFormSaveDraftConfirmModal({
   open,
   formCode,
   ticketLabel,
-  saving = false,
   onClose,
   onConfirm,
 }: EnterpriseFormSaveDraftConfirmModalProps) {
@@ -27,13 +25,12 @@ export function EnterpriseFormSaveDraftConfirmModal({
       eyebrow={ticketLabel ? `${formCode} · ${ticketLabel}` : formCode}
       onClose={onClose}
       maxWidth="max-w-md"
-      closeOnBackdropClick={!saving}
       footer={
         <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
-          <Button type="button" variant="secondary" size="sm" onClick={onClose} disabled={saving}>
+          <Button type="button" variant="secondary" size="sm" onClick={onClose}>
             Seguir editando
           </Button>
-          <Button type="button" size="sm" onClick={onConfirm} isLoading={saving} disabled={saving}>
+          <Button type="button" size="sm" onClick={onConfirm}>
             Guardar borrador
           </Button>
         </div>

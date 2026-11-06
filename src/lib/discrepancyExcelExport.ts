@@ -17,11 +17,7 @@ export async function exportDiscrepancyToExcel(
     if (!input.checks || input.checks.length === 0) {
       detail = await discrepanciesApi.get(input.id);
     } else {
-      detail = {
-        discrepancy: input,
-        completionConditions: [],
-        canComplete: false,
-              };
+      detail = { discrepancy: input };
     }
   }
 

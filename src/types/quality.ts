@@ -125,52 +125,6 @@ export interface ActionPlanItem {
   attachments: PlanItemAttachment[];
 }
 
-export const CREDIT_STATUSES = ["Solicitada", "Aprobada", "Rechazada", "Aplicada"] as const;
-
-export type CreditStatus = (typeof CREDIT_STATUSES)[number];
-
-export const CURRENCIES = ["DOP", "USD"] as const;
-
-export type Currency = (typeof CURRENCIES)[number];
-
-/** Solicitud de nota de credito al cliente. */
-export interface CreditRequest {
-  id: number;
-  number: string;
-  ticketId: number | null;
-  ticketNumber: string | null;
-  clientId: number;
-  clientName: string;
-  /** Obligatorio y positivo; no se modifica una vez aprobado. */
-  amount: number;
-  currency: Currency;
-  reason: string;
-  /** Referencia de factura sobre la que se emite el credito. */
-  invoiceRef: string | null;
-  status: CreditStatus;
-  requestedByStaffId: number;
-  requestedByName: string;
-  requestedAt: string;
-  /** Quien aprobo o rechazo; nunca puede ser el solicitante. */
-  decidedByStaffId: number | null;
-  decidedByName: string | null;
-  decidedAt: string | null;
-  decisionNote: string | null;
-  /** Por qué quien mira no puede decidir esta solicitud; null cuando sí puede. */
-  decisionBlockedReason: string | null;
-}
-
-/**
- * Personal disponible para los desplegables de Calidad. Los nombres que se
- * muestran ya vienen resueltos en cada respuesta; esto solo alimenta los
- * `<select>` de filtro y de formulario, y el responsable de cada accion del
- * plan, que es el unico nombre que el servidor todavia no resuelve.
- */
-export interface QualityStaff {
-  id: number;
-  name: string;
-}
-
 export interface SheetCounts {
   all: number;
   open: number;
