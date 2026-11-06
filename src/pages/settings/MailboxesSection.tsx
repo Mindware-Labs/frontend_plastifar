@@ -149,7 +149,18 @@ export function MailboxesSection() {
             secretRef: current.secretRef,
             isActive: !current.isActive,
           });
+          receipts.done({
+            action: current.isActive ? "reactivar-buzon" : "desactivar-buzon",
+            title: current.isActive ? "Buzón desactivado" : "Buzón reactivado",
+            detail: current.displayName,
+          });
           refresh();
+        } catch (err) {
+          receipts.failed({
+            action: "toggle-buzon",
+            title: mailbox.isActive ? "No se pudo desactivar el buzón" : "No se pudo reactivar el buzón",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyId(null);
         }
@@ -375,7 +386,15 @@ export function MailboxesSection() {
           mailbox={modal === "nuevo" ? undefined : modal}
           departments={departments}
           onClose={() => setModal(null)}
-          onSaved={refresh}
+          onSaved={(saved) => {
+            const isEdit = modal !== "nuevo";
+            receipts.done({
+              action: isEdit ? "editar-buzon" : "crear-buzon",
+              title: isEdit ? "Buzón actualizado" : "Buzón creado exitosamente",
+              detail: saved.displayName,
+            });
+            refresh();
+          }}
         />
       )}
 

@@ -87,29 +87,25 @@ export function VeredictosPage() {
     setConfirmation({
       tone: "warn",
       icon: CheckCircle2,
-      eyebrow: "Tickets · Veredictos",
       title: `Activar ${selectedIds.size} veredictos`,
       description: "Volverán a ofrecerse al marcar tickets como solucionados.",
       confirmLabel: "Activar",
-      onConfirm: () => {
-        setConfirmation(null);
-        void runBulk("activate");
-      },
+      onConfirm: () => runBulk("activate"),
     });
   }
 
   function askBulkDeactivate() {
     setConfirmation({
-      tone: "danger",
+      tone: "warn",
       icon: Ban,
-      eyebrow: "Tickets · Veredictos",
       title: `Desactivar ${selectedIds.size} veredictos`,
-      description: "Dejarán de ofrecerse en tickets nuevos. Los tickets que ya los usan no cambian.",
+      description: (
+        <>
+          Dejarán de ofrecerse en tickets nuevos. Los tickets que ya los usan no cambian.
+        </>
+      ),
       confirmLabel: "Desactivar",
-      onConfirm: () => {
-        setConfirmation(null);
-        void runBulk("deactivate");
-      },
+      onConfirm: () => runBulk("deactivate"),
     });
   }
 
@@ -117,15 +113,15 @@ export function VeredictosPage() {
     setConfirmation({
       tone: "danger",
       icon: Trash2,
-      eyebrow: "Tickets · Veredictos",
       title: `Eliminar ${selectedIds.size} veredictos`,
-      description:
-        "Solo se borran los que ningún ticket usa. El resto se omitirá y tendrás que desactivarlos.",
+      description: (
+        <>
+          Solo se borran los que ningún ticket usa. El resto se omitirá y tendrás que
+          desactivarlos.
+        </>
+      ),
       confirmLabel: "Eliminar",
-      onConfirm: () => {
-        setConfirmation(null);
-        void runBulk("delete");
-      },
+      onConfirm: () => runBulk("delete"),
     });
   }
 
@@ -146,9 +142,8 @@ export function VeredictosPage() {
   function askToggleActive(verdict: TicketVerdictResponse) {
     if (verdict.isActive) {
       setConfirmation({
-        tone: "danger",
+        tone: "warn",
         icon: Ban,
-        eyebrow: "Tickets · Veredictos",
         title: "Desactivar veredicto",
         description: (
           <>
@@ -169,7 +164,6 @@ export function VeredictosPage() {
     setConfirmation({
       tone: "danger",
       icon: Trash2,
-      eyebrow: "Tickets · Veredictos",
       title: "Eliminar veredicto",
       description: (
         <>

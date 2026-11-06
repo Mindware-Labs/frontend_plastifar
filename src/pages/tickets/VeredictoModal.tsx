@@ -11,6 +11,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
+import { useReceipts } from "../../context/useReceipts";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import type { SaveTicketVerdictRequest, TicketVerdictResponse } from "../../types/api";
 
@@ -45,6 +46,7 @@ interface VeredictoModalProps {
 
 export function VeredictoModal({ verdict, onClose, onSaved }: VeredictoModalProps) {
   const isEdit = verdict !== undefined;
+  const receipts = useReceipts();
   const [formError, setFormError] = useState<string | null>(null);
   const { isExiting, requestClose } = useModalAnimation();
 
@@ -97,6 +99,11 @@ export function VeredictoModal({ verdict, onClose, onSaved }: VeredictoModalProp
       } else {
         await ticketVerdictsApi.create(input);
       }
+      receipts.done({
+        action: isEdit ? "editar-veredicto" : "crear-veredicto",
+        title: isEdit ? "Veredicto actualizado" : "Veredicto creado exitosamente",
+        detail: input.name,
+      });
       onSaved();
       requestClose();
     } catch (err) {

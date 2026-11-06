@@ -26,6 +26,7 @@ import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useActionErrorReceipt, useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
+import { useReceipts } from "../../context/useReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { useTablePageSelection } from "../../hooks/useTablePageSelection";
@@ -42,6 +43,7 @@ export function SedesPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const receipts = useReceipts();
   const [search, setSearch] = useState("");
   const [chip, setChip] = useState<ChipKey>("todos");
   const [pageSize, setPageSize] = useState(15);
@@ -93,6 +95,13 @@ export function SedesPage() {
             ? `Se eliminaron ${result.updatedCount} de ${result.totalRequested}. ${skipped} tienen departamentos asignados.`
             : `Se actualizaron ${result.updatedCount} de ${result.totalRequested} sedes.`,
         );
+      } else {
+        const titles = { activate: "Sedes activadas", deactivate: "Sedes desactivadas", delete: "Sedes eliminadas" };
+        receipts.done({
+          action: `${action}-sedes-lote`,
+          title: titles[action],
+          detail: `${result.updatedCount} ${result.updatedCount === 1 ? "sede" : "sedes"}`,
+        });
       }
       clearSelection();
       refresh();
@@ -110,10 +119,7 @@ export function SedesPage() {
       title: `Reactivar ${selectedIds.size} sedes`,
       description: "Volverán a ofrecerse al asignar sede a un departamento.",
       confirmLabel: "Reactivar",
-      onConfirm: () => {
-        setConfirmation(null);
-        void runBulk("activate");
-      },
+      onConfirm: () => runBulk("activate"),
     });
   }
 
@@ -124,10 +130,7 @@ export function SedesPage() {
       title: `Desactivar ${selectedIds.size} sedes`,
       description: "Dejarán de ofrecerse en selectores; los departamentos que ya las usan las conservan.",
       confirmLabel: "Desactivar",
-      onConfirm: () => {
-        setConfirmation(null);
-        void runBulk("deactivate");
-      },
+      onConfirm: () => runBulk("deactivate"),
     });
   }
 
@@ -139,10 +142,7 @@ export function SedesPage() {
       description:
         "Solo se borran las que no tienen departamentos. Las demás se omitirán; desactívalas si no las necesitas.",
       confirmLabel: "Eliminar",
-      onConfirm: () => {
-        setConfirmation(null);
-        void runBulk("delete");
-      },
+      onConfirm: () => runBulk("delete"),
     });
   }
 
@@ -183,7 +183,18 @@ export function SedesPage() {
             address: current.address,
             isActive: !current.isActive,
           });
+          receipts.done({
+            action: current.isActive ? "reactivar-sede" : "desactivar-sede",
+            title: current.isActive ? "Sede desactivada" : "Sede reactivada",
+            detail: current.name,
+          });
           refresh();
+        } catch (err) {
+          receipts.failed({
+            action: "toggle-sede",
+            title: "No se pudo cambiar el estado de la sede",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyId(null);
         }
@@ -207,7 +218,14 @@ export function SedesPage() {
         setBusyId(sede.id);
         try {
           await sedesApi.remove(sede.id);
+          receipts.done({ action: "eliminar-sede", title: "Sede eliminada", detail: sede.name });
           refresh();
+        } catch (err) {
+          receipts.failed({
+            action: "eliminar-sede",
+            title: "No se pudo eliminar la sede",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyId(null);
         }
@@ -461,7 +479,15 @@ export function SedesPage() {
         <SedeModal
           sede={modal === "nuevo" ? undefined : modal}
           onClose={() => setModal(null)}
-          onSaved={() => refresh()}
+          onSaved={(saved) => {
+            const isEdit = modal !== "nuevo";
+            receipts.done({
+              action: isEdit ? "editar-sede" : "crear-sede",
+              title: isEdit ? "Sede actualizada" : "Sede creada exitosamente",
+              detail: saved.name,
+            });
+            refresh();
+          }}
         />
       )}
 

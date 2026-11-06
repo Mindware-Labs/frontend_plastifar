@@ -6,6 +6,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { TextAreaField, TextField } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
+import { useReceipts } from "../../context/useReceipts";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import type { CategoriaResponseItem } from "../../types/api";
 
@@ -26,6 +27,7 @@ interface CategoriaModalProps {
 
 export function CategoriaModal({ category, onClose, onSaved }: CategoriaModalProps) {
   const isEdit = category !== undefined;
+  const receipts = useReceipts();
   const { isExiting, requestClose } = useModalAnimation();
 
   const [name, setName] = useState(category?.name ?? "");
@@ -68,6 +70,11 @@ export function CategoriaModal({ category, onClose, onSaved }: CategoriaModalPro
           color,
         });
       }
+      receipts.done({
+        action: isEdit ? "editar-categoria-plantilla" : "crear-categoria-plantilla",
+        title: isEdit ? "Categoría actualizada" : "Categoría creada exitosamente",
+        detail: cleanName,
+      });
       onSaved();
       requestClose();
     } catch (err) {

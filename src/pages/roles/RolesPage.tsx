@@ -21,6 +21,7 @@ import { StatusDot } from "../../components/ui/StatusDot";
 import { useAuth } from "../../context/useAuth";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useActionErrorReceipt, useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
+import { useReceipts } from "../../context/useReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { useTablePageSelection } from "../../hooks/useTablePageSelection";
 import type { RoleListResponse, RoleResponse } from "../../types/api";
@@ -58,6 +59,7 @@ export function RolesPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const receipts = useReceipts();
   const [confirmation, setConfirmation] = useState<Omit<ConfirmDialogProps, "onClose"> | null>(
     null,
   );
@@ -119,6 +121,13 @@ export function RolesPage() {
             ? `Se eliminaron ${result.updatedCount} de ${result.totalRequested}. ${skipped} omitidos (sistema, en uso o predeterminados en departamentos).`
             : `Se actualizaron ${result.updatedCount} de ${result.totalRequested}. Los roles del sistema se omiten.`,
         );
+      } else {
+        const titles = { activate: "Roles activados", deactivate: "Roles desactivados", delete: "Roles eliminados" };
+        receipts.done({
+          action: `${action}-roles-lote`,
+          title: titles[action],
+          detail: `${result.updatedCount} ${result.updatedCount === 1 ? "rol" : "roles"}`,
+        });
       }
       clearSelection();
       refresh();
@@ -133,30 +142,26 @@ export function RolesPage() {
     setConfirmation({
       tone: "warn",
       icon: CheckCircle2,
-      eyebrow: "Personal · Roles",
       title: `Activar ${selectedIds.size} roles`,
       description: "Los roles personalizados seleccionados volverán a poder asignarse.",
       confirmLabel: "Activar",
-      onConfirm: () => {
-        setConfirmation(null);
-        void runBulk("activate");
-      },
+      onConfirm: () => runBulk("activate"),
     });
   }
 
   function askBulkDeactivate() {
     setConfirmation({
-      tone: "danger",
+      tone: "warn",
       icon: Ban,
-      eyebrow: "Personal · Roles",
       title: `Desactivar ${selectedIds.size} roles`,
-      description:
-        "Quienes los tengan asignados perderán la sesión activa. Los roles del sistema no se modifican.",
+      description: (
+        <>
+          Quienes los tengan asignados perderán la sesión activa. Los roles del sistema no se
+          modifican.
+        </>
+      ),
       confirmLabel: "Desactivar",
-      onConfirm: () => {
-        setConfirmation(null);
-        void runBulk("deactivate");
-      },
+      onConfirm: () => runBulk("deactivate"),
     });
   }
 
@@ -164,15 +169,15 @@ export function RolesPage() {
     setConfirmation({
       tone: "danger",
       icon: Trash2,
-      eyebrow: "Personal · Roles",
       title: `Eliminar ${selectedIds.size} roles`,
-      description:
-        "Solo se borran los personalizados sin personal asignado ni uso como rol predeterminado. El resto se omitirá.",
+      description: (
+        <>
+          Solo se borran los personalizados sin personal asignado ni uso como rol predeterminado. El
+          resto se omitirá.
+        </>
+      ),
       confirmLabel: "Eliminar",
-      onConfirm: () => {
-        setConfirmation(null);
-        void runBulk("delete");
-      },
+      onConfirm: () => runBulk("delete"),
     });
   }
 
@@ -185,7 +190,6 @@ export function RolesPage() {
     setConfirmation({
       tone: "danger",
       icon: Trash2,
-      eyebrow: "Personal · Roles",
       title: "Eliminar rol",
       description: (
         <>
@@ -198,7 +202,14 @@ export function RolesPage() {
         setBusyId(role.id);
         try {
           await rolesApi.remove(role.id);
+          receipts.done({ action: "eliminar-rol", title: "Rol eliminado", detail: role.name });
           refresh();
+        } catch (err) {
+          receipts.failed({
+            action: "eliminar-rol",
+            title: "No se pudo eliminar el rol",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyId(null);
         }
@@ -563,6 +574,12 @@ export function RolesPage() {
           role={modal === "nuevo" ? undefined : modal}
           onClose={() => setModal(null)}
           onSaved={(savedRole) => {
+            const isEdit = modal !== "nuevo";
+            receipts.done({
+              action: isEdit ? "editar-rol" : "crear-rol",
+              title: isEdit ? "Rol actualizado" : "Rol creado exitosamente",
+              detail: savedRole.name,
+            });
             refresh();
             // Si acabamos de crear un rol nuevo, abrir directamente el drawer de permisos para asignarle
             if (modal === "nuevo") {
@@ -578,7 +595,8 @@ export function RolesPage() {
           role={permissionDrawerRole}
           matrix={matrix}
           onClose={() => setPermissionDrawerRole(null)}
-          onSaved={(_updated) => {
+          onSaved={(updated) => {
+            receipts.done({ action: "permisos-rol", title: "Permisos del rol actualizados", detail: updated.name });
             refresh();
             setPermissionDrawerRole(null);
           }}

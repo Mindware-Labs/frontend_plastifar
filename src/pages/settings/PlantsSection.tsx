@@ -16,6 +16,7 @@ import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
+import { useReceipts } from "../../context/useReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import { PLANT_COUNTRIES, type Plant, type PlantCountry } from "../../types/settings";
@@ -33,6 +34,7 @@ export function PlantsSection() {
   const canWrite = can("settings.write");
 
   const [busyId, setBusyId] = useState<number | null>(null);
+  const receipts = useReceipts();
 
   const [search, setSearch] = useState("");
   const [country, setCountry] = useState<PlantCountry | "todos">("todos");
@@ -88,7 +90,14 @@ export function PlantsSection() {
         setBusyId(plant.id);
         try {
           await settingsApi.plants.remove(plant.id);
+          receipts.done({ action: "eliminar-planta", title: "Planta eliminada", detail: plant.name });
           refresh();
+        } catch (err) {
+          receipts.failed({
+            action: "eliminar-planta",
+            title: "No se pudo eliminar la planta",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyId(null);
         }
@@ -122,7 +131,18 @@ export function PlantsSection() {
             managerStaffId: current.managerStaffId,
             isActive: !current.isActive,
           });
+          receipts.done({
+            action: current.isActive ? "reactivar-planta" : "desactivar-planta",
+            title: current.isActive ? "Planta desactivada" : "Planta reactivada",
+            detail: current.name,
+          });
           refresh();
+        } catch (err) {
+          receipts.failed({
+            action: "toggle-planta",
+            title: plant.isActive ? "No se pudo desactivar la planta" : "No se pudo reactivar la planta",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyId(null);
         }
@@ -329,7 +349,15 @@ export function PlantsSection() {
         <PlantModal
           plant={modal === "nueva" ? undefined : modal}
           onClose={() => setModal(null)}
-          onSaved={refresh}
+          onSaved={(saved) => {
+            const isEdit = modal !== "nueva";
+            receipts.done({
+              action: isEdit ? "editar-planta" : "crear-planta",
+              title: isEdit ? "Planta actualizada" : "Planta creada exitosamente",
+              detail: saved.name,
+            });
+            refresh();
+          }}
         />
       )}
 

@@ -19,6 +19,7 @@ import { SearchInput } from "../../components/ui/SearchInput";
 import { SegmentedFilter } from "../../components/ui/SegmentedFilter";
 import { Select } from "../../components/ui/Select";
 import { Spinner } from "../../components/ui/Spinner";
+import { useReceipts } from "../../context/useReceipts";
 import {
   DEFAULT_PERMISSION_GROUPS,
   flattenPermissions,
@@ -53,6 +54,7 @@ export function StaffEffectivePermissionsCard({
   catalogGroups = DEFAULT_PERMISSION_GROUPS,
   onReload,
 }: StaffEffectivePermissionsCardProps) {
+  const receipts = useReceipts();
   const [filter, setFilter] = useState<FilterState>("todos");
   const [search, setSearch] = useState("");
   const [selectedModule, setSelectedModule] = useState<string>("todos");
@@ -179,8 +181,11 @@ export function StaffEffectivePermissionsCard({
       if (onReload) {
         await onReload();
       }
+      const titles = { grant: "Permiso otorgado", revoke: "Permiso restringido", reset: "Permiso restablecido" };
+      receipts.done({ action: "permiso-colaborador", title: titles[action], detail: permissionKey });
     } catch {
       setActionError("No se pudo actualizar la personalización del permiso. Intenta de nuevo.");
+      receipts.failed({ action: "permiso-colaborador", title: "No se pudo actualizar el permiso", detail: permissionKey });
     } finally {
       setBusyKey(null);
     }

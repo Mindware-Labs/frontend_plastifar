@@ -41,6 +41,7 @@ import type {
   DepartmentType,
 } from "../../types/api";
 import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
+import { useReceipts } from "../../context/useReceipts";
 import { useReferenceData } from "../settings/catalogState";
 import { DepartmentModal } from "./DepartmentModal";
 
@@ -64,6 +65,7 @@ export function DepartmentsPage() {
   // Selección múltiple y acciones en lote
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const receipts = useReceipts();
   const [bulkSedeModalOpen, setBulkSedeModalOpen] = useState(false);
   const [selectedBulkSedeId, setSelectedBulkSedeId] = useState<string>("");
 
@@ -186,10 +188,26 @@ export function DepartmentsPage() {
         action,
         sedeId,
       });
+      const count = selectedIds.size;
+      const titles = {
+        activate: "Departamentos activados",
+        deactivate: "Departamentos desactivados",
+        "set-sede": "Sede asignada",
+        delete: "Departamentos eliminados",
+      };
+      receipts.done({
+        action: `${action}-departamentos-lote`,
+        title: titles[action],
+        detail: `${count} ${count === 1 ? "departamento" : "departamentos"}`,
+      });
       setSelectedIds(new Set());
       refresh();
     } catch (err) {
-      console.error(err);
+      receipts.failed({
+        action: `${action}-departamentos-lote`,
+        title: "No se pudo completar la acción en lote",
+        detail: err instanceof Error ? err.message : undefined,
+      });
     } finally {
       setBulkBusy(false);
     }
@@ -197,26 +215,33 @@ export function DepartmentsPage() {
 
   function askBulkActivate() {
     setConfirmation({
-      icon: Power,
+      tone: "warn",
+      icon: CheckCircle2,
       title: `Activar ${selectedIds.size} departamentos`,
-      description: `¿Deseas activar los ${selectedIds.size} departamentos seleccionados? Volverán a estar disponibles en la creación de tickets.`,
+      description: (
+        <>
+          Los <strong className="font-semibold text-ink">{selectedIds.size}</strong> departamentos
+          seleccionados volverán a estar disponibles al asignar personal y encolar tickets.
+        </>
+      ),
       confirmLabel: "Activar",
-      onConfirm: async () => {
-        await runBulk("activate");
-      },
+      onConfirm: () => runBulk("activate"),
     });
   }
 
   function askBulkDeactivate() {
     setConfirmation({
       tone: "warn",
-      icon: Power,
+      icon: Ban,
       title: `Desactivar ${selectedIds.size} departamentos`,
-      description: `¿Estás seguro de que deseas desactivar los ${selectedIds.size} departamentos seleccionados? Ya no se ofrecerán al asignar tickets.`,
+      description: (
+        <>
+          Dejarán de ofrecerse al asignar tickets nuevos. Quien ya los tenga asignados los
+          conserva.
+        </>
+      ),
       confirmLabel: "Desactivar",
-      onConfirm: async () => {
-        await runBulk("deactivate");
-      },
+      onConfirm: () => runBulk("deactivate"),
     });
   }
 
@@ -225,11 +250,14 @@ export function DepartmentsPage() {
       tone: "danger",
       icon: Trash2,
       title: `Eliminar ${selectedIds.size} departamentos`,
-      description: `¿Estás seguro de que deseas eliminar los ${selectedIds.size} departamentos seleccionados? Sólo se eliminarán los que no tengan colaboradores asociados.`,
+      description: (
+        <>
+          Solo se eliminan los que no tengan colaboradores asociados. El resto se omitirá; desactívalos
+          si ya no los necesitas.
+        </>
+      ),
       confirmLabel: "Eliminar seleccionados",
-      onConfirm: async () => {
-        await runBulk("delete");
-      },
+      onConfirm: () => runBulk("delete"),
     });
   }
 
@@ -239,7 +267,7 @@ export function DepartmentsPage() {
   function askToggle(department: DepartmentResponse) {
     setConfirmation({
       tone: "warn",
-      icon: Power,
+      icon: department.isActive ? Ban : CheckCircle2,
       title: department.isActive ? "Desactivar departamento" : "Reactivar departamento",
       description: department.isActive ? (
         <>
@@ -278,7 +306,20 @@ export function DepartmentsPage() {
             mailboxId: current.mailboxId ?? null,
             managerStaffId: current.managerStaffId ?? null,
           });
+          receipts.done({
+            action: current.isActive ? "reactivar-departamento" : "desactivar-departamento",
+            title: current.isActive ? "Departamento desactivado" : "Departamento reactivado",
+            detail: current.name,
+          });
           refresh();
+        } catch (err) {
+          receipts.failed({
+            action: "toggle-departamento",
+            title: department.isActive
+              ? "No se pudo desactivar el departamento"
+              : "No se pudo reactivar el departamento",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyId(null);
         }
@@ -302,7 +343,14 @@ export function DepartmentsPage() {
         setBusyId(department.id);
         try {
           await departmentsApi.remove(department.id);
+          receipts.done({ action: "eliminar-departamento", title: "Departamento eliminado", detail: department.name });
           refresh();
+        } catch (err) {
+          receipts.failed({
+            action: "eliminar-departamento",
+            title: "No se pudo eliminar el departamento",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyId(null);
         }
@@ -685,7 +733,15 @@ export function DepartmentsPage() {
         <DepartmentModal
           department={modal === "nuevo" ? undefined : modal}
           onClose={() => setModal(null)}
-          onSaved={refresh}
+          onSaved={(name) => {
+            const isEdit = modal !== "nuevo";
+            receipts.done({
+              action: isEdit ? "editar-departamento" : "crear-departamento",
+              title: isEdit ? "Departamento actualizado" : "Departamento creado exitosamente",
+              detail: name,
+            });
+            refresh();
+          }}
         />
       )}
 

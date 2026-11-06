@@ -121,8 +121,8 @@ export function ReasonModal({
       description={description}
       onClose={onClose}
       footer={
-        <>
-          <Button type="button" variant="secondary" onClick={onClose}>
+        <div className="flex w-full items-center justify-end gap-2">
+          <Button type="button" variant="secondary" size="sm" onClick={onClose}>
             {cancelLabel}
           </Button>
           <SubmitValidationButton
@@ -136,7 +136,7 @@ export function ReasonModal({
           >
             {submitLabel}
           </SubmitValidationButton>
-        </>
+        </div>
       }
     >
       <form id={formId} onSubmit={handleSubmit(submit)} noValidate className="flex flex-col gap-4">

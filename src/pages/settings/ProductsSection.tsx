@@ -16,6 +16,7 @@ import { TableSkeleton } from "../../components/ui/Skeleton";
 import { StatusDot } from "../../components/ui/StatusDot";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
+import { useReceipts } from "../../context/useReceipts";
 import { usePagedList } from "../../hooks/usePagedList";
 import { usePermissions } from "../../hooks/usePermissions";
 import {
@@ -48,6 +49,7 @@ export function ProductsSection() {
   const canWrite = can("settings.write");
 
   const [busyId, setBusyId] = useState<number | null>(null);
+  const receipts = useReceipts();
 
   const [search, setSearch] = useState("");
   const [plantId, setPlantId] = useState(TODOS);
@@ -133,7 +135,18 @@ export function ProductsSection() {
             plantId: current.plantId,
             isActive: !current.isActive,
           });
+          receipts.done({
+            action: current.isActive ? "reactivar-producto" : "desactivar-producto",
+            title: current.isActive ? "Producto desactivado" : "Producto reactivado",
+            detail: `${current.code} · ${current.name}`,
+          });
           refresh();
+        } catch (err) {
+          receipts.failed({
+            action: "toggle-producto",
+            title: product.isActive ? "No se pudo desactivar el producto" : "No se pudo reactivar el producto",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyId(null);
         }
@@ -162,7 +175,14 @@ export function ProductsSection() {
         setBusyId(product.id);
         try {
           await settingsApi.products.remove(product.id);
+          receipts.done({ action: "eliminar-producto", title: "Producto eliminado", detail: `${product.code} · ${product.name}` });
           refresh();
+        } catch (err) {
+          receipts.failed({
+            action: "eliminar-producto",
+            title: "No se pudo eliminar el producto",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyId(null);
         }
@@ -393,7 +413,15 @@ export function ProductsSection() {
           plants={plantsRef.data}
           referencesFailed={referencesFailed}
           onClose={() => setModal(null)}
-          onSaved={refresh}
+          onSaved={(saved) => {
+            const isEdit = modal !== "nuevo";
+            receipts.done({
+              action: isEdit ? "editar-producto" : "crear-producto",
+              title: isEdit ? "Producto actualizado" : "Producto creado exitosamente",
+              detail: `${saved.code} · ${saved.name}`,
+            });
+            refresh();
+          }}
         />
       )}
 

@@ -12,6 +12,7 @@ import { FormDivider } from "../../components/ui/FormDivider";
 import { Modal } from "../../components/ui/Modal";
 import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
 import { useAuth } from "../../context/useAuth";
+import { useReceipts } from "../../context/useReceipts";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { departmentPathOptions } from "../../lib/departments";
 import { buildValidationItems, focusFormField } from "../../lib/validationItems";
@@ -60,6 +61,7 @@ interface StaffModalProps {
 /** Alta y edición de personal con diseño y validación siguiendo el estándar de ClientModal. */
 export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalProps) {
   const { user } = useAuth();
+  const receipts = useReceipts();
   const [formError, setFormError] = useState<string | null>(null);
   const [clientModalOpen, setClientModalOpen] = useState(false);
   const [pendingValues, setPendingValues] = useState<FormValues | null>(null);
@@ -227,6 +229,11 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
           }
         }
 
+        receipts.done({
+          action: "editar-colaborador",
+          title: "Colaborador actualizado",
+          detail: `${saved.firstName} ${saved.lastName}`,
+        });
         onSaved(saved);
       } else {
         const saved = await staffApi.create({
@@ -238,6 +245,11 @@ export function StaffModal({ departments, staff, onClose, onSaved }: StaffModalP
           isAdmin: values.isAdmin,
           isSalesRep: values.isSalesRep,
           assignClientId: assignClientId ?? null,
+        });
+        receipts.done({
+          action: "crear-colaborador",
+          title: "Colaborador creado exitosamente",
+          detail: `${saved.firstName} ${saved.lastName}`,
         });
         onSaved(saved);
       }

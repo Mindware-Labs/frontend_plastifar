@@ -59,7 +59,7 @@ interface DepartmentModalProps {
   department?: DepartmentResponse;
   all?: DepartmentResponse[];
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (name: string) => void;
 }
 
 export function DepartmentModal({ department, onClose, onSaved }: DepartmentModalProps) {
@@ -181,7 +181,7 @@ export function DepartmentModal({ department, onClose, onSaved }: DepartmentModa
     try {
       if (isEdit) await departmentsApi.update(department.id, request);
       else await departmentsApi.create(request);
-      onSaved();
+      onSaved(request.name);
       requestClose();
     } catch (err) {
       setFormError(

@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { cannedApi, cannedCategoriesApi } from "../../api/canned";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { SEGMENTED_TAB_COUNT_BADGE_CLASS } from "../../components/ui/SegmentedTabs";
+import { useReceipts } from "../../context/useReceipts";
 import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
@@ -37,6 +38,7 @@ import { CategoriasTab } from "./CategoriasTab";
 export function RespuestasPage() {
   const { user } = useAuth();
   const { can } = usePermissions();
+  const receipts = useReceipts();
   const canMailSend = can("mail.send");
 
   const [activeTab, setActiveTab] = useState<"plantillas" | "categorias">("plantillas");
@@ -154,7 +156,6 @@ export function RespuestasPage() {
     setConfirmation({
       tone: "danger",
       icon: Trash2,
-      eyebrow: "Correo · Plantillas",
       title: "Eliminar plantilla",
       description: (
         <>
@@ -167,11 +168,18 @@ export function RespuestasPage() {
         setBusyId(item.id);
         try {
           await cannedApi.remove(item.id);
+          receipts.done({ action: "eliminar-plantilla", title: "Plantilla eliminada", detail: cleanTitle });
           if (previewItem?.id === item.id) {
             setPreviewItem(null);
           }
           setSelectedIds((prev) => prev.filter((id) => id !== item.id));
           reloadAll();
+        } catch (err) {
+          receipts.failed({
+            action: "eliminar-plantilla",
+            title: "No se pudo eliminar la plantilla",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyId(null);
         }
@@ -186,7 +194,6 @@ export function RespuestasPage() {
     setConfirmation({
       tone: "danger",
       icon: Trash2,
-      eyebrow: "Correo · Plantillas en lote",
       title: `Eliminar ${count} ${count === 1 ? "plantilla" : "plantillas"}`,
       description: (
         <>
@@ -198,18 +205,32 @@ export function RespuestasPage() {
       onConfirm: async () => {
         try {
           await cannedApi.bulkDelete(selectedIds);
-          setSelectedIds([]);
-          reloadAll();
+          receipts.done({
+            action: "eliminar-plantillas-lote",
+            title: "Plantillas eliminadas",
+            detail: `${count} ${count === 1 ? "plantilla" : "plantillas"}`,
+          });
         } catch {
           // Fallback individual si falla en lote
+          let deleted = 0;
           for (const id of selectedIds) {
             try {
               await cannedApi.remove(id);
+              deleted++;
             } catch {}
           }
-          setSelectedIds([]);
-          reloadAll();
+          if (deleted === count) {
+            receipts.done({ action: "eliminar-plantillas-lote", title: "Plantillas eliminadas", detail: `${count} plantillas` });
+          } else {
+            receipts.failed({
+              action: "eliminar-plantillas-lote",
+              title: "No se pudieron eliminar todas las plantillas",
+              detail: `Se eliminaron ${deleted} de ${count}`,
+            });
+          }
         }
+        setSelectedIds([]);
+        reloadAll();
       },
     });
   }

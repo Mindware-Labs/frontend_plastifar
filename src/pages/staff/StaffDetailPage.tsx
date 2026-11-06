@@ -17,6 +17,7 @@ import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { StaffDetailSkeleton } from "../../components/ui/Skeleton";
 import { RowAction } from "../../components/ui/RowAction";
 import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
+import { useReceipts } from "../../context/useReceipts";
 import { useConfigNoticeReceipt } from "../../hooks/useNoticeReceipts";
 import { usePermissions } from "../../hooks/usePermissions";
 import { departmentPaths } from "../../lib/departments";
@@ -49,6 +50,7 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
   const [staff, setStaff] = useState<StaffDetail | null>(null);
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
   const [catalogGroups, setCatalogGroups] = useState<PermissionGroup[]>([]);
+  const receipts = useReceipts();
   const [error, setError] = useState<string | null>(null);
   const [referenceError, setReferenceError] = useState<string | null>(null);
   const [busyDepartmentId, setBusyDepartmentId] = useState<number | null>(null);
@@ -126,8 +128,15 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
         isPrimary: true,
       });
       await reload();
+      receipts.done({
+        action: "departamento-principal",
+        title: "Departamento principal actualizado",
+        detail: departmentLabel(access),
+      });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo cambiar el departamento principal");
+      const message = err instanceof ApiError ? err.message : "No se pudo cambiar el departamento principal";
+      setError(message);
+      receipts.failed({ action: "departamento-principal", title: "No se pudo cambiar el departamento principal", detail: message });
     } finally {
       setBusyDepartmentId(null);
     }
@@ -154,6 +163,13 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
         try {
           await staffApi.revokeDepartmentAccess(staffId, access.departmentId);
           await reload();
+          receipts.done({ action: "revocar-acceso", title: "Acceso revocado", detail: departmentLabel(access) });
+        } catch (err) {
+          receipts.failed({
+            action: "revocar-acceso",
+            title: "No se pudo revocar el acceso",
+            detail: err instanceof Error ? err.message : undefined,
+          });
         } finally {
           setBusyDepartmentId(null);
         }

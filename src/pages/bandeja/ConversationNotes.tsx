@@ -21,6 +21,7 @@ import {
 import { ApiError } from "../../api/client";
 import { emailsApi } from "../../api/emails";
 import { useAuth } from "../../context/useAuth";
+import { useReceipts } from "../../context/useReceipts";
 import { autoResizeTextarea } from "../../lib/autoResizeTextarea";
 import type { EmailNoteResponse } from "../../types/api";
 import { InternalNoteThread } from "../../components/notes/InternalNoteThread";
@@ -76,6 +77,7 @@ function formatNoteTime(iso: string): string {
 export const ConversationNotes = forwardRef<ConversationNotesHandle, ConversationNotesProps>(
   function ConversationNotes({ emailId, onNotesCountChange }, ref) {
   const { user } = useAuth();
+  const receipts = useReceipts();
   const [notes, setNotes] = useState<EmailNoteResponse[] | null>(null);
   const [open, setOpen] = useState(false);
   const [originX, setOriginX] = useState(0);
@@ -202,6 +204,7 @@ export const ConversationNotes = forwardRef<ConversationNotesHandle, Conversatio
       const nextNotes = [...(notes ?? []), newNote];
       setNotes(nextNotes);
       onNotesCountChange?.(nextNotes.length);
+      receipts.done({ action: "agregar-nota", title: "Nota agregada" });
       closeAddForm();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo guardar la nota");
@@ -356,6 +359,7 @@ export const ConversationNotes = forwardRef<ConversationNotesHandle, Conversatio
               canReply={Boolean(user)}
               onReply={async (parentId, body) => {
                 const created = await emailsApi.addNote(emailId, body, parentId);
+                receipts.done({ action: "responder-nota", title: "Respuesta agregada" });
                 setNotes((prev) => {
                   const list = prev ?? [];
                   const next = mergeNotes(list, [created]);
@@ -428,6 +432,7 @@ interface AddNotePanelProps {
 
 /** El creador se mantiene al pie de la conversacion, donde estaba antes. */
 export function AddNotePanel({ emailId, onNoteAdded }: AddNotePanelProps) {
+  const receipts = useReceipts();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -481,6 +486,7 @@ export function AddNotePanel({ emailId, onNoteAdded }: AddNotePanelProps) {
     setError(null);
     try {
       const newNote = await emailsApi.addNote(emailId, body);
+      receipts.done({ action: "agregar-nota", title: "Nota agregada" });
       closeForm(() => onNoteAdded(newNote));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo guardar la nota");

@@ -1849,6 +1849,7 @@ export function EmailDetailPane({
 
       {confirmingDelete && (
         <ConfirmDialog
+          tone="danger"
           eyebrow="Papelera"
           icon={Trash2}
           title="Eliminar definitivamente"
