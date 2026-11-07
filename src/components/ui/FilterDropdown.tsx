@@ -203,7 +203,7 @@ export function FilterDropdown({
             {title && (
               <div
                 data-motion-item
-                className="select-none px-2.5 pt-1.5 pb-1 text-[11px] font-medium text-zinc-400"
+                className="select-none px-2.5 pt-1.5 pb-1 text-[11px] font-medium text-faint"
               >
                 {title}
               </div>
@@ -217,7 +217,7 @@ export function FilterDropdown({
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder={searchPlaceholder}
-                    className="w-full rounded-md border border-zinc-200 bg-zinc-50/70 py-1 pl-7 pr-6 text-[12px] text-zinc-900 placeholder:text-zinc-400 outline-none focus:border-brand-red focus:bg-white focus:ring-1 focus:ring-brand-red/20 transition-all"
+                    className="w-full rounded-md border border-zinc-200 bg-zinc-50/70 py-1 pl-7 pr-6 text-[12px] text-zinc-900 placeholder:text-faint outline-none focus:border-brand-red focus:bg-white focus:ring-1 focus:ring-brand-red/20 transition-all"
                     autoFocus
                     onKeyDown={(e) => {
                       if (e.key === "Escape") {
@@ -231,7 +231,7 @@ export function FilterDropdown({
                     <button
                       type="button"
                       onClick={() => setSearchTerm("")}
-                      className="absolute right-1.5 flex h-4 w-4 items-center justify-center rounded text-zinc-400 hover:text-zinc-600 cursor-pointer"
+                      className="absolute right-1.5 flex h-4 w-4 items-center justify-center rounded text-faint hover:text-zinc-600 cursor-pointer"
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -241,7 +241,7 @@ export function FilterDropdown({
             )}
             <div className="max-h-[280px] overflow-y-auto flex flex-col gap-0.5">
               {filteredOptions.length === 0 ? (
-                <div className="px-3 py-3 text-center text-[12px] text-zinc-400">
+                <div className="px-3 py-3 text-center text-[12px] text-faint">
                   No se encontraron resultados
                 </div>
               ) : (
@@ -517,7 +517,7 @@ export function LookupFilterDropdown({
             {title && (
               <div
                 data-motion-item
-                className="select-none px-2.5 pt-1.5 pb-0.5 text-[11px] font-medium text-zinc-400"
+                className="select-none px-2.5 pt-1.5 pb-0.5 text-[11px] font-medium text-faint"
               >
                 {title}
               </div>
@@ -535,7 +535,7 @@ export function LookupFilterDropdown({
                 onChange={(event) => setTerm(event.target.value)}
                 placeholder={searchPlaceholder}
                 aria-label={searchPlaceholder}
-                className="h-7 w-full rounded-md border border-transparent bg-zinc-50/80 pl-7 pr-2 text-[12.5px] text-zinc-800 outline-none placeholder:text-zinc-400 focus:border-zinc-200 focus:bg-white"
+                className="h-7 w-full rounded-md border border-transparent bg-zinc-50/80 pl-7 pr-2 text-[12.5px] text-zinc-800 outline-none placeholder:text-faint focus:border-zinc-200 focus:bg-white"
               />
             </div>
 
@@ -590,7 +590,7 @@ export function LookupFilterDropdown({
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate">{option.label}</span>
                       {option.hint && (
-                        <span className="truncate text-[11px] font-normal text-zinc-400">
+                        <span className="truncate text-[11px] font-normal text-faint">
                           {option.hint}
                         </span>
                       )}
@@ -604,7 +604,7 @@ export function LookupFilterDropdown({
             </div>
 
             {(failed || isLoading || result.options.length === 0 || result.hasMore) && (
-              <div className="border-t border-zinc-100 px-2.5 py-1.5 text-[11px] text-zinc-400">
+              <div className="border-t border-zinc-100 px-2.5 py-1.5 text-[11px] text-faint">
                 {failed
                   ? "No se pudo buscar. Intenta de nuevo."
                   : isLoading
@@ -766,7 +766,7 @@ export function DateRangeFilterDropdown({
             className={`${panelClasses(exiting)} p-3 flex flex-col gap-2.5`}
           >
             {title && (
-              <div className="select-none text-[10.5px] font-heading font-bold uppercase tracking-wider text-zinc-400">
+              <div className="select-none text-[10.5px] font-heading font-bold uppercase tracking-wider text-faint">
                 {title}
               </div>
             )}

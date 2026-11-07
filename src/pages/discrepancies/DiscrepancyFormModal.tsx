@@ -285,7 +285,7 @@ function parseNote(rawNote: string | null | undefined): { date: string; note: st
 function FormDivider({ title }: { title: string }) {
   return (
     <div className="flex items-center gap-2 pt-2 border-t border-zinc-100 first:border-0 first:pt-0">
-      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400 select-none">
+      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-faint select-none">
         {title}
       </span>
       <div className="h-px flex-1 bg-zinc-100" />
@@ -335,12 +335,12 @@ function StepperButton({
       <span className="flex flex-col text-left">
         <span
           className={`text-[12px] font-heading font-semibold transition-colors ${
-            isCurrent ? "text-zinc-900" : isDone ? "text-zinc-700" : "text-zinc-400"
+            isCurrent ? "text-zinc-900" : isDone ? "text-zinc-700" : "text-faint"
           }`}
         >
           {title}
         </span>
-        <span className="hidden text-[10px] text-zinc-400 sm:inline">{caption}</span>
+        <span className="hidden text-[10px] text-faint sm:inline">{caption}</span>
       </span>
     </button>
   );
@@ -998,7 +998,7 @@ export function DiscrepancyFormModal({
                   <span className="shrink-0 font-mono text-xs font-bold text-zinc-900 bg-zinc-100 border border-zinc-200/80 px-2.5 py-1 rounded-md">
                     {parsedTicketInfo.code || ticketIdValue}
                   </span>
-                  <span className="text-[11.5px] text-zinc-400 truncate">
+                  <span className="text-[11.5px] text-faint truncate">
                     Caso registrado
                   </span>
                 </div>
@@ -1104,7 +1104,7 @@ export function DiscrepancyFormModal({
         </div>
 
         {/** Pie unificado informativo y sobrio */}
-        <div className="bg-zinc-50/50 px-5 sm:px-6 py-2.5 border-t border-zinc-100 text-[11px] text-zinc-400 flex flex-wrap items-center justify-between gap-2">
+        <div className="bg-zinc-50/50 px-5 sm:px-6 py-2.5 border-t border-zinc-100 text-[11px] text-faint flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
             <Info className="size-3.5 shrink-0 text-zinc-400" />
             <span>Documenta diferencias entre la carga facturada y la despachada físicamente.</span>
@@ -1114,7 +1114,7 @@ export function DiscrepancyFormModal({
               <span>{recommendedProductOptions.length} producto{recommendedProductOptions.length === 1 ? "" : "s"} para revisar en el Paso 2</span>
             </div>
           ) : (
-            <div className="hidden sm:flex items-center gap-1.5 text-zinc-400">
+            <div className="hidden sm:flex items-center gap-1.5 text-faint">
               <span>Trazabilidad de precinto y contenedor</span>
             </div>
           )}
@@ -1136,7 +1136,7 @@ export function DiscrepancyFormModal({
         <div className="flex min-w-0 flex-col gap-2">
           <div className="flex items-center justify-between">
             <FormDivider title="Líneas en discrepancia (Formato PF-FOR-291)" />
-            <span className="text-xs font-medium text-zinc-400 select-none">
+            <span className="text-xs font-medium text-faint select-none">
               {fields.length} {fields.length === 1 ? "línea registrada" : "líneas registradas"}
             </span>
           </div>
@@ -1218,7 +1218,7 @@ export function DiscrepancyFormModal({
                           handleRemoveLine(idx);
                         }}
                         title={`Quitar línea #${idx + 1}`}
-                        className="-mr-1 ml-0.5 cursor-pointer rounded p-0.5 text-zinc-400 opacity-60 transition-all hover:bg-rose-100 hover:text-brand-red group-hover:opacity-100"
+                        className="-mr-1 ml-0.5 cursor-pointer rounded p-0.5 text-faint opacity-60 transition-all hover:bg-rose-100 hover:text-brand-red group-hover:opacity-100"
                       >
                         <X className="size-3" />
                       </span>
@@ -1272,7 +1272,7 @@ export function DiscrepancyFormModal({
           className="min-h-[64px] resize-none overflow-hidden text-[12.5px] py-2"
           placeholder="Observaciones de entrega, horarios de recepción, particularidades de la carga, precinto o contenedor…"
           hint={
-            <span className="flex items-center justify-between text-[11px] text-zinc-400">
+            <span className="flex items-center justify-between text-[11px] text-faint">
               <span>Contexto de la carga, contenedor o precinto</span>
               <span
                 className={`tabular-nums ${
@@ -1338,11 +1338,11 @@ export function DiscrepancyFormModal({
               <th className="py-2.5 pl-3 pr-2 w-10 text-center whitespace-nowrap">#</th>
               <th className="py-2.5 px-3 whitespace-nowrap">Puntos de Seguridad a Evaluar</th>
               <th className="py-2.5 px-2 w-28 text-center whitespace-nowrap">
-                <span className="block text-[9px] text-zinc-400 font-normal lowercase tracking-normal">marcar X</span>
+                <span className="block text-[9px] text-faint font-normal lowercase tracking-normal">marcar X</span>
                 <span className="text-brand-red">Positivo</span>
               </th>
               <th className="py-2.5 px-2 w-28 text-center whitespace-nowrap">
-                <span className="block text-[9px] text-zinc-400 font-normal lowercase tracking-normal">marcar X</span>
+                <span className="block text-[9px] text-faint font-normal lowercase tracking-normal">marcar X</span>
                 <span>Negativo</span>
               </th>
             </tr>
@@ -1365,14 +1365,14 @@ export function DiscrepancyFormModal({
                   <td
                     id={`security-num-${item.itemNumber}`}
                     aria-label={`Punto ${item.itemNumber}`}
-                    className="py-2.5 pl-3 pr-2 text-center font-mono text-[11px] font-semibold text-zinc-400"
+                    className="py-2.5 pl-3 pr-2 text-center font-mono text-[11px] font-semibold text-faint"
                   >
                     {item.itemNumber}
                   </td>
                   <td className="py-2.5 px-3 leading-relaxed text-zinc-800">
                     <p id={`security-item-${item.itemNumber}`}>{item.text}</p>
                     {isNinth && !anyPositive && (
-                      <span className="mt-0.5 inline-block text-[11px] text-zinc-400 italic">
+                      <span className="mt-0.5 inline-block text-[11px] text-faint italic">
                         (Aplica únicamente cuando al menos un punto del 1 al 8 es Positivo)
                       </span>
                     )}
@@ -1451,7 +1451,7 @@ export function DiscrepancyFormModal({
   const renderFooterLeft = () => (
     <>
       {step === 3 ? (
-        <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
+        <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-faint select-none">
           <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
             Ctrl
           </kbd>
@@ -1462,7 +1462,7 @@ export function DiscrepancyFormModal({
           <span className="ml-0.5">para finalizar</span>
         </span>
       ) : (
-        <span className="text-[11.5px] text-zinc-400">
+        <span className="text-[11.5px] text-faint">
           Paso {step} de 3
         </span>
       )}
@@ -1841,7 +1841,7 @@ function DiscrepancyLineCard({
               </span>
             )
           ) : (
-            <span className="text-[11px] text-zinc-400">
+            <span className="text-[11px] text-faint">
               (Indica la cantidad de {discrepancyType})
             </span>
           )}
@@ -1851,7 +1851,7 @@ function DiscrepancyLineCard({
           <button
             type="button"
             onClick={onRemove}
-            className="inline-flex items-center gap-1 text-[11.5px] font-medium text-zinc-400 hover:text-brand-red px-2 py-1 rounded hover:bg-rose-50 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1 text-[11.5px] font-medium text-faint hover:text-brand-red px-2 py-1 rounded hover:bg-rose-50 transition-colors cursor-pointer"
             title={`Quitar línea ${index + 1}`}
           >
             <Trash2 className="size-3.5" />
@@ -2095,7 +2095,7 @@ function DiscrepancyLineCard({
                         tabIndex={-1}
                         title="Escribir nombre manualmente"
                         aria-label="Escribir nombre manualmente"
-                        className="flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
+                        className="flex h-5.5 w-5.5 items-center justify-center rounded text-faint hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
                       >
                         <PenLine className="h-3.5 w-3.5" />
                       </button>
@@ -2119,7 +2119,7 @@ function DiscrepancyLineCard({
                   tabIndex={-1}
                   title="Buscar usuario en el sistema"
                   aria-label="Buscar usuario en el sistema"
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-5.5 w-5.5 items-center justify-center rounded text-faint hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
                 >
                   <Users className="h-3.5 w-3.5" />
                 </button>
@@ -2151,7 +2151,7 @@ function DiscrepancyLineCard({
               className="font-heading text-[11.5px] font-semibold text-faint flex items-center justify-between"
             >
               <span>Supervisor</span>
-              <span className="text-[10px] text-zinc-400 font-normal">Opcional</span>
+              <span className="text-[10px] text-faint font-normal">Opcional</span>
             </label>
 
             {supervisorMode === "sistema" ? (
@@ -2192,7 +2192,7 @@ function DiscrepancyLineCard({
                         tabIndex={-1}
                         title="Escribir nombre manualmente"
                         aria-label="Escribir nombre manualmente"
-                        className="flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
+                        className="flex h-5.5 w-5.5 items-center justify-center rounded text-faint hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
                       >
                         <PenLine className="h-3.5 w-3.5" />
                       </button>
@@ -2216,7 +2216,7 @@ function DiscrepancyLineCard({
                   tabIndex={-1}
                   title="Buscar usuario en el sistema"
                   aria-label="Buscar usuario en el sistema"
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-5.5 w-5.5 items-center justify-center rounded text-faint hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
                 >
                   <Users className="h-3.5 w-3.5" />
                 </button>

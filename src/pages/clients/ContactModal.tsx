@@ -68,7 +68,7 @@ const fieldRules: FieldRule<keyof FormValues>[] = [
 function FormDivider({ title }: { title: string }) {
   return (
     <div className="flex items-center gap-2 border-t border-zinc-100 pt-2 first:border-0 first:pt-0">
-      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400 select-none">
+      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-faint select-none">
         {title}
       </span>
       <div className="h-px flex-1 bg-zinc-100" />
@@ -187,7 +187,7 @@ export function ContactModal({ clientId, contact, isFirst, onClose, onSaved }: C
       onRequestClose={requestClose}
       footer={
         <div className="flex w-full items-center justify-between gap-3">
-          <span className="hidden select-none items-center gap-1 text-[11px] text-zinc-400 sm:inline-flex">
+          <span className="hidden select-none items-center gap-1 text-[11px] text-faint sm:inline-flex">
             <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 font-mono text-[10px] text-zinc-500">
               Ctrl
             </kbd>

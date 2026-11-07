@@ -150,7 +150,7 @@ export function StaffActivityTab({ staffId, staffName }: StaffActivityTabProps) 
         title={`Historial de actividad de ${staffName}`}
         aside={
           data && (
-            <span className="text-[11.5px] font-medium text-zinc-400 tabular-nums">
+            <span className="text-[11.5px] font-medium text-faint tabular-nums">
               {data.total} {data.total === 1 ? "registro" : "registros"}
             </span>
           )
@@ -212,7 +212,7 @@ export function StaffActivityTab({ staffId, staffName }: StaffActivityTabProps) 
 
                         <time
                           dateTime={item.timestamp}
-                          className="font-mono text-[11px] text-zinc-400 tabular-nums shrink-0"
+                          className="font-mono text-[11px] text-faint tabular-nums shrink-0"
                           title={new Date(item.timestamp).toLocaleString("es-DO")}
                         >
                           {formatDateTime(item.timestamp)}
@@ -254,7 +254,7 @@ export function StaffActivityTab({ staffId, staffName }: StaffActivityTabProps) 
             <p className="mt-2.5 text-[13.5px] font-medium text-zinc-700">
               No se encontraron registros de actividad
             </p>
-            <p className="mt-1 text-[12px] text-zinc-400 max-w-sm mx-auto">
+            <p className="mt-1 text-[12px] text-faint max-w-sm mx-auto">
               {search
                 ? `No hay acciones que coincidan con la búsqueda "${search}".`
                 : category !== "all"

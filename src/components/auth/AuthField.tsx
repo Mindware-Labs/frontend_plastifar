@@ -45,7 +45,7 @@ const boxClass = (invalid: boolean) =>
 
 const iconClass = (invalid: boolean) =>
   `mr-3 shrink-0 transition-colors ${
-    invalid ? "text-brand-red" : "text-zinc-400 group-focus-within:text-brand-red"
+    invalid ? "text-brand-red" : "text-faint group-focus-within:text-brand-red"
   }`;
 
 /** Ref local para enfocar desde el relevo; la del formulario recibe el mismo elemento. */
@@ -169,7 +169,7 @@ export const AuthField = forwardRef<HTMLInputElement, AuthFieldProps>(function A
           ref={inputRef}
           id={inputId}
           placeholder={placeholder ?? label}
-          className={`h-full w-full min-w-0 bg-transparent text-[14px] font-normal text-zinc-900 placeholder:text-zinc-400 placeholder:font-normal outline-none ${className}`}
+          className={`h-full w-full min-w-0 bg-transparent text-[14px] font-normal text-zinc-900 placeholder:text-faint placeholder:font-normal outline-none ${className}`}
           aria-invalid={isInvalid || notice != null}
           aria-describedby={error ? errorId : notice != null ? noticeId : undefined}
           {...props}
@@ -236,7 +236,7 @@ export const AuthPasswordField = forwardRef<HTMLInputElement, AuthPasswordFieldP
             id={inputId}
             type={visible ? "text" : "password"}
             placeholder={placeholder ?? label}
-            className={`h-full w-full min-w-0 bg-transparent text-[14px] font-normal text-zinc-900 placeholder:text-zinc-400 placeholder:font-normal outline-none ${
+            className={`h-full w-full min-w-0 bg-transparent text-[14px] font-normal text-zinc-900 placeholder:text-faint placeholder:font-normal outline-none ${
               visible ? "" : "tracking-[0.14em]"
             } ${className}`}
             aria-invalid={isInvalid || notice != null}
@@ -261,7 +261,7 @@ export const AuthPasswordField = forwardRef<HTMLInputElement, AuthPasswordFieldP
             onClick={() => setVisible((v) => !v)}
             tabIndex={-1}
             aria-label={visible ? "Ocultar contraseña" : "Mostrar contraseña"}
-            className="ml-1.5 flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-200/50 hover:text-zinc-700"
+            className="ml-1.5 flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-faint transition-colors hover:bg-zinc-200/50 hover:text-zinc-700"
           >
             {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>

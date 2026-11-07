@@ -136,7 +136,7 @@ export function TicketChip({
       <span className="flex flex-col justify-center gap-[3px]">
         <span
           className={`font-heading text-[8.5px] font-bold uppercase leading-none tracking-[0.08em] transition-colors duration-300 ${
-            confirming ? "text-brand-green" : "text-zinc-400 group-hover/chip:text-zinc-500"
+            confirming ? "text-brand-green" : "text-faint group-hover/chip:text-zinc-500"
           }`}
         >
           {eyebrow}

@@ -13,7 +13,7 @@ import type { Client } from "../../types/clients";
 function FormDivider({ title }: { title: string }) {
   return (
     <div className="flex items-center gap-2 pt-2 border-t border-zinc-100 first:border-0 first:pt-0">
-      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400 select-none">
+      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-faint select-none">
         {title}
       </span>
       <div className="h-px flex-1 bg-zinc-100" />
@@ -77,7 +77,7 @@ export function BulkReassignSalesRepModal({ clients, onClose, onSaved }: BulkRea
       onRequestClose={requestClose}
       footer={
         <div className="flex w-full items-center justify-between gap-3">
-          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
+          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-faint select-none">
             <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
               Ctrl
             </kbd>
@@ -124,7 +124,7 @@ export function BulkReassignSalesRepModal({ clients, onClose, onSaved }: BulkRea
               </li>
             ))}
             {overflow > 0 && (
-              <li className="pt-2 text-[11.5px] font-medium text-zinc-400">
+              <li className="pt-2 text-[11.5px] font-medium text-faint">
                 + {overflow} {overflow === 1 ? "cliente más" : "clientes más"}
               </li>
             )}

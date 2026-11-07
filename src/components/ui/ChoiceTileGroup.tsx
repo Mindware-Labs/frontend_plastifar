@@ -232,7 +232,7 @@ export function ChoiceTileGroup({
                 placeholder={searchPlaceholder}
                 aria-label={searchPlaceholder}
                 className="h-8 w-full rounded-lg border border-zinc-200 bg-white pl-8 pr-2 text-[12.5px] text-zinc-800
-                  placeholder:text-zinc-400 shadow-2xs outline-none transition-colors
+                  placeholder:text-faint shadow-2xs outline-none transition-colors
                   focus:border-zinc-400 focus:ring-2 focus:ring-zinc-400/20 [&::-webkit-search-cancel-button]:hidden"
               />
             </div>

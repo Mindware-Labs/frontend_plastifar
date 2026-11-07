@@ -220,7 +220,7 @@ export function NotificationsModal({ onClose }: { onClose: () => void }) {
       size="md"
       footer={
         <div className="flex w-full items-center justify-between">
-          <span className="inline-flex items-center gap-1.5 text-[11.5px] text-zinc-400">
+          <span className="inline-flex items-center gap-1.5 text-[11.5px] text-faint">
             <kbd className="rounded border border-zinc-200 bg-white px-1.5 py-0.5 font-mono text-[10px] font-medium text-zinc-600 shadow-2xs">
               Esc
             </kbd>
@@ -283,7 +283,7 @@ export function NotificationsModal({ onClose }: { onClose: () => void }) {
                 Qué dispara un aviso
               </span>
             </div>
-            <span className="text-[11px] font-medium text-zinc-400">Canales activos</span>
+            <span className="text-[11px] font-medium text-faint">Canales activos</span>
           </div>
 
           <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">

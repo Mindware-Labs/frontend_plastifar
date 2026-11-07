@@ -295,7 +295,7 @@ export function StaffEffectivePermissionsCard({
               clearLabel="Limpiar búsqueda y filtros"
             />
           ) : (
-            <div className="text-[12.5px] text-zinc-400">No hay permisos para mostrar.</div>
+            <div className="text-[12.5px] text-faint">No hay permisos para mostrar.</div>
           )}
         </div>
       ) : (
@@ -369,10 +369,10 @@ export function StaffEffectivePermissionsCard({
                           {item.departments.join(", ")}
                         </span>
                       ) : (
-                        <span className="text-zinc-400">—</span>
+                        <span className="text-faint">—</span>
                       )
                     ) : (
-                      <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+                      <span className="inline-flex items-center gap-1.5 text-[12px] text-faint">
                         <Ban className="size-3 text-rose-400 shrink-0" />
                         <span>{item.denialReason}</span>
                       </span>

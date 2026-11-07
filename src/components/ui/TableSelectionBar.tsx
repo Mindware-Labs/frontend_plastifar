@@ -81,7 +81,7 @@ export function TableSelectionBar({
           onClick={onClear}
           aria-label="Quitar la selección (Esc)"
           title="Quitar la selección (Esc)"
-          className="flex h-6.5 w-6.5 items-center justify-center rounded-md text-zinc-400 outline-none transition-colors hover:bg-zinc-100 hover:text-zinc-700 focus-visible:ring-2 focus-visible:ring-brand-red/25"
+          className="flex h-6.5 w-6.5 items-center justify-center rounded-md text-faint outline-none transition-colors hover:bg-zinc-100 hover:text-zinc-700 focus-visible:ring-2 focus-visible:ring-brand-red/25"
         >
           <X className="h-4 w-4" />
         </button>

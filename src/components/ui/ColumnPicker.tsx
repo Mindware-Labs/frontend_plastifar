@@ -171,7 +171,7 @@ export function ColumnPicker({ columns, visible, onChange, label = "Columnas" }:
             className="animate-plf-toast-in z-[60] w-[248px] overflow-y-auto rounded-lg border border-zinc-200/90 bg-white p-1
               shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)]"
           >
-            <p className="px-2.5 pb-1.5 pt-1.5 text-[11px] font-medium text-zinc-400">
+            <p className="px-2.5 pb-1.5 pt-1.5 text-[11px] font-medium text-faint">
               Columnas visibles
             </p>
 

@@ -128,7 +128,7 @@ export function RoleModal({ role, onClose, onSaved }: RoleModalProps) {
       onRequestClose={requestClose}
       footer={
         <div className="flex w-full items-center justify-between gap-3">
-          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
+          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-faint select-none">
             <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
               Ctrl
             </kbd>

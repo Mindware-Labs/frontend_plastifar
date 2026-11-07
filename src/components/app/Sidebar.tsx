@@ -392,7 +392,7 @@ export function Sidebar() {
                     <Fragment key={child.to}>
                       {showSubgroup && (
                         <div className="relative pt-3 pb-1 pl-1.5 select-none">
-                          <p className="font-heading text-[9.5px] font-bold uppercase tracking-[0.09em] text-zinc-400">
+                          <p className="font-heading text-[9.5px] font-bold uppercase tracking-[0.09em] text-faint">
                             {child.subgroup}
                           </p>
                         </div>
@@ -616,7 +616,7 @@ export function Sidebar() {
             <div key={section} className="flex flex-col">
               <p
                 className={`px-2.5 pb-1 font-heading text-[10px] font-bold uppercase tracking-[0.1em] transition-colors duration-[380ms] ease-plf-spring motion-reduce:transition-none ${
-                  sectionActive ? "text-brand-red/70" : "text-zinc-400"
+                  sectionActive ? "text-brand-red/70" : "text-faint"
                 }`}
               >
                 {section}
@@ -647,7 +647,7 @@ export function Sidebar() {
             data-motion-item
             className="flex items-center justify-between border-b border-zinc-100 px-2.5 pb-2 pt-1"
           >
-            <span className="flex items-center gap-2 font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-400">
+            <span className="flex items-center gap-2 font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-faint">
               <flyout.group.icon className="h-3.5 w-3.5 text-zinc-400" />
               {flyout.group.label}
             </span>
@@ -667,7 +667,7 @@ export function Sidebar() {
                 <Fragment key={child.to}>
                   {showSubgroup && (
                     <div className="pt-2 pb-1 px-2.5 select-none border-t border-zinc-100/80 mt-1">
-                      <p className="font-heading text-[9px] font-bold uppercase tracking-[0.09em] text-zinc-400">
+                      <p className="font-heading text-[9px] font-bold uppercase tracking-[0.09em] text-faint">
                         {child.subgroup}
                       </p>
                     </div>
@@ -748,7 +748,7 @@ export function Sidebar() {
                   <p className="truncate font-heading text-[12.5px] font-semibold text-zinc-900 leading-tight">
                     {displayName}
                   </p>
-                  <p className="truncate text-[11px] text-zinc-400 leading-tight mt-0.5">{user?.email}</p>
+                  <p className="truncate text-[11px] text-faint leading-tight mt-0.5">{user?.email}</p>
                   <span className="mt-1 inline-flex items-center rounded-md bg-zinc-100 px-1.5 py-0.5 font-heading text-[9.5px] font-semibold text-zinc-600 tracking-wide">
                     {user?.isAdmin ? "ADMINISTRADOR" : "COLABORADOR"}
                   </span>
@@ -841,7 +841,7 @@ export function Sidebar() {
                 <span className="block truncate font-heading text-[12.5px] font-semibold leading-tight text-zinc-800">
                   {displayName}
                 </span>
-                <span className="block truncate text-[11px] leading-tight text-zinc-400 mt-0.5 font-normal">
+                <span className="block truncate text-[11px] leading-tight text-faint mt-0.5 font-normal">
                   {user?.isAdmin ? "Administrador" : "Staff"}
                 </span>
               </div>
@@ -877,7 +877,7 @@ export function Sidebar() {
           href="https://www.cquest.do/"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-center gap-1.5 text-[10.5px] text-zinc-400 transition-colors hover:text-zinc-600"
+          className="flex items-center justify-center gap-1.5 text-[10.5px] text-faint transition-colors hover:text-zinc-600"
         >
           <span>Desarrollado por</span>
           <img

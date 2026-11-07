@@ -66,7 +66,7 @@ function TimeStepButton({
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="flex h-5 w-full items-center justify-center rounded text-zinc-400 outline-none transition-colors hover:bg-zinc-100 hover:text-zinc-700 active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/20 cursor-pointer"
+      className="flex h-5 w-full items-center justify-center rounded text-faint outline-none transition-colors hover:bg-zinc-100 hover:text-zinc-700 active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/20 cursor-pointer"
     >
       <Icon className="h-3 w-3" />
     </button>
@@ -206,7 +206,7 @@ export function TimePicker({
             : open
             ? "border-brand-red ring-2 ring-brand-red/10"
             : "border-zinc-200 hover:border-zinc-300 focus-visible:border-brand-red focus-visible:ring-2 focus-visible:ring-brand-red/20"
-        } ${disabled ? "cursor-not-allowed bg-zinc-50 text-zinc-400" : "text-zinc-800"}`}
+        } ${disabled ? "cursor-not-allowed bg-zinc-50 text-faint" : "text-zinc-800"}`}
       >
         <span className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
           <Clock className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
@@ -214,7 +214,7 @@ export function TimePicker({
             {hasTime ? (
               <span className="font-semibold text-zinc-900">{formatDisplayTime(value)}</span>
             ) : (
-              <span className="font-normal text-zinc-400">{placeholder}</span>
+              <span className="font-normal text-faint">{placeholder}</span>
             )}
           </span>
         </span>
@@ -303,7 +303,7 @@ export function TimePicker({
               {/* Presets rápidos */}
               {presets.length > 0 && (
                 <div className="flex flex-col gap-1 border-t border-zinc-100 pt-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-faint">
                     Horas habituales
                   </span>
                   <div className="grid grid-cols-2 gap-1">

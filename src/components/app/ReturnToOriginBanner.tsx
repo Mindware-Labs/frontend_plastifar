@@ -82,7 +82,7 @@ export function ReturnToOriginBanner({ ticketId }: ReturnToOriginBannerProps) {
           type="button"
           onClick={dismiss}
           aria-label="Cerrar aviso"
-          className="flex h-9 w-9 shrink-0 items-center justify-center justify-self-center rounded-xl text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 cursor-pointer"
+          className="flex h-9 w-9 shrink-0 items-center justify-center justify-self-center rounded-xl text-faint transition-colors hover:bg-zinc-100 hover:text-zinc-700 cursor-pointer"
         >
           <X className="h-3.5 w-3.5" />
         </button>

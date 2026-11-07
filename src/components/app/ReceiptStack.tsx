@@ -222,7 +222,7 @@ export function ReceiptCard({
           type="button"
           onClick={() => (staticPreview ? onDismiss() : setLeaving(true))}
           aria-label="Cerrar el aviso"
-          className="flex size-7 shrink-0 items-center justify-center rounded-lg text-zinc-400 outline-none
+          className="flex size-7 shrink-0 items-center justify-center rounded-lg text-faint outline-none
             transition-colors hover:bg-zinc-100 hover:text-zinc-700 focus-visible:ring-2 focus-visible:ring-brand-red/25"
         >
           <X className="size-3.5" strokeWidth={2.25} />

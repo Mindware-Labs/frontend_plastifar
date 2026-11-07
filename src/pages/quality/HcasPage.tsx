@@ -340,7 +340,7 @@ export function HcasPage() {
               })}
             </div>
           ) : (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-faint">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
               Cargando las HCA…
             </span>

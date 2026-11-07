@@ -148,7 +148,7 @@ function TimeStepButton({
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="flex h-4 w-full items-center justify-center rounded text-zinc-400 outline-none transition-colors hover:bg-zinc-100 hover:text-zinc-700 active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/20 cursor-pointer"
+      className="flex h-4 w-full items-center justify-center rounded text-faint outline-none transition-colors hover:bg-zinc-100 hover:text-zinc-700 active:scale-95 focus-visible:ring-2 focus-visible:ring-brand-red/20 cursor-pointer"
     >
       <Icon className="h-3 w-3" />
     </button>
@@ -627,7 +627,7 @@ export function DatePicker({
             : open
             ? "border-brand-red ring-2 ring-brand-red/10"
             : "border-zinc-200 hover:border-zinc-300 focus-visible:border-brand-red focus-visible:ring-2 focus-visible:ring-brand-red/20"
-        } ${disabled ? "cursor-not-allowed bg-zinc-50 text-zinc-400" : "text-zinc-800"} ${className}`}
+        } ${disabled ? "cursor-not-allowed bg-zinc-50 text-faint" : "text-zinc-800"} ${className}`}
       >
         <span className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
           <CalendarIcon className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
@@ -637,7 +637,7 @@ export function DatePicker({
                 {formatDisplayValue(value, showTime, timeValue)}
               </span>
             ) : (
-              <span className="font-normal text-zinc-400">{placeholder}</span>
+              <span className="font-normal text-faint">{placeholder}</span>
             )}
           </span>
         </span>
@@ -653,7 +653,7 @@ export function DatePicker({
                 e.stopPropagation();
                 handleClear();
               }}
-              className="flex h-4 w-4 items-center justify-center rounded text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition-colors"
+              className="flex h-4 w-4 items-center justify-center rounded text-faint hover:bg-zinc-100 hover:text-zinc-700 transition-colors"
             >
               <X className="h-3 w-3" />
             </span>
@@ -701,7 +701,7 @@ export function DatePicker({
                 bg-white p-2 shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)] select-none overflow-y-auto overscroll-contain`}
             >
               <div className="flex items-center justify-between gap-1">
-                <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-faint">
                   {headerLabel}
                 </span>
                 {hasSelection ? (
@@ -713,7 +713,7 @@ export function DatePicker({
                     Borrar
                   </button>
                 ) : (
-                  <span className="text-[10px] text-zinc-400 truncate">
+                  <span className="text-[10px] text-faint truncate">
                     {showTime ? "Sin fecha/hora" : "Sin fecha"}
                   </span>
                 )}
@@ -769,7 +769,7 @@ export function DatePicker({
                   {WEEKDAY_NAMES.map((name) => (
                     <span
                       key={name}
-                      className="font-heading text-[9px] font-semibold uppercase tracking-wide text-zinc-400"
+                      className="font-heading text-[9px] font-semibold uppercase tracking-wide text-faint"
                     >
                       {name}
                     </span>
@@ -816,7 +816,7 @@ export function DatePicker({
                 </div>
 
                 {!showTime && (
-                  <p className="mt-1 border-t border-zinc-100 pt-1 text-[9.5px] font-medium text-zinc-400 truncate">
+                  <p className="mt-1 border-t border-zinc-100 pt-1 text-[9.5px] font-medium text-faint truncate">
                     {hasSelection
                       ? `${formatFriendlyDate(value)} seleccionada`
                       : "Elige un día"}
@@ -835,12 +835,12 @@ export function DatePicker({
                       <button
                         type="button"
                         onClick={() => onTimeChange?.("")}
-                        className="text-[9.5px] font-medium text-zinc-400 hover:text-brand-red transition-colors cursor-pointer"
+                        className="text-[9.5px] font-medium text-faint hover:text-brand-red transition-colors cursor-pointer"
                       >
                         Quitar
                       </button>
                     ) : (
-                      <span className="text-[9.5px] text-zinc-400">Opc.</span>
+                      <span className="text-[9.5px] text-faint">Opc.</span>
                     )}
                   </div>
 

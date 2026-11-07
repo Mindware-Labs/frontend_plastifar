@@ -65,7 +65,7 @@ export function ToastCard({
         type="button"
         onClick={onDismiss}
         aria-label="Cerrar aviso"
-        className="-mr-1.5 -mt-0.5 shrink-0 rounded-full p-1.5 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
+        className="-mr-1.5 -mt-0.5 shrink-0 rounded-full p-1.5 text-faint hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
       >
         <X className="h-3.5 w-3.5" />
       </button>

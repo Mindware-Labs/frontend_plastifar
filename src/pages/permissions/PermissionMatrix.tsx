@@ -1,4 +1,4 @@
-import { Check, Lock } from "lucide-react";
+import { Check, Lock, Minus } from "lucide-react";
 import { Fragment, useId, useMemo, useRef, useState } from "react";
 import { Badge } from "../../components/ui/Badge";
 import { Tooltip } from "../../components/ui/Tooltip";
@@ -225,7 +225,7 @@ export function PermissionMatrix({
               <th
                 scope="col"
                 className={`${permissionCol} sticky top-0 z-30 border-b border-line bg-white py-2.5
-                  text-left font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint`}
+                  text-left font-heading text-[11px] font-semibold uppercase tracking-[0.08em] text-faint`}
               >
                 Permiso
               </th>
@@ -244,10 +244,10 @@ export function PermissionMatrix({
                       {/* Regla de la versalita: toda cabecera de columna del panel
                           va en «faint». Un rol inactivo lo dice con su subtitulo,
                           no con un segundo color de cabecera. */}
-                      <span className="font-heading text-[10px] font-semibold uppercase leading-tight tracking-[0.08em] text-faint">
+                      <span className="font-heading text-[11px] font-semibold uppercase leading-tight tracking-[0.08em] text-faint">
                         {role.name}
                       </span>
-                      <span className="text-[10.5px] font-normal normal-case tracking-normal text-faint">
+                      <span className="text-[11px] font-normal normal-case tracking-normal text-faint">
                         {/* Lo que se anuncia aqui es el alcance real del rol
                             (`grantsAll`), no si se puede editar: un rol del
                             sistema con lista parcial decia «todo el catálogo»
@@ -278,7 +278,7 @@ export function PermissionMatrix({
                     colSpan={roles.length + 1}
                     className="scroll-mt-3 bg-canvas px-0 py-1.5 text-left"
                   >
-                    <span className="sticky left-0 inline-block font-heading text-[10px] font-semibold uppercase tracking-[0.08em] text-faint">
+                    <span className="sticky left-0 inline-block font-heading text-[11px] font-semibold uppercase tracking-[0.08em] text-faint">
                       {group.module}
                     </span>
                   </th>
@@ -394,8 +394,10 @@ export function PermissionMatrix({
                                  forma de barrer la rejilla y ver DONDE se
                                  concede, que es lo unico que se viene a leer.
                                  Ahora solo el «si» lleva tinta y caja; el «no»
-                                 es un punto tenue que aparece al pasar por
-                                 encima. El patron de concesiones salta solo. */
+                                 es un guion sin caja en `text-faint`. Antes era
+                                 un punto en `line-strong` (~1,2:1) que no se
+                                 distinguia de una celda vacia. El patron de
+                                 concesiones sigue saltando solo. */
                               className={`group inline-flex h-6 w-6 items-center justify-center rounded-edge
                                 outline-none transition-[background-color,border-color,color]
                                 focus-visible:ring-3 focus-visible:ring-brand-red/25
@@ -403,7 +405,7 @@ export function PermissionMatrix({
                                 ${
                                   granted
                                     ? "border border-brand-red/35 bg-brand-red/8 text-brand-red"
-                                    : `text-line-strong ${locked ? "" : "hover:bg-fill hover:text-subtle"}`
+                                    : `text-faint ${locked ? "" : "hover:bg-fill hover:text-subtle"}`
                                 }
                                 ${changed ? "ring-2 ring-inset ring-warn/45" : ""}`}
                             >
@@ -412,7 +414,7 @@ export function PermissionMatrix({
                               ) : granted ? (
                                 <Check aria-hidden className="h-3.5 w-3.5" strokeWidth={2.75} />
                               ) : (
-                                <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-current" />
+                                <Minus aria-hidden className="h-3 w-3" strokeWidth={2.25} />
                               )}
                             </button>
 

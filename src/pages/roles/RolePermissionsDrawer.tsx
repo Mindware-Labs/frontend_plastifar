@@ -510,7 +510,7 @@ export function RolePermissionsDrawer({
           {matrix === null && matrixError !== null ? (
             <ErrorRetry onRetry={() => onRetryMatrix?.()}>{matrixError}</ErrorRetry>
           ) : matrix === null ? (
-            <div className="flex flex-col items-center justify-center py-16 text-zinc-400">
+            <div className="flex flex-col items-center justify-center py-16 text-faint">
               <Spinner />
               <p className="mt-3 text-[12.5px]">Cargando catálogo de permisos…</p>
             </div>
@@ -520,7 +520,7 @@ export function RolePermissionsDrawer({
               <p className="mt-2 text-[13px] font-medium text-zinc-700">
                 No se encontraron permisos
               </p>
-              <p className="text-[12px] text-zinc-400 mt-0.5">
+              <p className="text-[12px] text-faint mt-0.5">
                 Prueba con otro término de búsqueda o cambia el filtro de módulo.
               </p>
             </div>
@@ -553,7 +553,7 @@ export function RolePermissionsDrawer({
                               ? "bg-emerald-100 text-emerald-800"
                               : groupGrantedCount > 0
                               ? "bg-zinc-200/70 text-zinc-700"
-                              : "bg-zinc-100 text-zinc-400"
+                              : "bg-zinc-100 text-faint"
                           }`}
                         >
                           {groupGrantedCount} de {group.permissions.length} concedidos
@@ -656,7 +656,7 @@ export function RolePermissionsDrawer({
                               </p>
 
                               {requiredLabel && (
-                                <p className="mt-1 flex items-center gap-1 text-[11px] text-zinc-400">
+                                <p className="mt-1 flex items-center gap-1 text-[11px] text-faint">
                                   <span>Requiere:</span>
                                   <span className="font-medium text-zinc-600 underline decoration-zinc-300">
                                     {requiredLabel}

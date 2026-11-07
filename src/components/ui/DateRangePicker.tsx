@@ -238,7 +238,7 @@ export function DateRangePicker({ since, until, onChange }: DateRangePickerProps
     <div className="flex flex-col gap-2.5 select-none">
       {/* Cabecera de período y estado de selección */}
       <div className="flex items-center justify-between">
-        <span className="font-heading text-[10.5px] font-bold uppercase tracking-wider text-zinc-400">
+        <span className="font-heading text-[10.5px] font-bold uppercase tracking-wider text-faint">
           Período
         </span>
 
@@ -257,7 +257,7 @@ export function DateRangePicker({ since, until, onChange }: DateRangePickerProps
             </button>
           </span>
         ) : (
-          <span className="text-[11px] font-medium text-zinc-400">Cualquier fecha</span>
+          <span className="text-[11px] font-medium text-faint">Cualquier fecha</span>
         )}
       </div>
 
@@ -315,7 +315,7 @@ export function DateRangePicker({ since, until, onChange }: DateRangePickerProps
           {WEEKDAY_NAMES.map((name) => (
             <span
               key={name}
-              className="font-heading text-[10px] font-semibold uppercase tracking-wider text-zinc-400 py-0.5"
+              className="font-heading text-[10px] font-semibold uppercase tracking-wider text-faint py-0.5"
             >
               {name}
             </span>
@@ -382,7 +382,7 @@ export function DateRangePicker({ since, until, onChange }: DateRangePickerProps
         </div>
 
         {/* Mensaje de guía intuitivo */}
-        <p className="mt-2 border-t border-zinc-100 pt-2 text-center text-[10.5px] font-medium text-zinc-400">
+        <p className="mt-2 border-t border-zinc-100 pt-2 text-center text-[10.5px] font-medium text-faint">
           {hintText}
         </p>
       </div>

@@ -290,7 +290,7 @@ function HcaParticipantWhoCell({
                   }}
                   title="Escribir nombre manualmente"
                   aria-label="Escribir nombre manualmente"
-                  className="flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
+                  className="flex h-5.5 w-5.5 items-center justify-center rounded text-faint hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
                 >
                   <PenLine className="h-3.5 w-3.5" />
                 </button>
@@ -313,7 +313,7 @@ function HcaParticipantWhoCell({
             onClick={() => onKindChange(index, "personal")}
             title="Buscar usuario en el sistema"
             aria-label="Buscar usuario en el sistema"
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-5.5 w-5.5 items-center justify-center rounded text-faint hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
           >
             <Users className="h-3.5 w-3.5" />
           </button>
@@ -396,7 +396,7 @@ function HcaPlanWhoCell({
                   }}
                   title="Escribir nombre manualmente"
                   aria-label="Escribir nombre manualmente"
-                  className="flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
+                  className="flex h-5.5 w-5.5 items-center justify-center rounded text-faint hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
                 >
                   <PenLine className="h-3.5 w-3.5" />
                 </button>
@@ -420,7 +420,7 @@ function HcaPlanWhoCell({
             onClick={() => onModeChange(index, "sistema")}
             title="Buscar usuario en el sistema"
             aria-label="Buscar usuario en el sistema"
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-5.5 w-5.5 items-center justify-center rounded text-faint hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
           >
             <Users className="h-3.5 w-3.5" />
           </button>
@@ -1221,12 +1221,12 @@ export function HcaFormModal({
             <div className="flex flex-col text-left min-w-0 hidden md:flex">
               <span
                 className={`text-[12px] font-heading font-semibold truncate transition-colors ${
-                  step === n ? "text-zinc-900" : step > n ? "text-zinc-700" : "text-zinc-400"
+                  step === n ? "text-zinc-900" : step > n ? "text-zinc-700" : "text-faint"
                 }`}
               >
                 {stepLabels[n].title}
               </span>
-              <span className="text-[10px] text-zinc-400 truncate">{stepLabels[n].hint}</span>
+              <span className="text-[10px] text-faint truncate">{stepLabels[n].hint}</span>
             </div>
           </button>
           {idx < 3 && (
@@ -1272,7 +1272,7 @@ export function HcaFormModal({
               )}
             />
             <div className="px-3 py-2.5 flex flex-col justify-center">
-              <span className="text-[10px] font-heading font-bold uppercase tracking-wider text-zinc-400">
+              <span className="text-[10px] font-heading font-bold uppercase tracking-wider text-faint">
                 Elaborado por
               </span>
               <span className="text-sm font-medium text-zinc-800 mt-0.5 truncate" title={elaboradoLabel}>
@@ -1372,7 +1372,7 @@ export function HcaFormModal({
                           }}
                           title="Escribir nombre manualmente"
                           aria-label="Escribir nombre manualmente"
-                          className="flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
+                          className="flex h-5.5 w-5.5 items-center justify-center rounded text-faint hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
                         >
                           <PenLine className="h-3.5 w-3.5" />
                         </button>
@@ -1395,7 +1395,7 @@ export function HcaFormModal({
                     onClick={() => handleResponsibleModeChange("sistema")}
                     title="Buscar usuario en el sistema"
                     aria-label="Buscar usuario en el sistema"
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-5.5 w-5.5 items-center justify-center rounded text-faint hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
                   >
                     <Users className="h-3.5 w-3.5" />
                   </button>
@@ -1466,7 +1466,7 @@ export function HcaFormModal({
                       htmlFor={causeFieldId}
                       className="flex items-center gap-1.5 font-heading text-xs font-semibold tracking-wide text-zinc-700"
                     >
-                      <span className="font-mono text-[11px] font-bold text-zinc-400">
+                      <span className="font-mono text-[11px] font-bold text-faint">
                         {index + 1}.
                       </span>
                       <span>{causeLabel}</span>
@@ -1478,7 +1478,7 @@ export function HcaFormModal({
                         aria-label={`Quitar ${causeLabel.toLowerCase()}`}
                         disabled={isExiting}
                         onClick={() => handleRemoveCause(field.id)}
-                        className="inline-flex size-6 cursor-pointer items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-brand-red active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="inline-flex size-6 cursor-pointer items-center justify-center rounded-md text-faint transition-colors hover:bg-zinc-100 hover:text-brand-red active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         <Trash2 className="size-3.5" />
                       </button>
@@ -1616,7 +1616,7 @@ function PlanMotionCell({
                       innerClassName="py-2.5 pl-2 flex items-center justify-center min-h-[38px]"
                       className="align-middle text-center"
                     >
-                      <span className="font-heading text-[11.5px] font-normal tabular-nums leading-none text-zinc-400">
+                      <span className="font-heading text-[11.5px] font-normal tabular-nums leading-none text-faint">
                         {index + 1}
                       </span>
                     </PlanMotionCell>
@@ -1706,7 +1706,7 @@ function PlanMotionCell({
                           aria-label="Quitar acción"
                           disabled={isExiting}
                           onClick={() => handleRemovePlanRow(planField.id)}
-                          className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-brand-red active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                          className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-faint transition-colors hover:bg-zinc-100 hover:text-brand-red active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <Trash2 className="size-3.5" />
                         </button>
@@ -1741,7 +1741,7 @@ function PlanMotionCell({
             return (
               <AppleMotionBlock key={field.id} phase={phase} rowPreset="composer">
                 <div className="rounded-lg border border-zinc-100 bg-zinc-50/40 p-3">
-                  <span className="text-[10px] font-heading font-bold uppercase text-zinc-400">
+                  <span className="text-[10px] font-heading font-bold uppercase text-faint">
                     Evidencia · Acción {index + 1}
                   </span>
                   <TextAreaField
@@ -1796,7 +1796,7 @@ function PlanMotionCell({
                         className="font-heading text-[11.5px] font-semibold text-faint"
                       >
                         Elaboró
-                        <span className="ml-1 font-normal text-zinc-400">· tu usuario</span>
+                        <span className="ml-1 font-normal text-faint">· tu usuario</span>
                       </label>
                       {participantFields.fields.length < 2 ? (
                         <button
@@ -1971,7 +1971,7 @@ function PlanMotionCell({
   };
 
   const renderFooterLeft = () => (
-    <span className="text-[11px] text-zinc-400 select-none">
+    <span className="text-[11px] text-faint select-none">
       Paso {step} de 4
       {step === 4 && (
         <span className="hidden sm:inline ml-2">
@@ -2146,7 +2146,7 @@ function HeaderField({
 }) {
   return (
     <div className="px-3 py-2.5 flex flex-col justify-center min-h-[52px]">
-      <span className="text-[10px] font-heading font-bold uppercase tracking-wider text-zinc-400">
+      <span className="text-[10px] font-heading font-bold uppercase tracking-wider text-faint">
         {label}
       </span>
       <span

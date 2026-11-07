@@ -126,7 +126,7 @@ export function ListSortMenu({
                 exiting ? "pointer-events-none" : ""
               }`}
           >
-            <div data-motion-item className="select-none px-2.5 pt-1.5 pb-1 text-[11px] font-medium text-zinc-400">
+            <div data-motion-item className="select-none px-2.5 pt-1.5 pb-1 text-[11px] font-medium text-faint">
               Ordenar por
             </div>
             {sortOptions.map(({ value, label }) => {

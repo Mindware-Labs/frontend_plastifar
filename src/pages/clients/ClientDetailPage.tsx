@@ -440,7 +440,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                     <span className="font-heading text-[15px] font-bold text-zinc-900">
                       {client.isActive ? "Activo" : "Inactivo"}
                     </span>
-                    <span className="text-[11px] text-zinc-400 truncate">
+                    <span className="text-[11px] text-faint truncate">
                       {client.isActive ? "Habilitado" : "Suspendido"}
                     </span>
                   </div>
@@ -518,7 +518,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                       <div className="flex items-center justify-between py-2 text-[12.5px]">
                         <span className="text-zinc-500 font-medium">Persona de contacto</span>
                         <span className="text-zinc-900 font-medium truncate max-w-[55%] text-right">
-                          {client.contactPersonName ?? <span className="text-zinc-400 font-normal">—</span>}
+                          {client.contactPersonName ?? <span className="text-faint font-normal">—</span>}
                         </span>
                       </div>
 
@@ -539,7 +539,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                               <CopyButton text={client.phone} label="Copiar teléfono" />
                             </>
                           ) : (
-                            <span className="text-zinc-400">—</span>
+                            <span className="text-faint">—</span>
                           )}
                         </div>
                       </div>
@@ -561,7 +561,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                               <CopyButton text={client.email} label="Copiar correo" />
                             </>
                           ) : (
-                            <span className="text-zinc-400">—</span>
+                            <span className="text-faint">—</span>
                           )}
                         </div>
                       </div>
@@ -572,7 +572,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                           <span>Dirección física</span>
                         </div>
                         <div className="text-right text-zinc-800 font-medium max-w-[340px] leading-relaxed">
-                          {client.address || <span className="text-zinc-400 font-normal">Sin dirección física registrada</span>}
+                          {client.address || <span className="text-faint font-normal">Sin dirección física registrada</span>}
                         </div>
                       </div>
                     </div>
@@ -583,7 +583,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                     icon={FileText}
                     title="Observaciones Internas"
                     aside={
-                      <span className="text-[10.5px] font-medium text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded">
+                      <span className="text-[10.5px] font-medium text-faint bg-zinc-100 px-2 py-0.5 rounded">
                         Uso interno
                       </span>
                     }
@@ -595,7 +595,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                           {client.notes}
                         </div>
                       ) : (
-                        <p className="text-[12.5px] text-zinc-400 italic">
+                        <p className="text-[12.5px] text-faint italic">
                           No hay observaciones internas registradas para este cliente.
                         </p>
                       )}
@@ -839,7 +839,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                               <span>{label}</span>
                               <span
                                 className={`font-heading text-[10px] font-bold leading-none tabular-nums transition-colors ${
-                                  isActive ? "text-zinc-900" : "text-zinc-400"
+                                  isActive ? "text-zinc-900" : "text-faint"
                                 }`}
                               >
                                 {count}
@@ -1023,7 +1023,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                             <span>{label}</span>
                             <span
                               className={`font-heading text-[10px] font-bold leading-none tabular-nums transition-colors ${
-                                isActive ? "text-zinc-900" : "text-zinc-400"
+                                isActive ? "text-zinc-900" : "text-faint"
                               }`}
                             >
                               {count}
@@ -1109,7 +1109,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                                 {ticket.subject}
                               </Link>
                               {ticket.topicName && (
-                                <span className="text-[11px] text-zinc-400 block font-normal">
+                                <span className="text-[11px] text-faint block font-normal">
                                   {ticket.topicName}
                                 </span>
                               )}
@@ -1125,7 +1125,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                             </Td>
                             <Td className="text-[12.5px] text-zinc-600">
                               {ticket.assignedStaffName ?? (
-                                <span className="text-zinc-400">Sin asignar</span>
+                                <span className="text-faint">Sin asignar</span>
                               )}
                             </Td>
                             <Td className="whitespace-nowrap text-[12px] text-zinc-500 text-right tabular-nums">

@@ -50,7 +50,7 @@ export function SegmentedFilter<T extends string = string>({
             {item.count !== undefined && (
               <span
                 className={`font-heading text-[10px] font-bold leading-none tabular-nums transition-colors ${
-                  isActive ? "text-zinc-900" : "text-zinc-400"
+                  isActive ? "text-zinc-900" : "text-faint"
                 }`}
               >
                 {item.count}

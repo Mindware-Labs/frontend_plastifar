@@ -59,7 +59,7 @@ export function TaskEvidenceUpload({
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <span className="font-heading text-[11px] font-semibold text-zinc-500">{label}</span>
-        <span className="text-[11px] text-zinc-400">Máx. 10 MB por archivo</span>
+        <span className="text-[11px] text-faint">Máx. 10 MB por archivo</span>
       </div>
 
       <input
@@ -126,7 +126,7 @@ export function TaskEvidenceUpload({
             <p className="mt-1.5 max-w-[360px] truncate font-heading text-[12px] font-semibold text-zinc-700 leading-tight">
               {dropzoneTitle}
             </p>
-            <p className="mt-0.5 max-w-[360px] truncate text-[11px] text-zinc-400 leading-tight">{dropzoneHint}</p>
+            <p className="mt-0.5 max-w-[360px] truncate text-[11px] text-faint leading-tight">{dropzoneHint}</p>
           </div>
         )}
       </button>

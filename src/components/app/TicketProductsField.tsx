@@ -143,7 +143,7 @@ export function TicketProductsField({
               <button
                 type="button"
                 onClick={handleClearAll}
-                className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-zinc-400 transition-colors hover:text-brand-red cursor-pointer"
+                className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-faint transition-colors hover:text-brand-red cursor-pointer"
               >
                 <Trash2 className="size-3" />
                 Vaciar
@@ -181,7 +181,7 @@ export function TicketProductsField({
                   </span>
                   <button
                     type="button"
-                    className="flex size-5 shrink-0 items-center justify-center rounded text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 cursor-pointer"
+                    className="flex size-5 shrink-0 items-center justify-center rounded text-faint transition-colors hover:bg-zinc-100 hover:text-zinc-700 cursor-pointer"
                     aria-label={`Quitar ${row.productName || row.productCode || row.productId}`}
                     disabled={exiting}
                     onClick={() => handleRemove(row.productId)}

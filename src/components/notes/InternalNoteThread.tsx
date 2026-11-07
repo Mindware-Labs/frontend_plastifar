@@ -190,7 +190,7 @@ function NoteCard<T extends InternalNoteThreadItem>({
             <time
               dateTime={note.createdAt}
               title={formatDateTime(note.createdAt)}
-              className="text-[11px] font-medium tabular-nums text-zinc-400"
+              className="text-[11px] font-medium tabular-nums text-faint"
             >
               {noteDateLabel}
             </time>
@@ -224,7 +224,7 @@ function NoteCard<T extends InternalNoteThreadItem>({
             <time
               dateTime={note.createdAt}
               title={formatDateTime(note.createdAt)}
-              className="shrink-0 text-[11px] font-medium tabular-nums text-zinc-400"
+              className="shrink-0 text-[11px] font-medium tabular-nums text-faint"
             >
               {noteDateLabel}
             </time>

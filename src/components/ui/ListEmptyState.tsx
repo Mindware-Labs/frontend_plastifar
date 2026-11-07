@@ -42,7 +42,7 @@ export function ListEmptyState({
         <>
           <p className="text-[13px] font-medium text-zinc-700">{emptyTitle}</p>
           {emptyDescription && (
-            <p className="max-w-md text-[12px] leading-relaxed text-zinc-400">{emptyDescription}</p>
+            <p className="max-w-md text-[12px] leading-relaxed text-faint">{emptyDescription}</p>
           )}
           {action}
         </>

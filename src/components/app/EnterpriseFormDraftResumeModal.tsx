@@ -60,7 +60,7 @@ export function EnterpriseFormDraftResumeModal({
             <dl className="mt-3 grid grid-cols-2 gap-2 rounded-lg border border-line-soft bg-zinc-50/80 px-3 py-2.5 text-left text-[11px]">
               {savedAtLabel ? (
                 <div>
-                  <dt className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400">
+                  <dt className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-faint">
                     Guardado
                   </dt>
                   <dd className="mt-0.5 font-medium tabular-nums text-zinc-800">{savedAtLabel}</dd>
@@ -68,7 +68,7 @@ export function EnterpriseFormDraftResumeModal({
               ) : null}
               {stepLabel ? (
                 <div>
-                  <dt className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400">
+                  <dt className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-faint">
                     Paso
                   </dt>
                   <dd className="mt-0.5 font-medium text-zinc-800">{stepLabel}</dd>

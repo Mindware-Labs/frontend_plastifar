@@ -686,12 +686,12 @@ export function WithdrawalFormModal({
               <div className="hidden min-w-0 flex-col text-left md:flex">
                 <span
                   className={`truncate font-heading text-[12px] font-semibold ${
-                    isCurrent ? "text-zinc-900" : isCompleted ? "text-zinc-700" : "text-zinc-400"
+                    isCurrent ? "text-zinc-900" : isCompleted ? "text-zinc-700" : "text-faint"
                   }`}
                 >
                   {item.label}
                 </span>
-                <span className="truncate text-[10px] text-zinc-400">{item.hint}</span>
+                <span className="truncate text-[10px] text-faint">{item.hint}</span>
               </div>
             </li>
             {idx < STEPS.length - 1 ? (
@@ -709,7 +709,7 @@ export function WithdrawalFormModal({
   );
 
   const renderFooterLeft = () => (
-    <span className="text-[11.5px] text-zinc-400 select-none">
+    <span className="text-[11.5px] text-faint select-none">
       Paso {step} de {STEPS.length}
     </span>
   );
@@ -1095,7 +1095,7 @@ function WithdrawalTicketContextBar({
   return (
     <div className="grid grid-cols-1 overflow-hidden rounded-xl border border-zinc-200/90 bg-zinc-50/70 sm:grid-cols-2 sm:divide-x sm:divide-zinc-200/90">
       <div className="flex min-h-[3.25rem] min-w-0 flex-col justify-center gap-0.5 border-b border-zinc-200/90 px-4 py-3 sm:border-b-0">
-        <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400">
+        <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-faint">
           {codeLabel}
         </span>
         <span className="truncate font-mono text-[13px] font-semibold leading-snug text-zinc-900" title={ticketNumber}>
@@ -1103,7 +1103,7 @@ function WithdrawalTicketContextBar({
         </span>
       </div>
       <div className="flex min-h-[3.25rem] min-w-0 flex-col justify-center gap-0.5 px-4 py-3">
-        <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400">
+        <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-faint">
           Nombre empresa
         </span>
         <span className="truncate text-[13px] font-semibold leading-snug text-zinc-900" title={companyName}>

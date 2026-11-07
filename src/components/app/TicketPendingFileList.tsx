@@ -50,7 +50,7 @@ function TicketPendingFileChip({
           onClick={onRemove}
           disabled={exiting}
           aria-label={`Quitar ${file.name}`}
-          className="ml-0.5 flex size-4.5 shrink-0 cursor-pointer items-center justify-center rounded text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-brand-red disabled:pointer-events-none"
+          className="ml-0.5 flex size-4.5 shrink-0 cursor-pointer items-center justify-center rounded text-faint transition-colors hover:bg-zinc-200 hover:text-brand-red disabled:pointer-events-none"
         >
           <X className="size-3" />
         </button>
@@ -77,14 +77,14 @@ function TicketPendingFileChip({
         <span className="truncate font-medium text-zinc-800" title={file.name}>
           {file.name}
         </span>
-        <span className="shrink-0 text-[11px] tabular-nums text-zinc-400">({formatBytes(file.size)})</span>
+        <span className="shrink-0 text-[11px] tabular-nums text-faint">({formatBytes(file.size)})</span>
       </div>
       <button
         type="button"
         onClick={onRemove}
         disabled={exiting}
         title="Quitar archivo"
-        className="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 disabled:pointer-events-none"
+        className="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded text-faint hover:bg-zinc-100 hover:text-zinc-700 disabled:pointer-events-none"
       >
         <X className="size-3" />
       </button>

@@ -160,7 +160,7 @@ const timeFormat = new Intl.DateTimeFormat("es-DO", {
 function FormDivider({ title }: { title: string }) {
   return (
     <div className="flex items-center gap-2 pt-2 border-t border-zinc-100 first:border-0 first:pt-0">
-      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400 select-none">
+      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-faint select-none">
         {title}
       </span>
       <div className="h-px flex-1 bg-zinc-100" />
@@ -184,7 +184,7 @@ function skippedPhrase(leg: DeadlineResult): string {
 function SimulationRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-0.5 py-2.5">
-      <span className="font-heading text-[10.5px] font-semibold uppercase tracking-[0.06em] text-zinc-400">
+      <span className="font-heading text-[10.5px] font-semibold uppercase tracking-[0.06em] text-faint">
         {label}
       </span>
       <span className="text-[13px] font-semibold tabular-nums leading-snug text-zinc-900">{value}</span>
@@ -228,7 +228,7 @@ function SlaLiveSimulationPanel({
         <button
           type="button"
           onClick={onClose}
-          className="shrink-0 rounded-md p-1 text-zinc-400 transition-colors hover:bg-zinc-200/60 hover:text-zinc-700 cursor-pointer"
+          className="shrink-0 rounded-md p-1 text-faint transition-colors hover:bg-zinc-200/60 hover:text-zinc-700 cursor-pointer"
           aria-label="Ocultar simulación"
         >
           <X className="h-3.5 w-3.5" />
@@ -423,7 +423,7 @@ function DurationField({
           data-skip-autofocus
           onChange={(e) => onValueChange(e.target.value)}
           placeholder="Ej. 8"
-          className="w-full min-w-0 border-0 bg-transparent px-3 py-1.5 text-[13px] text-ink focus:outline-none placeholder:text-zinc-400 tabular-nums"
+          className="w-full min-w-0 border-0 bg-transparent px-3 py-1.5 text-[13px] text-ink focus:outline-none placeholder:text-faint tabular-nums"
         />
         <div className="w-[120px] shrink-0 border-l border-zinc-200 flex items-center h-full">
           <Select
@@ -678,7 +678,7 @@ export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) 
       onRequestClose={requestClose}
       footer={
         <div className="flex w-full items-center justify-between gap-3">
-          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 select-none">
+          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-faint select-none">
             <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
               Ctrl
             </kbd>

@@ -2,7 +2,7 @@ import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 
 const baseClass =
-  "inline-flex h-5 w-5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors";
+  "inline-flex h-5 w-5 items-center justify-center rounded text-faint hover:text-zinc-700 hover:bg-zinc-100 transition-colors";
 
 interface CopyButtonProps {
   text: string;

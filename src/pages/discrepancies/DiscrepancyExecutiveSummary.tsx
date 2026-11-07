@@ -127,7 +127,7 @@ export function DiscrepancyExecutiveSummary({
                     <td className="p-3">
                       <p className="font-semibold text-zinc-900">{line.productName}</p>
                       {line.productCode && (
-                        <span className="font-mono text-[10.5px] text-zinc-400">{line.productCode}</span>
+                        <span className="font-mono text-[10.5px] text-faint">{line.productCode}</span>
                       )}
                     </td>
                     <td className="p-3">{line.invoiceRef || "—"}</td>

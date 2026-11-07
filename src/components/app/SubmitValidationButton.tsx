@@ -251,7 +251,7 @@ export function SubmitValidationButton({
           </div>
 
           {shortcutLabel ? (
-            <div className="mt-2.5 flex items-center justify-between border-t border-zinc-100 pt-2 text-[10px] text-zinc-400">
+            <div className="mt-2.5 flex items-center justify-between border-t border-zinc-100 pt-2 text-[10px] text-faint">
               <span>Atajo de teclado</span>
               <span className="rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 font-mono text-[9.5px] font-semibold text-zinc-600 shadow-2xs">
                 {shortcutLabel}

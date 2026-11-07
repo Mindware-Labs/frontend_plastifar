@@ -135,7 +135,7 @@ export function ClientViewMenu({
                 exiting ? "pointer-events-none" : ""
               }`}
           >
-            <div data-motion-item className="select-none px-2.5 pt-1.5 pb-1 text-[11px] font-medium text-zinc-400">
+            <div data-motion-item className="select-none px-2.5 pt-1.5 pb-1 text-[11px] font-medium text-faint">
               Ordenar por
             </div>
             {sortOptions.map(({ value, label }) => {
@@ -166,7 +166,7 @@ export function ClientViewMenu({
 
             <div
               data-motion-item
-              className="select-none border-t border-zinc-100 px-2.5 pt-2 pb-1 text-[11px] font-medium text-zinc-400"
+              className="select-none border-t border-zinc-100 px-2.5 pt-2 pb-1 text-[11px] font-medium text-faint"
             >
               Enfocar en
             </div>

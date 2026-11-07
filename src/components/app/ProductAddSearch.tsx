@@ -336,7 +336,7 @@ export function ProductAddSearch({
               closePanel();
             }
           }}
-          className={`${controlBase} ${controlSizes.sm} pl-8 ${term.length > 0 ? "pr-10" : "pr-3"} font-medium text-ink placeholder:font-normal placeholder:text-zinc-400
+          className={`${controlBase} ${controlSizes.sm} pl-8 ${term.length > 0 ? "pr-10" : "pr-3"} font-medium text-ink placeholder:font-normal placeholder:text-faint
             border-line-strong hover:border-hairline-hover focus:border-brand-red focus:ring-3 focus:ring-brand-red/10
             transition-[border-color,background-color,box-shadow] duration-280 ease-plf-spring motion-reduce:transition-none
             ${open ? "border-zinc-300 bg-zinc-50/80 shadow-2xs" : ""}`}
@@ -349,7 +349,7 @@ export function ProductAddSearch({
               aria-label="Limpiar búsqueda"
               title="Limpiar búsqueda"
               onClick={clearSearch}
-              className="pointer-events-auto flex size-5.5 items-center justify-center rounded-full text-zinc-400 transition-[color,background-color,opacity] duration-200 hover:bg-zinc-100 hover:text-zinc-600 cursor-pointer"
+              className="pointer-events-auto flex size-5.5 items-center justify-center rounded-full text-faint transition-[color,background-color,opacity] duration-200 hover:bg-zinc-100 hover:text-zinc-600 cursor-pointer"
             >
               <X className="size-3" strokeWidth={2.5} />
             </button>
@@ -419,7 +419,7 @@ export function ProductAddSearch({
                           {option.label}
                         </span>
                         {option.hint ? (
-                          <span className="truncate font-mono text-[10.5px] text-zinc-400 leading-tight">
+                          <span className="truncate font-mono text-[10.5px] text-faint leading-tight">
                             {option.hint}
                           </span>
                         ) : null}
@@ -454,7 +454,7 @@ export function ProductAddSearch({
                       ? "Escribe para buscar productos"
                       : "Sin coincidencias"}
                   </p>
-                  <p className="mt-0.5 text-[11px] text-zinc-400">
+                  <p className="mt-0.5 text-[11px] text-faint">
                     {debouncedTerm === ""
                       ? "Código o descripción en el buscador."
                       : `Nada coincide con «${debouncedTerm}».`}
@@ -467,7 +467,7 @@ export function ProductAddSearch({
                   data-motion-item
                   role="status"
                   className={`shrink-0 border-t border-zinc-100 px-2.5 py-1.5 text-[10.5px] leading-snug ${
-                    failed ? "font-medium text-brand-red" : "text-zinc-400"
+                    failed ? "font-medium text-brand-red" : "text-faint"
                   }`}
                 >
                   {status}

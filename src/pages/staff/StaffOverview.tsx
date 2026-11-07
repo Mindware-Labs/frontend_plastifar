@@ -171,7 +171,7 @@ export function StaffOverview({ staff, fullName, departmentLabel, formatDate, ac
                     <CopyButton text={staff.phoneExt} label="Copiar extensión" className="cursor-pointer" />
                   </div>
                 ) : (
-                  <span className="text-zinc-400">Sin extensión</span>
+                  <span className="text-faint">Sin extensión</span>
                 )}
               </div>
 
@@ -200,7 +200,7 @@ export function StaffOverview({ staff, fullName, departmentLabel, formatDate, ac
             }
           >
             {accesses.length === 0 ? (
-              <p className="px-4 py-6 text-center text-[12.5px] italic text-zinc-400">
+              <p className="px-4 py-6 text-center text-[12.5px] italic text-faint">
                 Todavía no tiene acceso a ningún departamento: entra al sistema pero no ve nada.
               </p>
             ) : (
@@ -234,7 +234,7 @@ export function StaffOverview({ staff, fullName, departmentLabel, formatDate, ac
                         >
                           {departmentLabel(access)}
                         </span>
-                        <span className="block text-[11px] text-zinc-400">
+                        <span className="block text-[11px] text-faint">
                           {access.isPrimary ? "Principal · " : ""}Desde {formatDate(access.grantedAt)}
                         </span>
                       </div>
@@ -258,13 +258,13 @@ export function StaffOverview({ staff, fullName, departmentLabel, formatDate, ac
                   className="max-w-[65%] truncate text-right font-medium text-zinc-800"
                   title={primary ? departmentLabel(primary) : undefined}
                 >
-                  {primary ? departmentLabel(primary) : <span className="text-zinc-400">—</span>}
+                  {primary ? departmentLabel(primary) : <span className="text-faint">—</span>}
                 </span>
               </div>
               <div className={rowClass}>
                 <span className={rowLabelClass}>Rol</span>
                 <span className="max-w-[65%] truncate text-right font-medium text-zinc-800">
-                  {primary?.roleName ?? <span className="text-zinc-400">—</span>}
+                  {primary?.roleName ?? <span className="text-faint">—</span>}
                 </span>
               </div>
               <div className={rowClass}>
@@ -285,7 +285,7 @@ export function StaffOverview({ staff, fullName, departmentLabel, formatDate, ac
               <div className={rowClass}>
                 <span className={rowLabelClass}>Último acceso</span>
                 <span className="font-medium tabular-nums text-zinc-800">
-                  {staff.lastLoginAt ? formatDate(staff.lastLoginAt) : <span className="text-zinc-400">Nunca</span>}
+                  {staff.lastLoginAt ? formatDate(staff.lastLoginAt) : <span className="text-faint">Nunca</span>}
                 </span>
               </div>
             </div>
@@ -304,7 +304,7 @@ export function StaffOverview({ staff, fullName, departmentLabel, formatDate, ac
                     to={accessesTo}
                     className="group rounded-lg border border-zinc-200/80 bg-zinc-50/60 p-2 text-left outline-none transition-colors hover:border-zinc-300 hover:bg-zinc-100/70 focus-visible:ring-2 focus-visible:ring-brand-red/25"
                   >
-                    <span className="block font-heading text-[10px] font-semibold uppercase tracking-wider text-zinc-400 group-hover:text-zinc-600">
+                    <span className="block font-heading text-[10px] font-semibold uppercase tracking-wider text-faint group-hover:text-zinc-600">
                       {stat.label}
                     </span>
                     <span className="font-heading text-[16px] font-bold tabular-nums text-zinc-900">

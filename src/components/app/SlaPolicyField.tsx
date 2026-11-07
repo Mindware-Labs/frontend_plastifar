@@ -17,7 +17,7 @@ const POLICY_GAP_PX = 4;
 const LIST_VIEWPORT_ITEMS = 3;
 
 const sectionDividerTitleClass =
-  "shrink-0 font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-zinc-400 select-none";
+  "shrink-0 font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-faint select-none";
 
 export interface SlaPolicyFieldProps {
   required?: boolean;
@@ -112,7 +112,7 @@ export function SlaPolicyField({
         onClick={() => setSearchExpanded(true)}
         className={
           compactSearch
-            ? `inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 ${
+            ? `inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-faint transition-colors hover:bg-zinc-100 hover:text-zinc-700 ${
                 search.trim() ? "text-brand-red" : ""
               }`
             : `inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-white text-zinc-500 shadow-2xs transition-all hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-800 ${
@@ -145,7 +145,7 @@ export function SlaPolicyField({
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Buscar política…"
             aria-label="Buscar política…"
-            className={`w-full rounded-md border border-zinc-200 bg-white pl-7 pr-2 text-[12px] text-zinc-800 placeholder:text-zinc-400 outline-none transition-colors focus:border-zinc-400 focus:ring-2 focus:ring-zinc-400/20 [&::-webkit-search-cancel-button]:hidden ${expandedInputH}`}
+            className={`w-full rounded-md border border-zinc-200 bg-white pl-7 pr-2 text-[12px] text-zinc-800 placeholder:text-faint outline-none transition-colors focus:border-zinc-400 focus:ring-2 focus:ring-zinc-400/20 [&::-webkit-search-cancel-button]:hidden ${expandedInputH}`}
           />
         </div>
         <button type="button" aria-label="Cerrar búsqueda" onClick={closeSearch} className={closeBtnClass}>
@@ -268,7 +268,7 @@ export function SlaPolicyField({
           )}
         </span>
         <span
-          className={`pl-4 text-[10.5px] leading-snug ${isSelected ? "text-zinc-500" : "text-zinc-400"}`}
+          className={`pl-4 text-[10.5px] leading-snug ${isSelected ? "text-zinc-500" : "text-faint"}`}
         >
           Prioridad {policy.priority.toLowerCase()} · {slaPolicyPlazoLabel(policy)}
         </span>
@@ -336,7 +336,7 @@ export function SlaPolicyField({
       </div>
 
       {readOnly && readOnlyHint ? (
-        <p className="text-[11px] leading-snug text-zinc-400">{readOnlyHint}</p>
+        <p className="text-[11px] leading-snug text-faint">{readOnlyHint}</p>
       ) : null}
 
       {error && (

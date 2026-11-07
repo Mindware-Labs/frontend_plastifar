@@ -26,7 +26,7 @@ export function PrintSheetSkeleton({
       <header className="sticky top-0 z-30 flex h-14 w-full shrink-0 items-center justify-between border-b border-zinc-200/90 bg-white/95 px-4 sm:px-6 backdrop-blur-md shadow-2xs">
         {/* Lado izquierdo: Botón volver + Título skeleton */}
         <div className="flex items-center gap-3 min-w-0">
-          <div className="inline-flex h-8.5 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-400 shadow-2xs">
+          <div className="inline-flex h-8.5 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 text-xs font-semibold text-faint shadow-2xs">
             <ArrowLeft className="size-3.5 text-zinc-300" />
             <span>{backLabel}</span>
           </div>

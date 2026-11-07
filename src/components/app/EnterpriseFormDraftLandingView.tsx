@@ -39,7 +39,7 @@ export function EnterpriseFormDraftLandingView({
           <FilePenLine className="size-[18px]" strokeWidth={2} />
         </div>
         <div className="min-w-0 text-left">
-          <p className="font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-400">
+          <p className="font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-faint">
             {hostKindLabel} {ticketNumber}
           </p>
           <h3 className="mt-0.5 font-heading text-base font-bold text-zinc-900 sm:text-[17px]">
@@ -74,7 +74,7 @@ export function EnterpriseFormDraftLandingView({
                   <dl className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
                     {draft.savedAtLabel ? (
                       <div className="rounded-md border border-zinc-200/80 bg-white/90 px-2 py-1">
-                        <dt className="font-heading text-[9px] font-bold uppercase tracking-[0.08em] text-zinc-400">
+                        <dt className="font-heading text-[9px] font-bold uppercase tracking-[0.08em] text-faint">
                           Guardado
                         </dt>
                         <dd className="mt-px font-medium tabular-nums leading-tight text-zinc-800">
@@ -84,7 +84,7 @@ export function EnterpriseFormDraftLandingView({
                     ) : null}
                     {draft.stepLabel ? (
                       <div className="rounded-md border border-zinc-200/80 bg-white/90 px-2 py-1">
-                        <dt className="font-heading text-[9px] font-bold uppercase tracking-[0.08em] text-zinc-400">
+                        <dt className="font-heading text-[9px] font-bold uppercase tracking-[0.08em] text-faint">
                           Progreso
                         </dt>
                         <dd className="mt-px font-medium leading-tight text-zinc-800">{draft.stepLabel}</dd>

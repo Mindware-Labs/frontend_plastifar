@@ -113,7 +113,7 @@ export function NotificationsBell({
           ? "bg-zinc-100 text-zinc-900 ring-1 ring-zinc-900/[0.06] shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]"
           : unreadCount > 0
             ? "text-zinc-800 hover:bg-zinc-100/80"
-            : "text-zinc-400 hover:bg-zinc-100/80 hover:text-zinc-800"
+            : "text-faint hover:bg-zinc-100/80 hover:text-zinc-800"
       } ${collapsed ? "mx-auto" : ""}`}
     >
       <Bell
@@ -293,7 +293,7 @@ function PanelBody({ onClose, onOpenSettings }: { onClose: () => void; onOpenSet
           <div className={`flex flex-col pb-1.5 transition-opacity duration-150 ${status === "loading" ? "opacity-60" : ""}`}>
             {groups.map((group) => (
               <section key={group.label} aria-label={group.label}>
-                <p className="sticky top-0 z-[1] bg-white/95 px-3 pt-2 pb-1 font-heading text-[9.5px] font-bold uppercase tracking-[0.1em] text-zinc-400 backdrop-blur-sm">
+                <p className="sticky top-0 z-[1] bg-white/95 px-3 pt-2 pb-1 font-heading text-[9.5px] font-bold uppercase tracking-[0.1em] text-faint backdrop-blur-sm">
                   {group.label}
                 </p>
                 <ul className="flex flex-col px-1.5">
@@ -375,7 +375,7 @@ function NotificationRow({
           {notification.body && (
             <span className="truncate text-[11.5px] leading-snug text-zinc-500">{notification.body}</span>
           )}
-          <span className="mt-0.5 flex items-center gap-1 text-[10.5px] text-zinc-400">
+          <span className="mt-0.5 flex items-center gap-1 text-[10.5px] text-faint">
             <span className="font-medium text-zinc-500">{meta.module}</span>
             <span aria-hidden>·</span>
             <time dateTime={notification.createdAt} title={new Date(notification.createdAt).toLocaleString("es-DO")}>
@@ -397,7 +397,7 @@ function NotificationRow({
         onClick={onToggleRead}
         aria-label={unread ? "Marcar como leída" : "Marcar como no leída"}
         title={unread ? "Marcar como leída" : "Marcar como no leída"}
-        className="absolute top-1.5 right-1.5 flex size-6 items-center justify-center rounded-md text-zinc-400 opacity-0 outline-none transition-all duration-150 hover:bg-white hover:text-zinc-800 hover:shadow-2xs focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-brand-red/25 group-hover/row:opacity-100 cursor-pointer"
+        className="absolute top-1.5 right-1.5 flex size-6 items-center justify-center rounded-md text-faint opacity-0 outline-none transition-all duration-150 hover:bg-white hover:text-zinc-800 hover:shadow-2xs focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-brand-red/25 group-hover/row:opacity-100 cursor-pointer"
       >
         {unread ? <Check className="size-3" strokeWidth={2.4} /> : <Circle className="size-2.5" strokeWidth={2.6} />}
       </button>
@@ -470,7 +470,7 @@ function IconButton({
 function EmptyState({ filter }: { filter: NotificationFilter }) {
   return (
     <div className="flex flex-col items-center px-6 py-8 text-center">
-      <span className="mb-2 flex size-8 items-center justify-center rounded-lg border border-zinc-200/80 bg-zinc-50 text-zinc-400 shadow-2xs">
+      <span className="mb-2 flex size-8 items-center justify-center rounded-lg border border-zinc-200/80 bg-zinc-50 text-faint shadow-2xs">
         {filter === "unread" ? <CheckCheck className="size-4" /> : <Bell className="size-4" />}
       </span>
       <p className="font-heading text-[12.5px] font-semibold text-ink">

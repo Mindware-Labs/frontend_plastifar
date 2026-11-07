@@ -347,7 +347,7 @@ export function Select({
           disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:text-zinc-400
           ${triggerVariantClass} ${sizeHeight} ${sizeTypography} ${paddingClass} items-center
           ${centered ? "flex items-center justify-center gap-1.5" : "flex justify-between text-left"} font-medium
-          ${selected ? "text-zinc-900" : "text-zinc-400"} ${buttonClassName}`}
+          ${selected ? "text-zinc-900" : "text-faint"} ${buttonClassName}`}
       >
         <div
           className={`flex min-w-0 ${centered ? "flex-none justify-center" : "flex-1"} gap-1.5 ${
@@ -432,7 +432,7 @@ export function Select({
                     aria-label="Buscar opciones"
                     aria-controls={listId}
                     className="w-full rounded-md border border-zinc-200 bg-zinc-50/60 py-1.5 pl-8 pr-2 text-[12px]
-                      text-zinc-800 outline-none transition-colors placeholder:text-zinc-400 focus:border-zinc-400
+                      text-zinc-800 outline-none transition-colors placeholder:text-faint focus:border-zinc-400
                       focus:bg-white focus:ring-2 focus:ring-zinc-400/20"
                   />
                 </div>

@@ -107,7 +107,7 @@ export function Modal({
               {eyebrow && (
                 <p
                   key={eyebrow}
-                  className="animate-plf-header-fade font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-400"
+                  className="animate-plf-header-fade font-heading text-[10px] font-bold uppercase tracking-[0.1em] text-faint"
                 >
                   {eyebrow}
                 </p>

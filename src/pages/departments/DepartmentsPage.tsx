@@ -426,7 +426,7 @@ export function DepartmentsPage() {
               />
             </div>
           ) : (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-faint">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
               Cargando departamentos…
             </span>
@@ -632,7 +632,7 @@ export function DepartmentsPage() {
                               <span className="truncate">{d.sedeName}</span>
                             </span>
                           ) : (
-                            <span className="text-[12px] text-zinc-400 italic">Sin sede</span>
+                            <span className="text-[12px] text-faint">Sin sede</span>
                           )}
                         </Td>
 
@@ -666,7 +666,7 @@ export function DepartmentsPage() {
                               <span className="truncate">{d.managerName}</span>
                             </span>
                           ) : (
-                            <span className="text-[12px] text-zinc-400 italic">Sin administrador</span>
+                            <span className="text-[12px] text-faint">Sin administrador</span>
                           )}
                         </Td>
 
@@ -678,7 +678,7 @@ export function DepartmentsPage() {
                               <span>{d.defaultRoleName}</span>
                             </span>
                           ) : (
-                            <span className="text-[12px] text-zinc-400 italic">Sin rol</span>
+                            <span className="text-[12px] text-faint">Sin rol</span>
                           )}
                         </Td>
 

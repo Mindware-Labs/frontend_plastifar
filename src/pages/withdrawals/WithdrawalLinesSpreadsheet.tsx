@@ -562,7 +562,7 @@ export function WithdrawalLinesSpreadsheet({
                       aria-label={`Quitar fila ${index + 1}`}
                       disabled={liveCount <= 1 || exiting}
                       onClick={() => requestRemove(line.key)}
-                      className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md text-zinc-400 transition-[color,background-color,transform] duration-150 ease-plf-spring hover:bg-zinc-100 hover:text-brand-red active:scale-[0.92] disabled:cursor-not-allowed disabled:opacity-30 motion-reduce:transition-none motion-reduce:active:scale-100"
+                      className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md text-faint transition-[color,background-color,transform] duration-150 ease-plf-spring hover:bg-zinc-100 hover:text-brand-red active:scale-[0.92] disabled:cursor-not-allowed disabled:opacity-30 motion-reduce:transition-none motion-reduce:active:scale-100"
                     >
                       <Trash2 className="size-3.5" />
                     </button>
