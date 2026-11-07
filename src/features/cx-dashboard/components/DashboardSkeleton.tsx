@@ -398,127 +398,7 @@ function TopicsCard() {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  4 — Bandeja reciente                                                       */
-/* -------------------------------------------------------------------------- */
-
-/** Anchos relativos de las siete columnas, tomados del tablero cargado. */
-const TABLE_COLS = "minmax(0,2.4fr) minmax(0,1.8fr) minmax(0,0.65fr) minmax(0,0.75fr) minmax(0,1.05fr) minmax(0,1.3fr) minmax(0,0.85fr)";
-
-function RecentCard() {
-  const tabs = [40, 54, 44, 112, 110, 70];
-  return (
-    <SkCard>
-      <SkHead title="w-36" right={<ControlPill width={230} delay={40} />} />
-      {/* Riel de pestañas: seis, en una pastilla `chip`. */}
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 3,
-          margin: "12px 0",
-          background: "#F0F2F5",
-          borderRadius: 999,
-          padding: 3,
-          width: "fit-content",
-          maxWidth: "100%",
-        }}
-      >
-        {tabs.map((width, i) => (
-          <span
-            key={i}
-            style={{
-              ...ROW,
-              justifyContent: "center",
-              width: width + 24,
-              height: 25,
-              borderRadius: 999,
-              background: i === 0 ? "#fff" : undefined,
-            }}
-          >
-            {/* Sobre el gris del riel el brillo del esqueleto no se distingue:
-                las inactivas van en `rail`, un paso mas oscuro, y quietas. */}
-            {i === 0 ? (
-              <Skeleton className="h-2 w-2/3 !rounded-full" />
-            ) : (
-              <span aria-hidden style={{ width: "66%", height: 8, borderRadius: 99, background: RAIL }} />
-            )}
-          </span>
-        ))}
-      </div>
-      <div style={{ overflowX: "auto" }}>
-        <div style={{ minWidth: 640 }}>
-          <div style={{ display: "grid", gridTemplateColumns: TABLE_COLS, height: 23, alignItems: "start" }}>
-            {[12, 12, 10, 14, 10, 18, 14].map((width, col) => (
-              <span
-                key={col}
-                style={{ padding: "0 10px", display: "flex", justifyContent: col === 6 ? "flex-end" : "flex-start" }}
-              >
-                <span style={{ width: width * 4 }}>
-                  <Skeleton className="h-2" delay={col * 25} />
-                </span>
-              </span>
-            ))}
-          </div>
-          {Array.from({ length: 5 }).map((_, row) => {
-            const d = Math.min(row * 60, 300);
-            return (
-              <div
-                key={row}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: TABLE_COLS,
-                  alignItems: "center",
-                  height: 50,
-                  borderTop: HAIR2,
-                }}
-              >
-                <span style={{ padding: "0 10px", display: "flex", flexDirection: "column", gap: 6 }}>
-                  <Skeleton className="h-3 w-20" delay={d} />
-                  <Skeleton className="h-2.5 w-44 max-w-full" delay={d + 20} />
-                </span>
-                <span style={{ padding: "0 10px" }}>
-                  <Skeleton className="h-3 w-4/5" delay={d + 40} />
-                </span>
-                <span style={{ padding: "0 10px" }}>
-                  <Skeleton className="h-3 w-12" delay={d + 60} />
-                </span>
-                <span style={{ padding: "0 10px" }}>
-                  <Skeleton className="h-3 w-12" delay={d + 80} />
-                </span>
-                <span style={{ padding: "0 10px" }}>
-                  <Skeleton className="h-[21px] w-20 !rounded-full" delay={d + 100} />
-                </span>
-                <span style={{ ...ROW, gap: 7, padding: "0 10px" }}>
-                  <Skeleton className="h-[22px] w-[22px] shrink-0 !rounded-full" delay={d + 120} />
-                  <Skeleton className="h-3 w-12" delay={d + 120} />
-                </span>
-                <span style={{ padding: "0 10px", display: "flex", justifyContent: "flex-end" }}>
-                  <Skeleton className="h-2.5 w-20" delay={d + 140} />
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      <div
-        style={{
-          ...ROW,
-          justifyContent: "space-between",
-          marginTop: 10,
-          paddingTop: 9,
-          borderTop: "1px solid #E9ECF1",
-          height: 15.4 + 9,
-        }}
-      >
-        <Skeleton className="h-2.5 w-12" delay={300} />
-        <Skeleton className="h-2.5 w-32" delay={330} />
-      </div>
-    </SkCard>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*  5 — Canales + responsables                                                 */
+/*  4 — Canales + responsables                                               */
 /* -------------------------------------------------------------------------- */
 
 function ChannelsCard() {
@@ -648,8 +528,6 @@ export function DashboardSkeleton() {
         <StatesCard />
         <TopicsCard />
       </div>
-
-      <RecentCard />
 
       <div className="cx-pair" style={WIDE}>
         <ChannelsCard />
