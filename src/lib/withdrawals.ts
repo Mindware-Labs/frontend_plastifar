@@ -55,7 +55,7 @@ export function splitIsoDate(isoDateString: string | null | undefined): {
 /** Control documental del pie del PF-FOR-068, tal como está en la plantilla. */
 export const WITHDRAWAL_FORM_CONTROL = {
   code: "PF-FOR-068",
-  title: "SOLICITUD RETIRO DE MERCANCIA",
+  title: "SOLICITUD RETIRO DE MERCANCÍA",
   revision: "00",
   replaces: "N/A",
   lastRevision: "11-Junio-2013",

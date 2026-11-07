@@ -208,35 +208,35 @@ const SECURITY_ITEMS = [
   },
   {
     itemNumber: 2,
-    text: "El despachador no realizó la inspeccion previa de contenedor vacio antes de iniciar la carga de materiales.",
+    text: "El despachador no realizó la inspección previa del contenedor vacío antes de iniciar la carga de materiales.",
   },
   {
     itemNumber: 3,
-    text: "El despachador no utiliza las herramientas de inspeccion (Martillo de Goma, Formato de Inspección).",
+    text: "El despachador no utiliza las herramientas de inspección (martillo de goma, formato de inspección).",
   },
   {
     itemNumber: 4,
-    text: "No hay suficiente iluminacion al momento de realizar la inspeccion del contenedor y no se utilizo linterna en caso falta de iluminacion.",
+    text: "No hay suficiente iluminación al momento de realizar la inspección del contenedor y no se utilizó linterna en caso de falta de iluminación.",
   },
   {
     itemNumber: 5,
-    text: "La carga es introducida al contenedor antes de realizar la inspeccion de seguridad.",
+    text: "La carga es introducida al contenedor antes de realizar la inspección de seguridad.",
   },
   {
     itemNumber: 6,
-    text: "Durante el proceso de carga se pudo evidenciar la manipulación de empaques para introducir materiales sospechas dentro del empaque?",
+    text: "¿Durante el proceso de carga se pudo evidenciar la manipulación de empaques para introducir materiales sospechosos dentro del empaque?",
   },
   {
     itemNumber: 7,
-    text: "Durante el proceso de carga se pudo evidenciar la presencia de personal ajeno a la carga o no autorizado?",
+    text: "¿Durante el proceso de carga se pudo evidenciar la presencia de personal ajeno a la carga o no autorizado?",
   },
   {
     itemNumber: 8,
-    text: "Alguna persona de las que trabajaron en la carga de contenedor nunca salió del contenedor al finalizar la carga? Contrabando de personas",
+    text: "¿Alguna de las personas que trabajaron en la carga del contenedor no salió del contenedor al finalizar la carga? (Contrabando de personas)",
   },
   {
     itemNumber: 9,
-    text: "En caso de positivo en alguna de las anteriores preguntas se notifico a las Gerencias de Seguridad y Logística del evento?",
+    text: "Si alguna de las preguntas anteriores fue positiva, ¿se notificó el evento a las Gerencias de Seguridad y Logística?",
   },
 ];
 
@@ -907,11 +907,11 @@ export function DiscrepancyFormModal({
 
   // Stepper Header
   const stepperSteps: { n: 1 | 2 | 3; title: string; caption: string; enabled: boolean }[] = [
-    { n: 1, title: "Origen y Despacho", caption: "Ticket y fecha", enabled: true },
-    { n: 2, title: "Líneas y Detalle", caption: "Productos y nota", enabled: !!ticketIdValue },
+    { n: 1, title: "Origen y despacho", caption: "Ticket y fecha", enabled: true },
+    { n: 2, title: "Líneas y detalle", caption: "Productos y nota", enabled: !!ticketIdValue },
     {
       n: 3,
-      title: "Puntos de Seguridad",
+      title: "Puntos de seguridad",
       caption: "9 puntos de control",
       enabled: !!ticketIdValue && fields.length > 0,
     },
@@ -1326,7 +1326,7 @@ export function DiscrepancyFormModal({
           <thead>
             <tr className="border-b border-zinc-200 bg-zinc-50/90 text-[11px] font-heading font-bold uppercase tracking-wider text-zinc-500 select-none">
               <th className="py-2.5 pl-3 pr-2 w-10 text-center whitespace-nowrap">#</th>
-              <th className="py-2.5 px-3 whitespace-nowrap">Puntos de Seguridad a Evaluar</th>
+              <th className="py-2.5 px-3 whitespace-nowrap">Puntos de seguridad a evaluar</th>
               <th className="py-2.5 px-2 w-28 text-center whitespace-nowrap">
                 <span className="block text-[9px] text-faint font-normal lowercase tracking-normal">marcar X</span>
                 <span className="text-brand-red">Positivo</span>

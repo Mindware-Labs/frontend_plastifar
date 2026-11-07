@@ -878,7 +878,7 @@ export function WithdrawalFormModal({
           {/** Fecha, Origen del error y Moneda */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <DateField
-              label="Fecha de solicitud (DIA / MES / AÑO)"
+              label="Fecha de solicitud (DÍA / MES / AÑO)"
               required
               value={requestDate}
               maxDate={today()}
@@ -953,7 +953,7 @@ export function WithdrawalFormModal({
             </button>
             <h2 className="min-w-0 flex-1 truncate font-heading text-base font-bold leading-none text-zinc-900 sm:text-lg">
               {isEditing
-                ? `Editar solicitud · ${displayTicketNumber ?? ""}`
+                ? `Editar solicitud ${withdrawal?.number ?? ""}`
                 : "Solicitud de retiro de mercancía"}
             </h2>
             <FormCodeTag code={WITHDRAWAL_FORM_CONTROL.code} />

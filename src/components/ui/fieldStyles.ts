@@ -1,6 +1,6 @@
 /**
  * Gramatica visual compartida por todos los controles de formulario:
- * radio de 2 px, filete gris, foco en rojo 185 C y estado explicito.
+ * radio `--radius-edge`, filete gris, foco en `brand-red` y estado explicito.
  * Vive aparte para que Field y Select no dependan uno del otro.
  */
 export type FieldState = "idle" | "error" | "valid";

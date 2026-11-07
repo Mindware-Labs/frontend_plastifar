@@ -86,7 +86,7 @@ function filterOptions(options: LookupOption[], term: string): LookupOption[] {
  * partir de ahi el registro simplemente no existia para quien buscaba.
  *
  * Misma gramatica visual que `Select` --disparador identico, panel en portal,
- * radio de 2 px, foco en rojo 185 C-- con un campo de texto arriba que consulta
+ * radio `--radius-edge`, foco en `brand-red`-- con un campo de texto arriba que consulta
  * al SERVIDOR con retardo. La lista dice siempre en que estado esta: cargando,
  * vacia, o incompleta con la invitacion a seguir escribiendo.
  */

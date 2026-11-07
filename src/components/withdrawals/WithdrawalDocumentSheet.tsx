@@ -59,7 +59,7 @@ export function WithdrawalDocumentSheet({
         </div>
 
         <div className="border-b border-black py-1 text-center text-[12px] font-bold uppercase tracking-wide">
-          SOLICITUD RETIRO DE MERCANCIA
+          SOLICITUD RETIRO DE MERCANCÍA
         </div>
 
         <div className="border-b border-black px-3 py-2.5">
@@ -96,7 +96,7 @@ export function WithdrawalDocumentSheet({
                     </th>
                   </tr>
                   <tr>
-                    <th className="w-1/3 border border-black py-0.5 font-normal">DIA</th>
+                    <th className="w-1/3 border border-black py-0.5 font-normal">DÍA</th>
                     <th className="w-1/3 border border-black py-0.5 font-normal">MES</th>
                     <th className="w-1/3 border border-black py-0.5 font-normal">AÑO</th>
                   </tr>
@@ -120,10 +120,10 @@ export function WithdrawalDocumentSheet({
         <table className="w-full border-collapse">
           <thead>
             <tr>
-              <th className={`${cell} w-[11%] border-t-0 border-l-0 font-normal`}>CODIGO</th>
+              <th className={`${cell} w-[11%] border-t-0 border-l-0 font-normal`}>CÓDIGO</th>
               <th className={`${cell} w-[11%] border-t-0 font-normal`}>CANT.</th>
               <th className={`${cell} w-[11%] border-t-0 font-normal`}>UNID</th>
-              <th className={`${cell} w-[39%] border-t-0 font-normal`}>DESCRICION</th>
+              <th className={`${cell} w-[39%] border-t-0 font-normal`}>DESCRIPCIÓN</th>
               <th className={`${cell} w-[14%] border-t-0 font-normal`}>P. UNIT.</th>
               <th className={`${cell} w-[14%] border-t-0 border-r-0 font-normal`}>VALOR</th>
             </tr>

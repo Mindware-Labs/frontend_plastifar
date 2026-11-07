@@ -1498,8 +1498,8 @@ input::-ms-clear {
 }
 
 @theme inline {
-  /* --font-heading no se toca aqui: Plastifar usa Montserrat para titulos en
-     toda la app, shadcn/Geist queda solo para sus propios componentes. */
+  /* --font-heading no se toca aqui: los titulos usan Onest (definido en el
+     @theme de arriba) y el cuerpo Geist, que es lo que fija --font-sans. */
   --font-sans: 'Geist Variable', sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);

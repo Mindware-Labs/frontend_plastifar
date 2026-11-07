@@ -276,14 +276,14 @@ export function RolesPage() {
       >
         {currentTab === "permisos" ? (
           <PermissionsView
-            title="Roles y Permisos"
+            title="Roles y permisos"
             headerExtra={tabSwitcher}
             onMatrixLoaded={setMatrix}
           />
         ) : (
           <>
       <ModuleHeader
-        title="Roles y Permisos"
+        title="Roles y permisos"
         summary={
           counts ? (
             <div className="flex flex-wrap items-center gap-1.5 tabular-nums">

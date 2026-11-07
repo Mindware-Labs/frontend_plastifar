@@ -19,7 +19,7 @@ const EDGE = 8;
 
 /**
  * Tooltip propio, sin libreria: aparece al pasar el mouse o al enfocar con
- * teclado, mismo vocabulario que el panel flotante (filete, radio de 2px,
+ * teclado, mismo vocabulario que el panel flotante (filete, radio `--radius-edge`,
  * sombra de panel flotante).
  *
  * Se renderiza en un portal con posicion fija. DESIGN.md decia que el portal

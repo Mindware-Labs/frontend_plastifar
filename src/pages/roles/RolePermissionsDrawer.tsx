@@ -465,7 +465,7 @@ export function RolePermissionsDrawer({
                     title="Quitar todos los permisos"
                   >
                     <RotateCcw className="h-3 w-3 shrink-0 text-zinc-400" aria-hidden />
-                    Limpiar
+                    Quitar todos
                   </button>
                 </div>
               )}

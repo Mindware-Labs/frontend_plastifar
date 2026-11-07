@@ -24,7 +24,8 @@ import { Select, type SelectOption } from "./Select";
 
 /**
  * Controles de formulario del panel: misma gramatica que las tablas — etiqueta
- * en Montserrat versalita, radio de 2 px, filete gris y foco en rojo 185 C.
+ * en versalita de la cara de titulos (Onest), radio `--radius-edge`, filete
+ * gris y foco en `brand-red`.
  *
  * El estado del campo es explicito y visible: reposo, error (borde rojo + mensaje
  * con icono) y correcto (borde verde 348 C + palomita). Nunca se pinta "correcto"

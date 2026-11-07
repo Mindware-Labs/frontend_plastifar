@@ -12,7 +12,7 @@ const FORM_CONTROL = {
   revision: "00",
   replaces: "N/A",
   lastRevision: "N/A",
-  issuedOn: "17 .04.2015",
+  issuedOn: "17.04.2015",
 } as const;
 
 export interface HcaDocumentSheetProps {
