@@ -96,6 +96,7 @@ import type {
   SecurityCheckInput,
   SecurityCheckResult,
 } from "../../types/discrepancies";
+import { FormDivider } from "../../components/ui/FormDivider";
 
 const quantity = z
   .string()
@@ -279,18 +280,6 @@ function parseNote(rawNote: string | null | undefined): { date: string; note: st
     return { date, note: cleanNote };
   }
   return { date: today(), note: rawNote };
-}
-
-/** Divisor idéntico al de ClientModal */
-function FormDivider({ title }: { title: string }) {
-  return (
-    <div className="flex items-center gap-2 pt-2 border-t border-zinc-100 first:border-0 first:pt-0">
-      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-faint select-none">
-        {title}
-      </span>
-      <div className="h-px flex-1 bg-zinc-100" />
-    </div>
-  );
 }
 
 /** Formulario de Investigación de Discrepancia de Carga (PF-FOR-291) Reestructurado en 3 p... */

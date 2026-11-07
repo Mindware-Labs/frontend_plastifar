@@ -6,14 +6,15 @@ import { SubmitValidationButton } from "../../components/app/SubmitValidationBut
 import { ApiError } from "../../api/client";
 import { clientsApi } from "../../api/clients";
 import { Alert } from "../../components/ui/Alert";
-import { Button } from "../../components/ui/Button";
 import { CheckboxField, TextField, type FieldState } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
+import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { formatPhoneNumber } from "../../lib/format";
 import { fieldForServerError, type FieldRule } from "../../lib/serverFieldErrors";
 import { buildValidationItems, focusFormField } from "../../lib/validationItems";
 import type { Contact } from "../../types/clients";
+import { FormDivider } from "../../components/ui/FormDivider";
 
 /**
  * Espejo de la validacion del servidor en POST/PUT /api/clients/{id}/contacts:
@@ -64,17 +65,6 @@ const fieldRules: FieldRule<keyof FormValues>[] = [
   { field: "position", matches: ["cargo"] },
   { field: "firstName", matches: ["nombre"] },
 ];
-
-function FormDivider({ title }: { title: string }) {
-  return (
-    <div className="flex items-center gap-2 border-t border-line-soft pt-2 first:border-0 first:pt-0">
-      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-faint select-none">
-        {title}
-      </span>
-      <div className="h-px flex-1 bg-fill" />
-    </div>
-  );
-}
 
 interface ContactModalProps {
   clientId: number;
@@ -186,21 +176,14 @@ export function ContactModal({ clientId, contact, isFirst, onClose, onSaved }: C
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
-        <div className="flex w-full items-center justify-between gap-3">
-          <span className="hidden select-none items-center gap-1 text-[11px] text-faint sm:inline-flex">
-            <kbd className="rounded-edge border border-line bg-fill px-1 py-0.5 font-mono text-[10px] text-subtle">
-              Ctrl
-            </kbd>
-            <span>+</span>
-            <kbd className="rounded-edge border border-line bg-fill px-1 py-0.5 font-mono text-[10px] text-subtle">
-              Enter
-            </kbd>
-            <span className="ml-0.5">para guardar</span>
-          </span>
-          <div className="ml-auto flex items-center gap-2">
-            <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
-              Cancelar
-            </Button>
+        <FormModalFooter
+          formId="contact-form"
+          isEdit={isEdit}
+          createLabel="Agregar contacto"
+          isSubmitting={isSubmitting}
+          onCancel={requestClose}
+          size="sm"
+          submit={
             <SubmitValidationButton
               formId="contact-form"
               ready={contactFormMissing.length === 0}
@@ -211,8 +194,8 @@ export function ContactModal({ clientId, contact, isFirst, onClose, onSaved }: C
             >
               {isEdit ? "Guardar cambios" : "Agregar contacto"}
             </SubmitValidationButton>
-          </div>
-        </div>
+          }
+        />
       }
     >
       <form

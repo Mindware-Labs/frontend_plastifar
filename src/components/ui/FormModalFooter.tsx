@@ -16,6 +16,13 @@ interface FormModalFooterProps {
    * tooltip y en `aria-keyshortcuts` del boton, no como texto en el pie.
    */
   shortcut?: boolean;
+  /** Tamano de los dos botones; por defecto el del Button. */
+  size?: "sm" | "md";
+  /**
+   * Sustituye el boton de envio por uno propio (p. ej. SubmitValidationButton,
+   * que explica que falta antes de guardar). Cancelar se mantiene igual.
+   */
+  submit?: ReactNode;
   /** Acciones secundarias antes de Cancelar (vista previa, etc.). */
   children?: ReactNode;
 }
@@ -30,23 +37,28 @@ export function FormModalFooter({
   isSubmitting,
   onCancel,
   shortcut = false,
+  size,
+  submit,
   children,
 }: FormModalFooterProps) {
   return (
     <>
       {children}
-      <Button type="button" variant="secondary" onClick={onCancel}>
+      <Button type="button" variant="secondary" size={size} onClick={onCancel}>
         {cancelLabel}
       </Button>
-      <Button
-        type="submit"
-        form={formId}
-        isLoading={isSubmitting}
-        title={shortcut ? "Ctrl + Enter" : undefined}
-        aria-keyshortcuts={shortcut ? "Control+Enter" : undefined}
-      >
-        {isEdit ? editLabel : createLabel}
-      </Button>
+      {submit ?? (
+        <Button
+          type="submit"
+          form={formId}
+          size={size}
+          isLoading={isSubmitting}
+          title={shortcut ? "Ctrl + Enter" : undefined}
+          aria-keyshortcuts={shortcut ? "Control+Enter" : undefined}
+        >
+          {isEdit ? editLabel : createLabel}
+        </Button>
+      )}
     </>
   );
 }

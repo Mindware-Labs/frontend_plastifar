@@ -6,9 +6,9 @@ import { SubmitValidationButton } from "../../components/app/SubmitValidationBut
 import { ApiError } from "../../api/client";
 import { sedesApi } from "../../api/sedes";
 import { Alert } from "../../components/ui/Alert";
-import { Button } from "../../components/ui/Button";
 import { CheckboxField, TextField, type FieldState } from "../../components/ui/Field";
 import { FormDivider } from "../../components/ui/FormDivider";
+import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { Modal } from "../../components/ui/Modal";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { buildValidationItems, focusFormField } from "../../lib/validationItems";
@@ -131,21 +131,14 @@ export function SedeModal({ sede, onClose, onSaved }: SedeModalProps) {
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
-        <div className="flex w-full items-center justify-between gap-3">
-          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-faint select-none">
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
-              Ctrl
-            </kbd>
-            <span>+</span>
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
-              Enter
-            </kbd>
-            <span className="ml-0.5">para guardar</span>
-          </span>
-          <div className="ml-auto flex items-center gap-2">
-            <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
-              Cancelar
-            </Button>
+        <FormModalFooter
+          formId="sede-form"
+          isEdit={isEdit}
+          createLabel="Crear sede"
+          isSubmitting={isSubmitting}
+          onCancel={requestClose}
+          size="sm"
+          submit={
             <SubmitValidationButton
               formId="sede-form"
               ready={sedeFormMissing.length === 0}
@@ -156,8 +149,8 @@ export function SedeModal({ sede, onClose, onSaved }: SedeModalProps) {
             >
               {isEdit ? "Guardar cambios" : "Crear sede"}
             </SubmitValidationButton>
-          </div>
-        </div>
+          }
+        />
       }
     >
       <form

@@ -45,6 +45,7 @@ import {
   type SlaPolicyType,
   type Weekday,
 } from "../../types/settings";
+import { FormDivider } from "../../components/ui/FormDivider";
 
 const PRIORITY_OPTIONS = [
   {
@@ -156,17 +157,6 @@ const timeFormat = new Intl.DateTimeFormat("es-DO", {
   hour: "2-digit",
   minute: "2-digit",
 });
-
-function FormDivider({ title }: { title: string }) {
-  return (
-    <div className="flex items-center gap-2 pt-2 border-t border-zinc-100 first:border-0 first:pt-0">
-      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-faint select-none">
-        {title}
-      </span>
-      <div className="h-px flex-1 bg-zinc-100" />
-    </div>
-  );
-}
 
 function skippedPhrase(leg: DeadlineResult): string {
   return [

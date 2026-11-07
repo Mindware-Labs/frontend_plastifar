@@ -3,23 +3,13 @@ import { Controller, useForm } from "react-hook-form";
 import { ApiError } from "../../api/client";
 import { clientsApi } from "../../api/clients";
 import { Alert } from "../../components/ui/Alert";
-import { Button } from "../../components/ui/Button";
 import { LookupField } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
+import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { resolveStaffLabel, searchSalesRepStaff } from "../../lib/lookups";
 import type { Client } from "../../types/clients";
-
-function FormDivider({ title }: { title: string }) {
-  return (
-    <div className="flex items-center gap-2 pt-2 border-t border-line-soft first:border-0 first:pt-0">
-      <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-faint select-none">
-        {title}
-      </span>
-      <div className="h-px flex-1 bg-fill" />
-    </div>
-  );
-}
+import { FormDivider } from "../../components/ui/FormDivider";
 
 interface BulkReassignSalesRepModalProps {
   clients: Client[];
@@ -76,31 +66,15 @@ export function BulkReassignSalesRepModal({ clients, onClose, onSaved }: BulkRea
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
-        <div className="flex w-full items-center justify-between gap-3">
-          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-faint select-none">
-            <kbd className="rounded-edge border border-line bg-fill px-1 py-0.5 text-[10px] font-mono text-subtle">
-              Ctrl
-            </kbd>
-            <span>+</span>
-            <kbd className="rounded-edge border border-line bg-fill px-1 py-0.5 text-[10px] font-mono text-subtle">
-              Enter
-            </kbd>
-            <span className="ml-0.5">para guardar</span>
-          </span>
-          <div className="flex items-center gap-2 ml-auto">
-            <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              form="bulk-reassign-form"
-              size="sm"
-              isLoading={formState.isSubmitting}
-            >
-              {clients.length === 1 ? "Reasignar cliente" : `Reasignar ${clients.length} clientes`}
-            </Button>
-          </div>
-        </div>
+        <FormModalFooter
+          formId="bulk-reassign-form"
+          isEdit={false}
+          createLabel={clients.length === 1 ? "Reasignar cliente" : `Reasignar ${clients.length} clientes`}
+          isSubmitting={formState.isSubmitting}
+          onCancel={requestClose}
+          size="sm"
+          shortcut
+        />
       }
     >
       <form

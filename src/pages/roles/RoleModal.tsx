@@ -6,9 +6,9 @@ import { z } from "zod";
 import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
 import { rolesApi } from "../../api/roles";
 import { Alert } from "../../components/ui/Alert";
-import { Button } from "../../components/ui/Button";
 import { CheckboxField, TextField, type FieldState } from "../../components/ui/Field";
 import { FormDivider } from "../../components/ui/FormDivider";
+import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { Modal } from "../../components/ui/Modal";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { applyServerError } from "../../lib/formErrors";
@@ -127,21 +127,14 @@ export function RoleModal({ role, onClose, onSaved }: RoleModalProps) {
       isExiting={isExiting}
       onRequestClose={requestClose}
       footer={
-        <div className="flex w-full items-center justify-between gap-3">
-          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-faint select-none">
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
-              Ctrl
-            </kbd>
-            <span>+</span>
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
-              Enter
-            </kbd>
-            <span className="ml-0.5">para guardar</span>
-          </span>
-          <div className="flex items-center gap-2 ml-auto">
-            <Button type="button" variant="secondary" size="sm" onClick={requestClose}>
-              Cancelar
-            </Button>
+        <FormModalFooter
+          formId="role-form"
+          isEdit={isEdit}
+          createLabel="Crear rol"
+          isSubmitting={isSubmitting}
+          onCancel={requestClose}
+          size="sm"
+          submit={
             <SubmitValidationButton
               formId="role-form"
               ready={roleFormMissing.length === 0}
@@ -152,8 +145,8 @@ export function RoleModal({ role, onClose, onSaved }: RoleModalProps) {
             >
               {isEdit ? "Guardar cambios" : "Crear rol"}
             </SubmitValidationButton>
-          </div>
-        </div>
+          }
+        />
       }
     >
       <form
