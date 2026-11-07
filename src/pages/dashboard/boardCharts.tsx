@@ -154,8 +154,8 @@ export function TrendArea({ data }: { data: TrendPoint[] }) {
           <AreaChart data={data} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
             <defs>
               <linearGradient id={`closed${id}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--color-brand-red)" stopOpacity={0.22} />
-                <stop offset="100%" stopColor="var(--color-brand-red)" stopOpacity={0} />
+                <stop offset="0%" stopColor="var(--color-brand-green)" stopOpacity={0.22} />
+                <stop offset="100%" stopColor="var(--color-brand-green)" stopOpacity={0} />
               </linearGradient>
               <linearGradient id={`opened${id}`} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="var(--color-subtle)" stopOpacity={0.16} />
@@ -184,7 +184,7 @@ export function TrendArea({ data }: { data: TrendPoint[] }) {
               cursor={{ stroke: "var(--color-line-strong)", strokeWidth: 1 }}
             />
             {/* La de contexto va PRIMERO para quedar detras: la serie principal
-                es la roja y no puede quedar tapada por el gris. */}
+                es la verde y no puede quedar tapada por el gris. */}
             <Area
               type="monotone"
               dataKey="opened"
@@ -204,13 +204,13 @@ export function TrendArea({ data }: { data: TrendPoint[] }) {
               type="monotone"
               dataKey="closed"
               name="Cerradas"
-              stroke="var(--color-brand-red)"
+              stroke="var(--color-brand-green)"
               strokeWidth={2}
               fill={`url(#closed${id})`}
               dot={false}
               activeDot={{
                 r: 4,
-                fill: "var(--color-brand-red)",
+                fill: "var(--color-brand-green)",
                 stroke: "#ffffff",
                 strokeWidth: 2,
               }}

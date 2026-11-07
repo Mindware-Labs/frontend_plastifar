@@ -78,7 +78,7 @@ function ModuleTabIcon({ module, selected }: { module: string; selected: boolean
   const { Icon, tone } = moduleIconMeta(module);
   return (
     <Icon
-      className={`h-3.5 w-3.5 shrink-0 ${selected ? "text-brand-red" : tone}`}
+      className={`h-3.5 w-3.5 shrink-0 ${selected ? "text-ink" : tone}`}
       aria-hidden
     />
   );
@@ -92,7 +92,7 @@ function ModuleHeaderIcon({ module }: { module: string }) {
 const rolePermissionTabClass = (selected: boolean) =>
   `inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-1 text-[11.5px] font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-brand-red/25 cursor-pointer ${
     selected
-      ? "border-brand-red/30 bg-brand-red/10 text-brand-red shadow-2xs font-semibold"
+      ? "border-ink/25 bg-fill text-ink shadow-2xs font-semibold"
       : "border-zinc-200/90 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
   }`;
 
@@ -103,11 +103,11 @@ const bulkGrantRevokeBtnClass =
 const rolePermissionTabBadgeClass = (selected: boolean, complete: boolean) => {
   if (complete) {
     return selected
-      ? "bg-brand-red/15 font-semibold text-brand-red"
+      ? "bg-brand-green/12 font-semibold text-brand-green"
       : "bg-emerald-100 font-semibold text-emerald-800";
   }
   return selected
-    ? "bg-brand-red/10 font-medium text-brand-red/90"
+    ? "bg-white font-medium text-ink ring-1 ring-inset ring-line"
     : "bg-zinc-100 font-medium text-zinc-600 ring-1 ring-inset ring-zinc-200/70";
 };
 
@@ -418,7 +418,7 @@ export function RolePermissionsDrawer({
             {/* Barra de progreso de cobertura */}
             <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-zinc-200">
               <div
-                className="h-full rounded-full bg-brand-red transition-all duration-300 ease-out"
+                className="h-full rounded-full bg-brand-green transition-all duration-300 ease-out"
                 style={{ width: `${coveragePercent}%` }}
               />
             </div>
@@ -453,7 +453,7 @@ export function RolePermissionsDrawer({
                     className={bulkGrantRevokeBtnClass}
                     title="Conceder todos los permisos"
                   >
-                    <CheckCheck className="h-3 w-3 shrink-0 text-emerald-600" aria-hidden />
+                    <CheckCheck className="h-3 w-3 shrink-0 text-brand-green" aria-hidden />
                     Conceder todos
                   </button>
                   <span aria-hidden className="h-4 w-px shrink-0 bg-zinc-200/90" />
@@ -623,7 +623,7 @@ export function RolePermissionsDrawer({
                                 <div
                                   className={`flex h-5 w-5 items-center justify-center rounded-md border transition-all duration-150 ${
                                     isGranted
-                                      ? "border-brand-red bg-brand-red text-white shadow-2xs"
+                                      ? "border-ink bg-ink text-white shadow-2xs"
                                       : "border-zinc-300 bg-white group-hover:border-zinc-400"
                                   }`}
                                 >

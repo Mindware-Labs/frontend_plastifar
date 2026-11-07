@@ -352,7 +352,7 @@ export function DashboardPage() {
                   <SeriesLegend
                     items={[
                       { label: "Abiertas", color: "var(--color-subtle)" },
-                      { label: "Cerradas", color: "var(--color-brand-red)" },
+                      { label: "Cerradas", color: "var(--color-brand-green)" },
                     ]}
                   />
                 }

@@ -1,6 +1,7 @@
 import { ArrowDownRight, ArrowUpRight, RefreshCw } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { SegmentedFilter } from "../../components/ui/SegmentedFilter";
 import { formatPercentDecimal } from "./format";
 
 /* ========================================================================== *
@@ -218,8 +219,9 @@ function KpiCell({ item, index }: { item: KpiItem; index: number }) {
  * Selector de periodo como chips, no como `Select`.
  *
  * Son tres opciones y siempre las mismas: un desplegable esconde dos de las tres
- * detras de un click para ahorrar 120 px que esta cabecera tiene de sobra. El
- * activo va en rojo solido, que es el mismo estado activo del resto del panel.
+ * detras de un click para ahorrar 120 px que esta cabecera tiene de sobra. Usa el
+ * `SegmentedFilter` del sistema: el activo antes iba en rojo solido, y el rojo
+ * queda reservado a la accion primaria y al error.
  */
 export function PeriodTabs<T extends string>({
   options,
@@ -231,32 +233,13 @@ export function PeriodTabs<T extends string>({
   onChange: (key: T) => void;
 }) {
   return (
-    <div
-      role="group"
+    <SegmentedFilter
       aria-label="Período"
-      className="flex shrink-0 items-center gap-1 rounded-edge border border-line p-0.5"
-    >
-      {options.map((option) => {
-        const active = option.key === value;
-        return (
-          <button
-            key={option.key}
-            type="button"
-            aria-pressed={active}
-            onClick={() => onChange(option.key)}
-            className={`h-7 cursor-pointer rounded-edge px-2.5 font-heading text-[11px] font-semibold
-              uppercase tracking-[0.06em] outline-none transition-colors
-              focus-visible:ring-3 focus-visible:ring-brand-red/25 ${
-                active
-                  ? "bg-brand-red text-white"
-                  : "text-subtle hover:bg-fill hover:text-ink"
-              }`}
-          >
-            {option.label}
-          </button>
-        );
-      })}
-    </div>
+      className="shrink-0"
+      items={options.map((option) => ({ key: option.key, label: option.label }))}
+      value={value}
+      onChange={onChange}
+    />
   );
 }
 

@@ -310,7 +310,7 @@ export function DiscrepanciesPage() {
                   setChip("hallazgo");
                   setPage(1);
                 }}
-                tone="red"
+                tone="amber"
                 dot
                 title="Filtrar por discrepancias con hallazgo de seguridad"
               />

@@ -77,7 +77,9 @@ interface Kpi {
    * señalar, y entonces no se pinta nada: una pastilla que dice «0» ocupa sitio
    * para no informar.
    */
-  hint: { icon: LucideIcon; text: string; urgent: boolean } | null;
+  /** `warn`: pide atención pero aún no incumple; va en ámbar. El rojo queda
+   *  para lo que ya está vencido. */
+  hint: { icon: LucideIcon; text: string; urgent: boolean; warn?: boolean } | null;
   filter: DashboardFilter;
   /**
    * Proporcion que dibuja el medidor, de 0 a 1, contra su propio total (los
@@ -111,7 +113,7 @@ interface Kpi {
 function Acompanante({ kpi }: { kpi: Kpi }) {
   if (kpi.hint === null) return null;
 
-  const hue = hueFor(kpi.hint.urgent ? "vencido" : "cumplido");
+  const hue = hueFor(kpi.hint.urgent ? (kpi.hint.warn ? "porVencer" : "vencido") : "cumplido");
   const fg = kpi.hint.urgent ? hue.color : C.soft;
   const bg = kpi.hint.urgent ? hue.tint : C.chip;
   const Icon = kpi.hint.icon;
@@ -317,7 +319,7 @@ export function KpiRow() {
       hint:
         attention.dueWithin2h === 0
           ? null
-          : { icon: AlarmClock, text: `${n(attention.dueWithin2h)} en 2 h`, urgent: true },
+          : { icon: AlarmClock, text: `${n(attention.dueWithin2h)} en 2 h`, urgent: true, warn: true },
       filter: { kind: "estado", value: "por-vencer", label: "los tickets por vencer" },
       meter: live === 0 ? null : counts.upcoming / live,
     },
@@ -332,7 +334,7 @@ export function KpiRow() {
       hint:
         attention.unassigned === 0
           ? null
-          : { icon: UserX, text: `${n(attention.unassigned)} sin asignar`, urgent: true },
+          : { icon: UserX, text: `${n(attention.unassigned)} sin asignar`, urgent: true, warn: true },
       filter: { kind: "estado", value: "abiertos", label: "los tickets abiertos" },
       meter: live === 0 ? null : counts.open / live,
     },
@@ -351,6 +353,7 @@ export function KpiRow() {
               icon: History,
               text: `${n(attention.waitingOver7Days)} > 7 días`,
               urgent: true,
+              warn: true,
             },
       filter: { kind: "estado", value: "espera", label: "los tickets en espera del cliente" },
       meter: live === 0 ? null : counts.waitingOnClient / live,

@@ -58,7 +58,7 @@ export function WithdrawalExecutiveSummary({ withdrawal }: WithdrawalExecutiveSu
         </div>
         <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/60 p-3.5 shadow-3xs">
           <span className={kpiLabelClass}>Valor total</span>
-          <p className="mt-1 text-sm font-bold tabular-nums text-brand-red">
+          <p className="mt-1 text-sm font-bold tabular-nums text-ink">
             {withdrawal.currency ? formatAmount(withdrawal.totalValue, withdrawal.currency) : formatQuantity(withdrawal.totalValue)}
           </p>
         </div>

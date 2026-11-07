@@ -928,7 +928,7 @@ export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) 
                             className={`flex h-9 w-full cursor-pointer items-center justify-center rounded-lg border font-heading text-[12.5px] font-bold transition-all select-none
                               has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-red/30 ${
                                 checked
-                                  ? "border-brand-red bg-brand-red text-white shadow-xs"
+                                  ? "border-ink bg-ink text-white shadow-xs"
                                   : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:text-zinc-900 shadow-2xs"
                               }`}
                           >
