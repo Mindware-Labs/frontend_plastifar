@@ -15,6 +15,7 @@ import { useMemo, useState } from "react";
 import { departmentsApi } from "../../api/departments";
 import { sedesApi } from "../../api/sedes";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
+import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
@@ -101,7 +102,9 @@ export function DepartmentsPage() {
   const listLoading = data === null || isStale;
   const rows = isStale ? [] : (data?.items ?? []);
 
-  useLoadErrorReceipt(error, "departments-list", refresh);
+  // El aviso en línea cubre la carga inicial; el toast solo avisa cuando
+  // la tabla sigue mostrando datos previos y el aviso no se ve.
+  useLoadErrorReceipt(data === null || isStale ? null : error, "departments-list", refresh);
 
   const { data: sedesList } = useReferenceData(
     ["sedes", "active"],
@@ -540,7 +543,11 @@ export function DepartmentsPage() {
           }
         >
           {listLoading ? (
+            error !== null ? (
+            <ErrorRetry className="p-4" onRetry={refresh}>{error}</ErrorRetry>
+          ) : (
             <TableSkeleton rows={pageSize} columns={7} />
+          )
           ) : rows.length === 0 ? (
             <p className="py-14 text-center text-[13.5px] text-faint">
               {isFiltering

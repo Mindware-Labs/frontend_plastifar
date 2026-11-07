@@ -5,6 +5,7 @@ import { departmentsApi } from "../../api/departments";
 import { staffApi, type StaffQuery } from "../../api/staff";
 import { HeaderCounts } from "../../components/app/HeaderCounts";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
+import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { Avatar } from "../../components/ui/Avatar";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -108,7 +109,9 @@ export function StaffPage() {
     pageKey: "pagina",
   });
 
-  useLoadErrorReceipt(error, "staff-list", refresh);
+  // El aviso en línea cubre la carga inicial; el toast solo avisa cuando
+  // la tabla sigue mostrando datos previos y el aviso no se ve.
+  useLoadErrorReceipt(data === null || isStale ? null : error, "staff-list", refresh);
   useActionErrorReceipt(bulkError, "staff-bulk");
 
   const listLoading = data === null || isStale;
@@ -547,7 +550,11 @@ export function StaffPage() {
           }
         >
           {listLoading ? (
-            error === null && <TableSkeleton rows={pageSize} columns={8} />
+            error !== null ? (
+            <ErrorRetry className="p-4" onRetry={refresh}>{error}</ErrorRetry>
+          ) : (
+            <TableSkeleton rows={pageSize} columns={8} />
+          )
           ) : rows.length === 0 ? (
             <EmptyResult
               message={

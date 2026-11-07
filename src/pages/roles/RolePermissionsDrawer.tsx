@@ -28,6 +28,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { Drawer } from "../../components/ui/Drawer";
+import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { FormLineTabStrip, formLineTabIndexAttr } from "../../components/ui/FormLineTabStrip";
 import { SearchInput } from "../../components/ui/SearchInput";
 import { Spinner } from "../../components/ui/Spinner";
@@ -43,6 +44,9 @@ import type {
 interface RolePermissionsDrawerProps {
   role: RoleResponse;
   matrix: PermissionMatrixResponse | null;
+  /** Fallo al cargar el catálogo; sin él, `matrix === null` significa cargando. */
+  matrixError?: string | null;
+  onRetryMatrix?: () => void;
   onClose: () => void;
   onSaved: (updatedRole: RoleResponse) => void;
   onEditRole?: (role: RoleResponse) => void;
@@ -110,6 +114,8 @@ const rolePermissionTabBadgeClass = (selected: boolean, complete: boolean) => {
 export function RolePermissionsDrawer({
   role,
   matrix,
+  matrixError = null,
+  onRetryMatrix,
   onClose,
   onSaved,
   onEditRole,
@@ -501,7 +507,9 @@ export function RolePermissionsDrawer({
           </div>
 
           {/* Contenido: Módulos y Permisos agrupados */}
-          {matrix === null ? (
+          {matrix === null && matrixError !== null ? (
+            <ErrorRetry onRetry={() => onRetryMatrix?.()}>{matrixError}</ErrorRetry>
+          ) : matrix === null ? (
             <div className="flex flex-col items-center justify-center py-16 text-zinc-400">
               <Spinner />
               <p className="mt-3 text-[12.5px]">Cargando catálogo de permisos…</p>

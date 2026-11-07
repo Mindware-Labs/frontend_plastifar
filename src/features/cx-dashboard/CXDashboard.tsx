@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useRef, type CSSProperties } from "react";
 import "./dashboard.css";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
+import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { AgentPerformance } from "./components/AgentPerformance";
 import { CallDetails } from "./components/CallDetails";
 import { KpiRow } from "./components/KpiRow";
@@ -90,7 +91,8 @@ export function CXDashboard() {
   const error = dashboard.isError ? "No se pudo cargar el tablero" : null;
   const { refetch } = dashboard;
 
-  useLoadErrorReceipt(error, "cx-dashboard", () => void refetch());
+  // Sin datos, el aviso va en línea; con datos previos en pantalla, basta el toast.
+  useLoadErrorReceipt(data === null ? null : error, "cx-dashboard", () => void refetch());
 
   /* Lo que la barra de aplicación muestra cuando esta pantalla ya scrolleó. El
      ítem `danger` es el único que sobrevive al condensado, así que lleva lo
@@ -109,10 +111,13 @@ export function CXDashboard() {
     scrollRoot: scrollRef,
   });
 
-  if (error !== null) {
+  if (error !== null && data === null) {
     return (
       <div className="cxhub" style={{ padding: "2px 3px" }}>
         <ModuleHeader title="Dashboard" summary="Tablero de operaciones" />
+        <ErrorRetry className="mt-4" onRetry={() => void refetch()}>
+          {error}
+        </ErrorRetry>
       </div>
     );
   }

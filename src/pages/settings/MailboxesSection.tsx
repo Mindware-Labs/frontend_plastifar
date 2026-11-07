@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { departmentsApi } from "../../api/departments";
 import { settingsApi } from "../../api/settings";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
+import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
@@ -84,7 +85,9 @@ export function MailboxesSection() {
   const departmentsRef = useReferenceData<DepartmentResponse[]>(["departments", "all"], departmentsApi.list, []);
   const departments = departmentsRef.data;
 
-  useLoadErrorReceipt(error, "settings-mailboxes-list", refresh);
+  // El aviso en línea cubre la carga inicial; el toast solo avisa cuando
+  // la tabla sigue mostrando datos previos y el aviso no se ve.
+  useLoadErrorReceipt(data === null || isStale ? null : error, "settings-mailboxes-list", refresh);
   useLoadErrorReceipt(
     departmentsRef.failed ? "No se pudieron cargar los departamentos: la columna queda sin nombre." : null,
     "settings-mailboxes-departments",
@@ -278,7 +281,11 @@ export function MailboxesSection() {
         }
       >
         {listLoading ? (
-          error === null && <TableSkeleton rows={pageSize} columns={6} />
+          error !== null ? (
+            <ErrorRetry className="p-4" onRetry={refresh}>{error}</ErrorRetry>
+          ) : (
+            <TableSkeleton rows={pageSize} columns={6} />
+          )
         ) : rows.length === 0 ? (
           <ListEmptyState
             icon={Inbox}

@@ -4,6 +4,7 @@ import { ApiError } from "../../api/client";
 import { settingsApi } from "../../api/settings";
 import { catalogs, fetchCatalog } from "../../lib/catalogQueries";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
+import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
@@ -94,7 +95,9 @@ export function SlaSection() {
   const { selectedIds, pageState, togglePage, toggleSelect, clearSelection } = useTablePageSelection(pageIds);
   const tableBusy = busyId !== null || bulkBusy;
 
-  useLoadErrorReceipt(error, "settings-sla-list", refresh);
+  // El aviso en línea cubre la carga inicial; el toast solo avisa cuando
+  // la tabla sigue mostrando datos previos y el aviso no se ve.
+  useLoadErrorReceipt(data === null || isStale ? null : error, "settings-sla-list", refresh);
   useActionErrorReceipt(actionError, "settings-sla-action");
 
   function reloadAll() {
@@ -390,7 +393,11 @@ export function SlaSection() {
         }
       >
         {listLoading ? (
-          error === null && <TableSkeleton rows={pageSize} columns={canWrite ? 10 : 9} />
+          error !== null ? (
+            <ErrorRetry className="p-4" onRetry={refresh}>{error}</ErrorRetry>
+          ) : (
+            <TableSkeleton rows={pageSize} columns={canWrite ? 10 : 9} />
+          )
         ) : rows.length === 0 ? (
           <ListEmptyState
             icon={Clock}

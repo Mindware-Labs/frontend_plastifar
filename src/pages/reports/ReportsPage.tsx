@@ -15,6 +15,7 @@ import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { useActionErrorReceipt, useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { Button } from "../../components/ui/Button";
 import { Drawer } from "../../components/ui/Drawer";
+import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { Pagination } from "../../components/ui/Pagination";
 import { usePermissions } from "../../hooks/usePermissions";
 import { REPORT_CATALOG, type ReportDefinition } from "../../types/reports";
@@ -184,7 +185,10 @@ export function ReportsPage() {
     [],
   );
 
-  useLoadErrorReceipt(error, "reports-generate", () => generate(report, criteria, page, pageSize));
+  // Sin resultado previo, el aviso va en línea; con uno en pantalla, basta el toast.
+  useLoadErrorReceipt(payload === null ? null : error, "reports-generate", () =>
+    generate(report, criteria, page, pageSize),
+  );
   useActionErrorReceipt(exportError, "reports-export");
 
   // Solo al abrir un enlace que ya trae reporte. Entrar al modulo sin `?reporte=`
@@ -345,6 +349,9 @@ export function ReportsPage() {
         <>
           {payload === null && error === null && (
             <div aria-hidden className="h-[220px] animate-pulse rounded-edge bg-fill" />
+          )}
+          {payload === null && error !== null && (
+            <ErrorRetry onRetry={() => generate(report, criteria, page, pageSize)}>{error}</ErrorRetry>
           )}
 
           <div className={isGenerating ? "opacity-60" : ""}>

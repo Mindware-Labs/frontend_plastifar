@@ -1,10 +1,11 @@
 import { Ban, CheckCircle2, KeyRound, Lock, Pencil, Plus, ShieldCheck, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError } from "../../api/client";
 import { useSearchParams } from "react-router-dom";
 import { permissionsApi } from "../../api/permissions";
 import { rolesApi, type RoleQuery } from "../../api/roles";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
+import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -71,13 +72,24 @@ export function RolesPage() {
 
   // Catálogo completo de permisos en caché para el drawer
   const [matrix, setMatrix] = useState<PermissionMatrixResponse | null>(null);
+  const [matrixError, setMatrixError] = useState<string | null>(null);
 
-  useEffect(() => {
+  // Antes el fallo se tragaba en silencio y el drawer giraba para siempre.
+  const loadMatrix = useCallback(() => {
+    setMatrixError(null);
     permissionsApi
       .matrix()
       .then(setMatrix)
-      .catch(() => {});
+      .catch((err: unknown) =>
+        setMatrixError(
+          err instanceof ApiError ? err.message : "No se pudo cargar el catálogo de permisos",
+        ),
+      );
   }, []);
+
+  useEffect(() => {
+    loadMatrix();
+  }, [loadMatrix]);
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("todos");
@@ -90,7 +102,9 @@ export function RolesPage() {
     fallbackError: "No se pudieron cargar los roles",
   });
 
-  useLoadErrorReceipt(error, "roles-list", refresh);
+  // El aviso en línea cubre la carga inicial; el toast solo avisa cuando
+  // la tabla sigue mostrando datos previos y el aviso no se ve.
+  useLoadErrorReceipt(data === null || isStale ? null : error, "roles-list", refresh);
   useActionErrorReceipt(actionError, "roles-action");
 
   const listLoading = data === null || isStale;
@@ -418,7 +432,11 @@ export function RolesPage() {
           }
         >
         {listLoading ? (
-          error === null && <TableSkeleton rows={pageSize} columns={6} />
+          error !== null ? (
+            <ErrorRetry className="p-4" onRetry={refresh}>{error}</ErrorRetry>
+          ) : (
+            <TableSkeleton rows={pageSize} columns={6} />
+          )
         ) : (
           <div className="plf-results-in">
             <DataTable>
@@ -594,6 +612,8 @@ export function RolesPage() {
         <RolePermissionsDrawer
           role={permissionDrawerRole}
           matrix={matrix}
+          matrixError={matrixError}
+          onRetryMatrix={loadMatrix}
           onClose={() => setPermissionDrawerRole(null)}
           onSaved={(updated) => {
             receipts.done({ action: "permisos-rol", title: "Permisos del rol actualizados", detail: updated.name });

@@ -2,6 +2,7 @@ import { Globe, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { settingsApi } from "../../api/settings";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
+import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
@@ -64,7 +65,9 @@ export function PlantsSection() {
     fallbackError: "No se pudieron cargar las plantas",
   });
 
-  useLoadErrorReceipt(error, "settings-plants-list", refresh);
+  // El aviso en línea cubre la carga inicial; el toast solo avisa cuando
+  // la tabla sigue mostrando datos previos y el aviso no se ve.
+  useLoadErrorReceipt(data === null || isStale ? null : error, "settings-plants-list", refresh);
 
   const listLoading = data === null || isStale;
   const rows = isStale ? [] : (data?.items ?? []);
@@ -273,7 +276,11 @@ export function PlantsSection() {
         }
       >
         {listLoading ? (
-          error === null && <TableSkeleton rows={pageSize} columns={4} />
+          error !== null ? (
+            <ErrorRetry className="p-4" onRetry={refresh}>{error}</ErrorRetry>
+          ) : (
+            <TableSkeleton rows={pageSize} columns={4} />
+          )
         ) : rows.length === 0 ? (
           <p className="py-14 text-center text-[13.5px] text-faint">
             {isFiltering

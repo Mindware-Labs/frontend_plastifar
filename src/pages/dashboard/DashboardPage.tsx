@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
 import { reportsApi, type ClientsReport, type QualityReport } from "../../api/reports";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
+import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { useLoadErrorReceipt } from "../../hooks/useNoticeReceipts";
 import { Board, KpiRow, PeriodTabs, RefreshButton, type KpiItem } from "./board";
 import { CategoryBars, HealthGauge, SeriesLegend, TrendArea } from "./boardCharts";
@@ -153,7 +154,8 @@ export function DashboardPage() {
 
   const load = useCallback(() => setReloadTick((tick) => tick + 1), []);
 
-  useLoadErrorReceipt(error, "dashboard-calidad", load);
+  // Sin datos, el aviso va en línea en el cuerpo; con datos previos, basta el toast.
+  useLoadErrorReceipt(quality !== null && clients !== null ? error : null, "dashboard-calidad", load);
 
   /**
    * El periodo por defecto se ajusta UNA vez a la data que existe. Doce meses
@@ -330,7 +332,11 @@ export function DashboardPage() {
           borde; el relleno le da sitio y el margen negativo lo devuelve. */}
       <div className="-mx-1 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-1 pt-4 pb-8">
         {!ready ? (
-          error === null && <DashboardSkeleton />
+          error !== null ? (
+            <ErrorRetry onRetry={load}>{error}</ErrorRetry>
+          ) : (
+            <DashboardSkeleton />
+          )
         ) : (
           <div className={`plf-stagger flex flex-col gap-4 ${isLoading ? "opacity-60" : ""}`}>
             {/* 1 — LAS CUATRO CIFRAS. */}
