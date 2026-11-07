@@ -71,7 +71,7 @@ export function TicketByStage() {
       key: "waiting",
       label: "En espera",
       value: stage.waiting,
-      color: C.faintMark,
+      color: C.neutralMark,
       hint: "del cliente",
       filter: { kind: "estado", value: "espera", label: "los tickets en espera" },
     },

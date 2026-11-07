@@ -131,6 +131,12 @@ export const C = {
 
   /** NO ES TEXTO. Marcas de eje sin peso. */
   faintMark: "#B6BDC9",
+  /**
+   * Marca de dato NEUTRA (p. ej. «En espera»): sin tono de estado, pero una
+   * marca que se compara tiene que verse. 3,4:1 sobre blanco y 3,2:1 sobre el
+   * panel hundido; `faintMark` daba 1,9:1 y solo sirve para ejes.
+   */
+  neutralMark: "#858C99",
 
   /** Barra en reposo de una serie temporal. El azul de serie, lavado. */
   barRest: "#AEC0E8",

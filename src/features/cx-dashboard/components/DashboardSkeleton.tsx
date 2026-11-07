@@ -354,45 +354,40 @@ function StatesCard() {
 }
 
 function TopicsCard() {
+  /* Barras horizontales de `TicketByCategory`: por fila, rótulo con cifra
+     arriba (12 px) y barra de 8 px debajo; ordenadas de mayor a menor. */
+  const rows = [
+    { name: "w-32", bar: 100 },
+    { name: "w-28", bar: 74 },
+    { name: "w-24", bar: 52 },
+    { name: "w-24", bar: 38 },
+    { name: "w-28", bar: 24 },
+  ];
   return (
-    <SkCard>
-      <SkHead title="w-32" delay={60} />
-      <div style={{ ...ROW, gap: 16, flexWrap: "wrap", marginTop: 2 }}>
-        {/* Dona de `TicketByCategory`: 124 px, radio 46, trazo 16. */}
-        <span style={{ position: "relative", width: 124, height: 124, margin: "4px 10px 4px 2px" }}>
-          <svg aria-hidden viewBox="0 0 124 124" width={124} height={124} className="motion-safe:animate-pulse">
-            <circle cx={62} cy={62} r={46} fill="none" stroke={RAIL} strokeWidth={16} />
-          </svg>
-          <span
-            style={{
-              position: "absolute",
-              inset: 0,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 6,
-            }}
-          >
-            <Skeleton className="h-4 w-7" delay={60} />
-            <Skeleton className="h-2 w-10" delay={90} />
-          </span>
-        </span>
-        <ul style={{ listStyle: "none", margin: 0, padding: 0, flex: 1, minWidth: 168 }}>
-          {["w-32", "w-28", "w-24", "w-24", "w-28"].map((width, i) => (
-            <li
-              key={i}
-              style={{ ...ROW, justifyContent: "space-between", height: 25, padding: "0 5px" }}
-            >
-              <span style={{ ...ROW, gap: 7 }}>
-                <Dot round={false} />
-                <Skeleton className={`h-2.5 ${width}`} delay={i * 50} />
+    <SkCard bodyStyle={{ display: "flex", flexDirection: "column" }}>
+      <SkHead title="w-32" right={<Skeleton className="h-2.5 w-14" delay={60} />} delay={60} />
+      <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+        {rows.map((row, i) => (
+          <li key={i} style={{ display: "flex", flexDirection: "column", gap: 5, padding: "6px 6px 7px" }}>
+            <span style={{ ...ROW, justifyContent: "space-between", height: 15.6 }}>
+              <Skeleton className={`h-2.5 ${row.name}`} delay={i * 50} />
+              <span style={{ ...ROW, gap: 8 }}>
+                <Skeleton className="h-2 w-6" delay={i * 50 + 15} />
+                <Skeleton className="h-2.5 w-7" delay={i * 50 + 25} />
               </span>
-              <Skeleton className="h-2.5 w-4" delay={i * 50 + 25} />
-            </li>
-          ))}
-        </ul>
-      </div>
+            </span>
+            <span
+              aria-hidden
+              style={{ display: "block", height: 8, borderRadius: 99, background: "#F1F4F8", overflow: "hidden" }}
+            >
+              <span
+                className="plf-skeleton"
+                style={{ display: "block", height: "100%", width: `${row.bar}%`, borderRadius: 99, background: RAIL }}
+              />
+            </span>
+          </li>
+        ))}
+      </ul>
     </SkCard>
   );
 }
