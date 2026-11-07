@@ -54,7 +54,7 @@ export function BulkReassignSalesRepModal({ clients, onClose, onSaved }: BulkRea
 
   return (
     <Modal
-      maxWidth="max-w-md"
+      size="sm"
       eyebrow={`${clients.length} ${clients.length === 1 ? "cliente seleccionado" : "clientes seleccionados"}`}
       title="Reasignar vendedor en lote"
       description={

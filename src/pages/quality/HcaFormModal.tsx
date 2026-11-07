@@ -44,6 +44,7 @@ import {
   DateField,
   SelectField,
   TextAreaField,
+  TEXTAREA_AUTO_GROW_CLASS,
   type FieldState,
 } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
@@ -329,7 +330,6 @@ function HcaParticipantWhoCell({
 }
 
 const LIST_ROW_REMOVE_MS = 280;
-const HCA_TEXTAREA_AUTO = "min-h-0 resize-none overflow-hidden";
 /** Una línea (13px + py-2.5 + borde), mismo mínimo que autoResize en causas y plan. */
 const HCA_CAUSE_LINE_MIN_PX = 42;
 /** Campos dentro de celdas: etiqueta solo para lectores de pantalla. */
@@ -1427,7 +1427,7 @@ export function HcaFormModal({
           label="Descripción del hecho / no conformidad"
           required
           rows={3}
-          className={HCA_TEXTAREA_AUTO}
+          className={TEXTAREA_AUTO_GROW_CLASS}
           placeholder="Describe qué ocurrió: lote, cantidad, efecto y contexto operativo…"
           error={errors.description?.message}
           {...bindAutoResizeTextarea(descriptionField, 96, (element) => {
@@ -1438,7 +1438,7 @@ export function HcaFormModal({
           <TextAreaField
             label="Acción inmediata (opcional)"
             rows={2}
-            className={HCA_TEXTAREA_AUTO}
+            className={TEXTAREA_AUTO_GROW_CLASS}
             placeholder="Contención aplicada al detectar el problema…"
             error={errors.immediateAction?.message}
             {...bindAutoResizeTextarea(immediateActionField, 64, (element) => {
@@ -1495,7 +1495,7 @@ export function HcaFormModal({
                       causeError
                         ? "border-brand-red bg-brand-red/[0.02] focus:ring-3 focus:ring-brand-red/10"
                         : "border-line-strong hover:border-hairline-hover focus:border-brand-red focus:ring-3 focus:ring-brand-red/10"
-                    } ${HCA_TEXTAREA_AUTO}`}
+                    } ${TEXTAREA_AUTO_GROW_CLASS}`}
                     {...bindAutoResizeTextarea(causeField, HCA_CAUSE_LINE_MIN_PX, (element) => {
                       if (element) causeTextareaRefs.current.set(field.id, element);
                       else causeTextareaRefs.current.delete(field.id);
@@ -1634,7 +1634,7 @@ function PlanMotionCell({
                             planErrors?.description?.message
                               ? "border-brand-red bg-brand-red/[0.02] focus:ring-2 focus:ring-brand-red/10"
                               : "border-transparent hover:border-zinc-200 focus:border-brand-red/40 focus:ring-2 focus:ring-brand-red/10"
-                          } ${HCA_TEXTAREA_AUTO}`}
+                          } ${TEXTAREA_AUTO_GROW_CLASS}`}
                           {...bindAutoResizeTextarea(descriptionField, HCA_CAUSE_LINE_MIN_PX, (element) => {
                             if (element) planTextareaRefs.current.set(planField.id, element);
                             else planTextareaRefs.current.delete(planField.id);
@@ -1899,7 +1899,7 @@ function PlanMotionCell({
                   errors.comments?.message
                     ? "border-brand-red bg-brand-red/[0.02] focus:ring-3 focus:ring-brand-red/10"
                     : "border-line-strong hover:border-hairline-hover focus:border-brand-red focus:ring-3 focus:ring-brand-red/10"
-                } ${HCA_TEXTAREA_AUTO}`}
+                } ${TEXTAREA_AUTO_GROW_CLASS}`}
                 {...bindAutoResizeTextarea(commentsField, HCA_CAUSE_LINE_MIN_PX, (element) => {
                   commentsTextareaRef.current = element;
                 })}

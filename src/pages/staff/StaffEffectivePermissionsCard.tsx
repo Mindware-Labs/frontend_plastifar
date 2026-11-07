@@ -25,6 +25,7 @@ import {
   flattenPermissions,
 } from "../../lib/permissionCatalog";
 import type { PermissionGroup, StaffDetail } from "../../types/permissions";
+import { STAFF_PERMISSIONS_SECTION_ID } from "./staffSections";
 
 interface StaffEffectivePermissionsCardProps {
   staff: StaffDetail;
@@ -193,6 +194,7 @@ export function StaffEffectivePermissionsCard({
 
   return (
     <DetailCard
+      id={STAFF_PERMISSIONS_SECTION_ID}
       icon={ShieldCheck}
       title={`Permisos efectivos y restricciones (${allowedCount} permitidos · ${deniedCount} no permitidos)`}
       aside={

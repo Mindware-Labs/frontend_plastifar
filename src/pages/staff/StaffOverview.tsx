@@ -17,6 +17,7 @@ import { Badge } from "../../components/ui/Badge";
 import { CopyButton } from "../../components/ui/CopyButton";
 import { DetailCard } from "../../components/ui/DetailCard";
 import { StatTile } from "../../components/ui/StatTile";
+import { STAFF_DEPARTMENTS_SECTION_ID, STAFF_PERMISSIONS_SECTION_ID } from "./staffSections";
 import { StatusDot } from "../../components/ui/StatusDot";
 import type { DepartmentAccess, StaffDetail } from "../../types/permissions";
 import { AlignedClampBody } from "../tickets/detail/AlignedClampBody";
@@ -293,23 +294,22 @@ export function StaffOverview({ staff, fullName, departmentLabel, formatDate, ac
 
           <DetailCard id={PERMISSIONS_CARD_ID} icon={ShieldCheck} title="Resumen de permisos">
             <div className="space-y-2.5 p-3.5">
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-1">
                 {[
-                  { label: "Permisos", value: effective.length },
-                  { label: "Módulos", value: modules },
-                  { label: "Deptos.", value: staff.accesses.length },
+                  { label: "Permisos", value: effective.length, to: `${accessesTo}#${STAFF_PERMISSIONS_SECTION_ID}` },
+                  { label: "Módulos", value: modules, to: `${accessesTo}#${STAFF_PERMISSIONS_SECTION_ID}` },
+                  { label: "Departamentos", value: staff.accesses.length, to: `${accessesTo}#${STAFF_DEPARTMENTS_SECTION_ID}` },
                 ].map((stat) => (
                   <Link
                     key={stat.label}
-                    to={accessesTo}
-                    className="group rounded-lg border border-zinc-200/80 bg-zinc-50/60 p-2 text-left outline-none transition-colors hover:border-zinc-300 hover:bg-zinc-100/70 focus-visible:ring-2 focus-visible:ring-brand-red/25"
+                    to={stat.to}
+                    className="group min-w-0 rounded-card outline-none focus-visible:ring-2 focus-visible:ring-ink/25"
                   >
-                    <span className="block font-heading text-[10px] font-semibold uppercase tracking-wider text-faint group-hover:text-zinc-600">
-                      {stat.label}
-                    </span>
-                    <span className="font-heading text-[16px] font-bold tabular-nums text-zinc-900">
-                      {stat.value}
-                    </span>
+                    <StatTile label={stat.label} className="h-full transition-colors group-hover:border-hairline-hover">
+                      <span className="mt-0.5 block font-heading text-[16px] font-bold tabular-nums text-ink">
+                        {stat.value}
+                      </span>
+                    </StatTile>
                   </Link>
                 ))}
               </div>

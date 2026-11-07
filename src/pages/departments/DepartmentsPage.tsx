@@ -728,7 +728,7 @@ export function DepartmentsPage() {
       {/* Modal para cambiar sede en lote */}
       {bulkSedeModalOpen && (
         <Modal
-          maxWidth="max-w-md"
+          size="sm"
           title={`Cambiar sede (${selectedIds.size} departamentos)`}
           description="Elige la sede a la que deseas asignar los departamentos seleccionados."
           onClose={() => setBulkSedeModalOpen(false)}

@@ -1000,7 +1000,7 @@ export function WithdrawalFormModal({
         <Modal
           title="¿Salir del formulario?"
           onClose={() => setConfirmCloseOpen(false)}
-          maxWidth="max-w-md"
+          size="sm"
           footer={
             <div className="flex w-full items-center justify-between gap-2">
               <Button

@@ -1,6 +1,6 @@
 import { Building2, KeyRound, Star, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { departmentsApi } from "../../api/departments";
 import { permissionsApi } from "../../api/permissions";
@@ -27,6 +27,7 @@ import type { DepartmentAccess, PermissionGroup, StaffDetail } from "../../types
 import { StaffActivityTab } from "./StaffActivityTab";
 import { StaffEffectivePermissionsCard } from "./StaffEffectivePermissionsCard";
 import { StaffOverview } from "./StaffOverview";
+import { STAFF_DEPARTMENTS_SECTION_ID } from "./staffSections";
 
 interface StaffDetailPageProps {
   section: "datos" | "accesos" | "actividad";
@@ -49,6 +50,15 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
   const canWrite = isAdmin;
 
   const [staff, setStaff] = useState<StaffDetail | null>(null);
+  const { hash } = useLocation();
+  const staffLoaded = staff !== null;
+
+  // El resumen de la ficha enlaza a una tarjeta concreta de Accesos (#ancla):
+  // el router no desplaza solo, y la tarjeta no existe hasta que llega la ficha.
+  useEffect(() => {
+    if (section !== "accesos" || !hash || !staffLoaded) return;
+    document.getElementById(decodeURIComponent(hash.slice(1)))?.scrollIntoView({ block: "start" });
+  }, [section, hash, staffLoaded]);
   const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
   const [catalogGroups, setCatalogGroups] = useState<PermissionGroup[]>([]);
   const receipts = useReceipts();
@@ -243,6 +253,7 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
               <div className="space-y-3.5">
                 {/* Tarjeta 1: Departamentos con acceso */}
                 <DetailCard
+                  id={STAFF_DEPARTMENTS_SECTION_ID}
                   icon={Building2}
                   title={`Departamentos y roles asignados (${staff.accesses.length})`}
                   aside={

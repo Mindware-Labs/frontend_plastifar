@@ -73,7 +73,7 @@ export function ReassignSalesRepModal({ client, onClose, onSaved }: ReassignSale
 
   return (
     <Modal
-      maxWidth="max-w-md"
+      size="sm"
       eyebrow={`Cliente #${client.id} · ${client.code}`}
       title="Reasignar vendedor"
       description={`Actualiza quién atiende comercialmente a ${client.name}.`}
