@@ -8,8 +8,8 @@ import {
 
   ShieldCheck,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { fetchAllPages } from "../../api/paging";
 import { productLinesApi } from "../../api/productLines";
 import { qualityApi } from "../../api/quality";
@@ -24,7 +24,7 @@ import {
   FilterDropdown,
   LookupFilterDropdown,
 } from "../../components/ui/FilterDropdown";
-import { HeaderTag } from "../../components/ui/HeaderTag";
+import { HeaderTag, type HeaderTagTone } from "../../components/ui/HeaderTag";
 import { ListEmptyState } from "../../components/ui/ListEmptyState";
 import { ListPanel } from "../../components/ui/ListPanel";
 import { Pagination } from "../../components/ui/Pagination";
@@ -46,15 +46,38 @@ import { isHcaOverdue } from "../../lib/quality";
 import { exportHcasListToExcel, exportHcasListToPdf } from "../../lib/hcaListExport";
 import { resolveClientLabel, searchClients } from "../../lib/lookups";
 import type { Plant, ProductLine } from "../../types/settings";
-import type { CorrectiveActionSheet, HcaQuery, SheetListResponse } from "../../types/quality";
+import type {
+  CorrectiveActionSheet,
+  HcaQuery,
+  HcaStatus,
+  SheetCounts,
+  SheetListResponse,
+} from "../../types/quality";
 
 import { HcaStatusBadge } from "./StatusBadges";
 import { HcaSummaryDrawer } from "./HcaSummaryDrawer";
 
 type SortKey = "fecha" | "numero" | "cliente";
+type ChipKey = "todas" | HcaStatus;
+
+/** Filtro por estado en la cabecera, como en Discrepancias y Retiros. El servidor filtra por `status`. */
+const CHIPS: {
+  key: ChipKey;
+  singular: string;
+  plural: string;
+  countKey: keyof SheetCounts;
+  tone: HeaderTagTone;
+}[] = [
+  { key: "todas", singular: "HCA", plural: "HCA", countKey: "all", tone: "neutral" },
+  { key: "Abierta", singular: "registrada", plural: "registradas", countKey: "open", tone: "blue" },
+  { key: "En análisis", singular: "en análisis", plural: "en análisis", countKey: "inAnalysis", tone: "amber" },
+  { key: "En ejecución", singular: "en ejecución", plural: "en ejecución", countKey: "inExecution", tone: "amber" },
+  { key: "En verificación", singular: "en verificación", plural: "en verificación", countKey: "inVerification", tone: "amber" },
+  { key: "Cerrada", singular: "cerrada", plural: "cerradas", countKey: "closed", tone: "emerald" },
+];
 
 /**
- * Listado paginado de Hojas de Acción Correctiva (HCA, PF-FOR-109).
+ * Listado paginado de las HCA, «Hecho, Causa y Acción» (PF-FOR-109).
  * Funciona de manera idéntica al módulo de Discrepancias: se registra el formulario,
  * queda asentado permanentemente en el sistema con su estado completado y se consulta
  * de inmediato desde el drawer o la vista completa.
@@ -73,6 +96,7 @@ export function HcasPage() {
   const [productLineId, setProductLineId] = useState("todas");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [chip, setChip] = useState<ChipKey>("todas");
   const { sort, sortOf, setSort } = useSort<SortKey>("fecha", "desc");
   const [pageSize, setPageSize] = useState(10);
 
@@ -104,6 +128,7 @@ export function HcasPage() {
     productLineId: productLineId === "todas" ? undefined : Number(productLineId),
     from: from || undefined,
     to: to || undefined,
+    status: chip === "todas" ? undefined : chip,
     sort: sort.key,
     dir: sort.dir,
   };
@@ -143,6 +168,7 @@ export function HcasPage() {
       if (typeof state.productLineId === "string") setProductLineId(state.productLineId);
       if (typeof state.from === "string") setFrom(state.from);
       if (typeof state.to === "string") setTo(state.to);
+      if (typeof state.chip === "string" && CHIPS.some((c) => c.key === state.chip)) setChip(state.chip as ChipKey);
       if (typeof state.pageSize === "number") setPageSize(state.pageSize);
       if (typeof state.sortKey === "string" && (state.sortDir === "asc" || state.sortDir === "desc")) {
         setSort({ key: state.sortKey as SortKey, dir: state.sortDir });
@@ -157,7 +183,7 @@ export function HcasPage() {
     return {
       listPath: "/calidad/hca",
       scrollY: captureListScrollY(),
-      bannerTitle: "Acciones correctivas (HCA)",
+      bannerTitle: "Hecho, Causa y Acción (HCA)",
       bannerDetail: row ? `${row.number} · ${row.clientName ?? "Sin cliente"}` : undefined,
       listState: {
         search,
@@ -166,6 +192,7 @@ export function HcasPage() {
         productLineId,
         from,
         to,
+        chip,
         pageSize,
         page,
         sortKey: sort.key,
@@ -183,6 +210,7 @@ export function HcasPage() {
     productLineId,
     from,
     to,
+    chip,
     pageSize,
     page,
     sort.key,
@@ -226,7 +254,7 @@ export function HcasPage() {
     setTo("");
   }
 
-  const unfiltered = narrowFiltersCount === 0 && !debouncedSearch;
+  const unfiltered = chip === "todas" && narrowFiltersCount === 0 && !debouncedSearch;
 
   async function handleBulkExportExcel() {
     if (selectedItems.length === 0) return;
@@ -237,7 +265,7 @@ export function HcasPage() {
       receipts.done({
         action: "exportar-hca-excel",
         title: "Excel descargado",
-        detail: `${count} ${count === 1 ? "acción correctiva en el archivo" : "acciones correctivas en el archivo"}`,
+        detail: `${count} HCA en el archivo`,
       });
     } catch {
       receipts.failed({ action: "exportar-hca-excel", title: "No se pudo generar el Excel" });
@@ -255,7 +283,7 @@ export function HcasPage() {
       receipts.done({
         action: "exportar-hca-pdf",
         title: "PDF descargado",
-        detail: `${count} ${count === 1 ? "acción correctiva en el archivo" : "acciones correctivas en el archivo"}`,
+        detail: `${count} HCA en el archivo`,
       });
     } catch {
       receipts.failed({ action: "exportar-hca-pdf", title: "No se pudo generar el PDF" });
@@ -286,23 +314,35 @@ export function HcasPage() {
       }`}
     >
       <ModuleHeader
-        title="Acciones Correctivas (HCA)"
+        title="Hecho, Causa y Acción (HCA)"
         summary={
           counts ? (
             <div className="flex flex-wrap items-center gap-1.5 tabular-nums">
-              <HeaderTag
-                label={counts.all === 1 ? "acción correctiva" : "acciones correctivas"}
-                count={counts.all}
-                active
-                onClick={() => setPage(1)}
-                tone="neutral"
-                title="Total de acciones correctivas registradas"
-              />
+              {CHIPS.map((c, index) => {
+                const count = counts[c.countKey];
+                return (
+                  <Fragment key={c.key}>
+                    {index > 0 && <span aria-hidden className="text-zinc-300">·</span>}
+                    <HeaderTag
+                      label={count === 1 ? c.singular : c.plural}
+                      count={count}
+                      active={chip === c.key}
+                      onClick={() => {
+                        setChip(c.key);
+                        setPage(1);
+                      }}
+                      tone={c.tone}
+                      dot={c.key !== "todas"}
+                      title={c.key === "todas" ? "Mostrar todas las HCA" : `Filtrar por HCA ${c.plural}`}
+                    />
+                  </Fragment>
+                );
+              })}
             </div>
           ) : (
             <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-300" />
-              Cargando acciones correctivas…
+              Cargando las HCA…
             </span>
           )
         }
@@ -397,25 +437,26 @@ export function HcasPage() {
               totalPages={data.totalPages}
               onPageChange={setPage}
               onPageSizeChange={setPageSize}
-              noun="acciones correctivas"
-              nounSingular="acción correctiva"
+              noun="HCA"
+              nounSingular="HCA"
             />
           )
         }
       >
         {listLoading ? (
-          error === null && <TableSkeleton rows={pageSize} columns={7} />
+          error === null && <TableSkeleton rows={pageSize} columns={8} />
         ) : rows.length === 0 ? (
           <ListEmptyState
             icon={ShieldCheck}
             isFiltered={!unfiltered}
-            filteredTitle="Ninguna acción correctiva coincide con este filtro o búsqueda."
+            filteredTitle="Ninguna HCA coincide con este filtro o búsqueda."
             onClearFilters={() => {
               setSearch("");
+              setChip("todas");
               clearNarrowFilters();
             }}
-            emptyTitle="Todavía no hay acciones correctivas (HCA) registradas."
-            emptyDescription="Las acciones correctivas se generan y gestionan derivadas directamente desde un ticket o reclamación."
+            emptyTitle="Todavía no hay HCA registradas."
+            emptyDescription="Las HCA se generan y gestionan derivadas directamente desde un ticket o reclamación."
           />
         ) : (
           <div className="plf-results-in">
@@ -455,16 +496,13 @@ export function HcasPage() {
                         />
                       </Td>
                       <Td>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setSummarySheetId(item.id);
-                          }}
-                          className="whitespace-nowrap font-mono text-[12.5px] font-semibold text-ink hover:text-brand-red text-left transition-colors"
+                        <Link
+                          to={`/calidad/hca/${item.id}`}
+                          onClick={(event) => event.stopPropagation()}
+                          className="whitespace-nowrap font-mono text-[12px] font-medium text-ink hover:text-brand-red"
                         >
                           {item.number}
-                        </button>
+                        </Link>
                       </Td>
                       <Td className="text-[12.5px] text-brand-gray">
                         <span title={item.clientName} className="block max-w-[200px] truncate font-medium text-ink">

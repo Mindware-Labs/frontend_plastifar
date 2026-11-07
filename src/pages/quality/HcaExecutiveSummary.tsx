@@ -32,7 +32,7 @@ export function HcaExecutiveSummary({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1 text-left">
             <div className="flex flex-wrap items-center justify-start gap-2">
-              <h3 className="text-base font-bold text-zinc-900">Acción Correctiva (HCA)</h3>
+              <h3 className="text-base font-bold text-zinc-900">Hecho, Causa y Acción (HCA)</h3>
 
 
 

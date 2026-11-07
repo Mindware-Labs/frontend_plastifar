@@ -288,10 +288,9 @@ function HcaParticipantWhoCell({
                     e.stopPropagation();
                     onKindChange(index, "manual");
                   }}
-                  tabIndex={-1}
                   title="Escribir nombre manualmente"
                   aria-label="Escribir nombre manualmente"
-                  className="flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
+                  className="flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
                 >
                   <PenLine className="h-3.5 w-3.5" />
                 </button>
@@ -312,10 +311,9 @@ function HcaParticipantWhoCell({
           <button
             type="button"
             onClick={() => onKindChange(index, "personal")}
-            tabIndex={-1}
             title="Buscar usuario en el sistema"
             aria-label="Buscar usuario en el sistema"
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
           >
             <Users className="h-3.5 w-3.5" />
           </button>
@@ -396,10 +394,9 @@ function HcaPlanWhoCell({
                     e.stopPropagation();
                     onModeChange(index, "manual");
                   }}
-                  tabIndex={-1}
                   title="Escribir nombre manualmente"
                   aria-label="Escribir nombre manualmente"
-                  className="flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
+                  className="flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
                 >
                   <PenLine className="h-3.5 w-3.5" />
                 </button>
@@ -421,10 +418,9 @@ function HcaPlanWhoCell({
           <button
             type="button"
             onClick={() => onModeChange(index, "sistema")}
-            tabIndex={-1}
             title="Buscar usuario en el sistema"
             aria-label="Buscar usuario en el sistema"
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
           >
             <Users className="h-3.5 w-3.5" />
           </button>
@@ -1374,10 +1370,9 @@ export function HcaFormModal({
                             e.stopPropagation();
                             handleResponsibleModeChange("manual");
                           }}
-                          tabIndex={-1}
                           title="Escribir nombre manualmente"
                           aria-label="Escribir nombre manualmente"
-                          className="flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
+                          className="flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
                         >
                           <PenLine className="h-3.5 w-3.5" />
                         </button>
@@ -1398,10 +1393,9 @@ export function HcaFormModal({
                   <button
                     type="button"
                     onClick={() => handleResponsibleModeChange("sistema")}
-                    tabIndex={-1}
                     title="Buscar usuario en el sistema"
                     aria-label="Buscar usuario en el sistema"
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-5.5 w-5.5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/20"
                   >
                     <Users className="h-3.5 w-3.5" />
                   </button>
@@ -2088,7 +2082,7 @@ function PlanMotionCell({
                   <span className="text-xs text-zinc-500">{stepLabels[step].hint}</span>
                 </div>
                 <h2 className="text-base sm:text-lg font-bold text-zinc-900 font-heading truncate mt-0.5">
-                  {isEdit ? `Editar ${sheet!.number}` : "Hecho, Causa y Acción"}
+                  {isEdit ? `Editar ${sheet!.number}` : "Hecho, Causa y Acción (HCA)"}
                 </h2>
               </div>
             </div>

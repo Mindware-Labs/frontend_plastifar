@@ -6,7 +6,7 @@ import {
   type PlastifarListReportOptions,
 } from "./plastifarListReport";
 
-const HCA_LIST_REPORT_TITLE = "REPORTE DE ACCIONES CORRECTIVAS (HCA)";
+const HCA_LIST_REPORT_TITLE = "REPORTE HECHO, CAUSA Y ACCIÓN (HCA)";
 
 const HCA_LIST_HEADERS = [
   "Código HCA",
@@ -39,7 +39,7 @@ const hcaListReportOptions: PlastifarListReportOptions<CorrectiveActionSheet> = 
   formRevision: "00",
   filenameStem: "HCA_Acciones_Correctivas",
   worksheetName: "HCA",
-  listBandTitle: "I. LISTADO DE ACCIONES CORRECTIVAS (PF-FOR-109)",
+  listBandTitle: "I. LISTADO DE HCA (PF-FOR-109)",
   headers: HCA_LIST_HEADERS,
   colWeights: HCA_LIST_COL_WEIGHTS,
   getRowValues: hcaListRowValues,

@@ -8,7 +8,7 @@ import { useDynamicBreadcrumb } from "../../context/useBreadcrumb";
 import { useDetail } from "../../hooks/useDetail";
 
 /**
- * Ficha oficial de una Hoja de Acción Correctiva (HCA, PF-FOR-109).
+ * Ficha oficial de una HCA, «Hecho, Causa y Acción» (PF-FOR-109).
  * Presenta el documento oficial integrado directamente en pantalla completa.
  */
 export function HcaDetailPage() {
@@ -27,7 +27,7 @@ export function HcaDetailPage() {
   if (error) {
     return (
       <div className="max-w-[920px]">
-        <ModuleHeader title="Acción Correctiva (HCA)" backTo="/calidad/hca" backLabel="Volver a las HCA" />
+        <ModuleHeader title="Hecho, Causa y Acción (HCA)" backTo="/calidad/hca" backLabel="Volver a las HCA" />
         <ErrorRetry onRetry={retry}>{error}</ErrorRetry>
       </div>
     );
