@@ -6,10 +6,11 @@ import { BandejaPage } from "./pages/bandeja/BandejaPage";
 import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage";
 import { LoginPage } from "./pages/auth/LoginPage";
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
-import { ClaimDetailPage } from "./pages/claims/ClaimDetailPage";
+// Reclamaciones deshabilitado temporalmente. Ver rutas comentadas abajo.
+// import { ClaimDetailPage } from "./pages/claims/ClaimDetailPage";
 import { TaskDetailPage } from "./pages/tasks/TaskDetailPage";
 import { TasksPage } from "./pages/tasks/TasksPage";
-import { ClaimsPage } from "./pages/claims/ClaimsPage";
+// import { ClaimsPage } from "./pages/claims/ClaimsPage";
 import { ClientDetailPage } from "./pages/clients/ClientDetailPage";
 import { ClientsPage } from "./pages/clients/ClientsPage";
 import { CXDashboard } from "./features/cx-dashboard";
@@ -157,11 +158,13 @@ export default function App() {
 
         {/* Reclamación de clientes, PF-FOR-034 (docs/plan/03). Clave propia:
             la llena Ventas y la trata Calidad, y ninguna de las dos es
-            quality.read. La vista de impresión va fuera del armazón, abajo. */}
-        <Route element={<PermissionRoute permission="claims.read"><Outlet /></PermissionRoute>}>
+            quality.read. La vista de impresión va fuera del armazón, abajo.
+            Deshabilitado temporalmente: sin estas rutas, /reclamaciones cae
+            en el comodín y redirige al inicio. */}
+        {/* <Route element={<PermissionRoute permission="claims.read"><Outlet /></PermissionRoute>}>
           <Route path="/reclamaciones" element={<ClaimsPage />} />
           <Route path="/reclamaciones/:id" element={<ClaimDetailPage />} />
-        </Route>
+        </Route> */}
 
         {/* Investigación de discrepancia de carga, PF-FOR-291 (docs/plan/06).
             Clave propia; la vista de impresión va fuera del armazón, abajo. */}
@@ -232,7 +235,8 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route path="/reclamaciones/:id/imprimir" element={<RedirectToDocument basePath="/reclamaciones" />} />
+        {/* Reclamaciones deshabilitado temporalmente.
+        <Route path="/reclamaciones/:id/imprimir" element={<RedirectToDocument basePath="/reclamaciones" />} /> */}
         <Route path="/calidad/hca/:id/imprimir" element={<RedirectToDocument basePath="/calidad/hca" />} />
         <Route path="/discrepancias/:id/imprimir" element={<RedirectToDocument basePath="/discrepancias" />} />
         <Route path="/retiros/:id/imprimir" element={<RedirectToDocument basePath="/retiros" />} />

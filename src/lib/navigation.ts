@@ -16,7 +16,7 @@ import {
   Building,
   Building2,
   Factory,
-  FileWarning,
+  // FileWarning, // Reclamaciones deshabilitado temporalmente.
   Gavel,
   Inbox,
   Layers,
@@ -114,7 +114,8 @@ export const SIDEBAR_NAV: NavGroup[] = [
     children: [
       { label: "Tickets", to: "/tickets", icon: TicketIcon, permission: "tickets.read" },
       { label: "Tareas", to: "/tareas", icon: ListTodo, permission: "tasks.read" },
-      { label: "Reclamaciones", to: "/reclamaciones", icon: FileWarning, permission: "claims.read", subgroup: "Incidencias y Casos" },
+      // Reclamaciones deshabilitado temporalmente.
+      // { label: "Reclamaciones", to: "/reclamaciones", icon: FileWarning, permission: "claims.read", subgroup: "Incidencias y Casos" },
       { label: "Discrepancias", to: "/discrepancias", icon: PackageSearch, permission: "discrepancies.read", subgroup: "Incidencias y Casos" },
       { label: "Retiros", to: "/retiros", icon: PackageMinus, permission: "withdrawals.read", subgroup: "Incidencias y Casos" },
       { label: "HCA", to: "/calidad/hca", icon: ShieldCheck, permission: "quality.read", subgroup: "Incidencias y Casos" },
