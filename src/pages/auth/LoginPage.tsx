@@ -24,7 +24,7 @@ type FormValues = z.infer<typeof schema>;
 type Phase = "idle" | "mismatch" | "deactivated" | "limited" | "failed";
 
 const toneLabels: Record<Exclude<Phase, "idle">, string> = {
-  mismatch: "Contraseña o correo incorrecto",
+  mismatch: "Correo o contraseña incorrectos",
   deactivated: "Cuenta desactivada",
   limited: "Demasiados intentos",
   failed: "No se pudo entrar",
@@ -109,8 +109,8 @@ export function LoginPage() {
         "mismatch",
         values,
         next === 1
-          ? "Correo y contraseña no coinciden. Por favor verifica tus credenciales."
-          : "Sigue sin coincidir. Puedes recuperar la contraseña desde el enlace.",
+          ? "Correo o contraseña incorrectos."
+          : "Correo o contraseña incorrectos. Puedes recuperar la contraseña desde el enlace.",
       );
       setSettle(true);
     }
@@ -258,33 +258,25 @@ export function LoginPage() {
           required
           state={stateOf("password")}
           error={errors.password?.message}
-          hint={
-            <span className="flex justify-end">
-              {locked ? (
-                <span
-                  aria-disabled="true"
-                  title="Disponible cuando termine el bloqueo"
-                  className="cursor-not-allowed font-medium text-faint"
-                >
-                  ¿Olvidaste tu contraseña?
-                </span>
-              ) : (
-                <Link
-                  to="/forgot-password"
-                  state={{ email: staleEmail || getValues("email") }}
-                  className="font-medium text-brand-red-dark hover:underline underline-offset-2"
-                >
-                  ¿Olvidaste tu contraseña?
-                </Link>
-              )}
-            </span>
-          }
           {...passwordReg}
           onChange={(e) => {
             passwordReg.onChange(e);
             recharge();
           }}
         />
+
+        {/* Hermano del campo, no su `hint`: dentro del hint acababa en el
+            aria-describedby de la contraseña y desaparecía con cada error.
+            Sigue activo durante el bloqueo: recuperar es la salida natural. */}
+        <div className="-mt-2 flex justify-end text-[11.5px]">
+          <Link
+            to="/forgot-password"
+            state={{ email: staleEmail || getValues("email") }}
+            className="rounded-edge font-medium text-brand-red-dark underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand-red/25"
+          >
+            ¿Olvidaste tu contraseña?
+          </Link>
+        </div>
 
         <Button
           type="submit"
