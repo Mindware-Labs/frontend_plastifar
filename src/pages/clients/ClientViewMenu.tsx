@@ -97,19 +97,19 @@ export function ClientViewMenu({
         aria-controls={mounted ? panelId : undefined}
         aria-label={`Vista del directorio (activo: ${menuLabel})`}
         title={`Vista: ${menuLabel}`}
-        className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-[12.5px] font-medium transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+        className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-edge border px-2.5 text-[12.5px] font-medium transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
           open || focusActive
-            ? "border-zinc-200 bg-white text-zinc-900 shadow-2xs"
-            : "border-zinc-200/80 bg-white text-zinc-600 hover:border-zinc-200 hover:text-zinc-900"
+            ? "border-line bg-white text-ink shadow-2xs"
+            : "border-line bg-white text-subtle hover:border-line hover:text-ink"
         }`}
       >
-        <SlidersHorizontal className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+        <SlidersHorizontal className="h-3.5 w-3.5 shrink-0 text-faint" />
         <span className="max-w-[11rem] truncate">{menuLabel}</span>
         {focusActive && (
-          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-red" title="Filtro de vista activo" />
+          <span className="h-1.5 w-1.5 shrink-0 rounded-pill bg-brand-red" title="Filtro de vista activo" />
         )}
         <ChevronDown
-          className={`h-3 w-3 shrink-0 text-zinc-400 transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${open ? "rotate-180 text-zinc-700" : ""}`}
+          className={`h-3 w-3 shrink-0 text-faint transition-transform duration-280 ease-plf-spring motion-reduce:transition-none ${open ? "rotate-180 text-ink" : ""}`}
         />
       </button>
 
@@ -130,7 +130,7 @@ export function ClientViewMenu({
               width: MENU_WIDTH,
               transformOrigin: `${anchor.originX}px top`,
             }}
-            className={`z-[60] flex max-h-[min(24rem,calc(100vh-1rem))] flex-col gap-0.5 overflow-y-auto overscroll-contain rounded-lg border border-zinc-200/90
+            className={`z-[60] flex max-h-[min(24rem,calc(100vh-1rem))] flex-col gap-0.5 overflow-y-auto overscroll-contain rounded-edge border border-line
               bg-white p-1 shadow-[0_10px_28px_-6px_rgba(0,0,0,0.12),0_2px_8px_-2px_rgba(0,0,0,0.04)] ${
                 exiting ? "pointer-events-none" : ""
               }`}
@@ -152,21 +152,21 @@ export function ClientViewMenu({
                     setOpen(false);
                     triggerRef.current?.focus();
                   }}
-                  className={`flex items-center justify-between gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[12.5px] transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+                  className={`flex items-center justify-between gap-2.5 rounded-edge px-2.5 py-1.5 text-left text-[12.5px] transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
                     isActive
-                      ? "bg-zinc-100 font-semibold text-zinc-900"
-                      : "font-medium text-zinc-700 hover:bg-zinc-100/80 hover:text-zinc-900"
+                      ? "bg-fill font-semibold text-ink"
+                      : "font-medium text-ink hover:bg-fill"
                   }`}
                 >
                   <span>{label}</span>
-                  {isActive ? <Check className="size-3.5 shrink-0 text-zinc-600" aria-hidden /> : null}
+                  {isActive ? <Check className="size-3.5 shrink-0 text-subtle" aria-hidden /> : null}
                 </button>
               );
             })}
 
             <div
               data-motion-item
-              className="select-none border-t border-zinc-100 px-2.5 pt-2 pb-1 text-[11px] font-medium text-faint"
+              className="select-none border-t border-line-soft px-2.5 pt-2 pb-1 text-[11px] font-medium text-faint"
             >
               Enfocar en
             </div>
@@ -184,14 +184,14 @@ export function ClientViewMenu({
                     setOpen(false);
                     triggerRef.current?.focus();
                   }}
-                  className={`flex items-center justify-between gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[12.5px] transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+                  className={`flex items-center justify-between gap-2.5 rounded-edge px-2.5 py-1.5 text-left text-[12.5px] transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
                     isActive
-                      ? "bg-zinc-100 font-semibold text-zinc-900"
-                      : "font-medium text-zinc-700 hover:bg-zinc-100/80 hover:text-zinc-900"
+                      ? "bg-fill font-semibold text-ink"
+                      : "font-medium text-ink hover:bg-fill"
                   }`}
                 >
                   <span>{label}</span>
-                  {isActive ? <Check className="size-3.5 shrink-0 text-zinc-600" aria-hidden /> : null}
+                  {isActive ? <Check className="size-3.5 shrink-0 text-subtle" aria-hidden /> : null}
                 </button>
               );
             })}

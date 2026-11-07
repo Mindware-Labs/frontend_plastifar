@@ -439,7 +439,7 @@ export function ClientsPage() {
                   {
                     key: "reassign",
                     label: "Reasignar vendedor",
-                    icon: <UserCog aria-hidden className="h-3.5 w-3.5 text-zinc-500" />,
+                    icon: <UserCog aria-hidden className="h-3.5 w-3.5 text-subtle" />,
                     onClick: () => setBulkReassigning(true),
                   },
                 ],
@@ -460,7 +460,7 @@ export function ClientsPage() {
               aria-label="Filtrar por vendedor"
               placeholder="Todos los vendedores"
               searchPlaceholder="Buscar vendedor…"
-              defaultIcon={<UserCheck className="h-3.5 w-3.5 text-zinc-500" />}
+              defaultIcon={<UserCheck className="h-3.5 w-3.5 text-subtle" />}
               value={salesRepId === "todos" ? "" : salesRepId}
               selectedLabel={salesRepId === "todos" ? null : repName(Number(salesRepId))}
               resolveSelectedLabel={resolveStaffLabel}
@@ -473,7 +473,7 @@ export function ClientsPage() {
               aria-label="Filtrar por tipo"
               value={type}
               onChange={setType}
-              defaultIcon={<Building2 className="h-3.5 w-3.5 text-zinc-500" />}
+              defaultIcon={<Building2 className="h-3.5 w-3.5 text-subtle" />}
               options={TYPE_OPTIONS}
             />
 

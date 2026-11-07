@@ -12,11 +12,11 @@ import type { Client } from "../../types/clients";
 
 function FormDivider({ title }: { title: string }) {
   return (
-    <div className="flex items-center gap-2 pt-2 border-t border-zinc-100 first:border-0 first:pt-0">
+    <div className="flex items-center gap-2 pt-2 border-t border-line-soft first:border-0 first:pt-0">
       <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-faint select-none">
         {title}
       </span>
-      <div className="h-px flex-1 bg-zinc-100" />
+      <div className="h-px flex-1 bg-fill" />
     </div>
   );
 }
@@ -78,11 +78,11 @@ export function BulkReassignSalesRepModal({ clients, onClose, onSaved }: BulkRea
       footer={
         <div className="flex w-full items-center justify-between gap-3">
           <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-faint select-none">
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+            <kbd className="rounded-edge border border-line bg-fill px-1 py-0.5 text-[10px] font-mono text-subtle">
               Ctrl
             </kbd>
             <span>+</span>
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+            <kbd className="rounded-edge border border-line bg-fill px-1 py-0.5 text-[10px] font-mono text-subtle">
               Enter
             </kbd>
             <span className="ml-0.5">para guardar</span>
@@ -115,12 +115,12 @@ export function BulkReassignSalesRepModal({ clients, onClose, onSaved }: BulkRea
         {/* 1. CLIENTES AFECTADOS */}
         <FormDivider title="Clientes seleccionados" />
 
-        <div className="rounded-lg border border-zinc-200/80 bg-zinc-50/70 p-3">
-          <ul className="flex flex-col divide-y divide-zinc-200/60 text-[12.5px]">
+        <div className="rounded-edge border border-line bg-canvas p-3">
+          <ul className="flex flex-col divide-y divide-line text-[12.5px]">
             {shown.map((client) => (
               <li key={client.id} className="flex items-center justify-between gap-2 py-1.5 first:pt-0 last:pb-0">
-                <span className="truncate font-medium text-zinc-900">{client.name}</span>
-                <span className="shrink-0 font-mono text-[11px] text-zinc-500">{client.code}</span>
+                <span className="truncate font-medium text-ink">{client.name}</span>
+                <span className="shrink-0 font-mono text-[11px] text-subtle">{client.code}</span>
               </li>
             ))}
             {overflow > 0 && (

@@ -380,7 +380,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
         title={client.name}
         badge={
           <div className="flex items-center gap-1.5">
-            <span className="font-mono text-[11px] font-medium text-zinc-500 bg-zinc-100 border border-zinc-200/80 px-2 py-0.5 rounded-md tabular-nums">
+            <span className="font-mono text-[11px] font-medium text-subtle bg-fill border border-line px-2 py-0.5 rounded-edge tabular-nums">
               {client.code}
             </span>
             {client.isActive ? (
@@ -391,12 +391,12 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
           </div>
         }
         summary={
-          <div className="flex items-center gap-1.5 text-[12px] text-zinc-500">
-            <span className="font-medium text-zinc-700">{client.type}</span>
+          <div className="flex items-center gap-1.5 text-[12px] text-subtle">
+            <span className="font-medium text-ink">{client.type}</span>
 
             {client.taxId && (
               <>
-                <span aria-hidden className="text-zinc-300">·</span>
+                <span aria-hidden className="text-line-strong">·</span>
                 <span>RNC: {client.taxId}</span>
               </>
             )}
@@ -434,10 +434,10 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <StatTile
                   label="Estado"
-                  indicator={<span className={`h-2 w-2 rounded-full ${client.isActive ? "bg-emerald-500" : "bg-zinc-300"}`} />}
+                  indicator={<span className={`h-2 w-2 rounded-pill ${client.isActive ? "bg-emerald-500" : "bg-faint"}`} />}
                 >
                   <div className="mt-1 flex items-baseline gap-2">
-                    <span className="font-heading text-[15px] font-bold text-zinc-900">
+                    <span className="font-heading text-[15px] font-bold text-ink">
                       {client.isActive ? "Activo" : "Inactivo"}
                     </span>
                     <span className="text-[11px] text-faint truncate">
@@ -446,17 +446,17 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                   </div>
                 </StatTile>
 
-                <StatTile label="Tipo" indicator={<TypeIcon className="h-3.5 w-3.5 text-zinc-400" />}>
+                <StatTile label="Tipo" indicator={<TypeIcon className="h-3.5 w-3.5 text-faint" />}>
                   <div className="mt-1">
-                    <span className="font-heading text-[15px] font-bold text-zinc-900 truncate block">
+                    <span className="font-heading text-[15px] font-bold text-ink truncate block">
                       {client.type}
                     </span>
                   </div>
                 </StatTile>
 
-                <StatTile label="Vendedor" indicator={<UserCheck className="h-3.5 w-3.5 text-zinc-400" />}>
+                <StatTile label="Vendedor" indicator={<UserCheck className="h-3.5 w-3.5 text-faint" />}>
                   <div className="mt-1">
-                    <span className={`font-heading text-[15px] font-bold truncate block ${salesRepName ? "text-zinc-900" : "text-amber-600"}`}>
+                    <span className={`font-heading text-[15px] font-bold truncate block ${salesRepName ? "text-ink" : "text-amber-600"}`}>
                       {salesRepName ?? "Sin asignar"}
                     </span>
                   </div>
@@ -472,22 +472,22 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                     icon={Building2}
                     title="Identificación Comercial"
                     aside={
-                      <span className="font-mono text-[11px] font-medium text-zinc-500 bg-white border border-zinc-200/80 px-2 py-0.5 rounded shadow-2xs tabular-nums">
+                      <span className="font-mono text-[11px] font-medium text-subtle bg-white border border-line px-2 py-0.5 rounded-edge shadow-2xs tabular-nums">
                         {client.code}
                       </span>
                     }
                   >
 
-                    <div className="px-4 py-1 divide-y divide-zinc-100">
+                    <div className="px-4 py-1 divide-y divide-line-soft">
                       <div className="flex items-center justify-between py-2 text-[12.5px]">
-                        <span className="text-zinc-500 font-medium">Nombre o Razón Social</span>
-                        <span className="font-semibold text-zinc-900 text-right">{client.name}</span>
+                        <span className="text-subtle font-medium">Nombre o Razón Social</span>
+                        <span className="font-semibold text-ink text-right">{client.name}</span>
                       </div>
 
                       <div className="flex items-center justify-between py-2 text-[12.5px]">
-                        <span className="text-zinc-500 font-medium">RNC / Cédula</span>
+                        <span className="text-subtle font-medium">RNC / Cédula</span>
                         <div className="flex items-center gap-1.5">
-                          <span className="font-mono text-zinc-800 tabular-nums">
+                          <span className="font-mono text-ink tabular-nums">
                             {client.taxId ?? "—"}
                           </span>
                           {client.taxId && <CopyButton text={client.taxId} label="Copiar RNC" />}
@@ -495,16 +495,16 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                       </div>
 
                       <div className="flex items-center justify-between py-2 text-[12.5px]">
-                        <span className="text-zinc-500 font-medium">Tipo de cliente</span>
-                        <span className="inline-flex items-center gap-1.5 text-zinc-800 font-medium">
-                          <TypeIcon className="h-3.5 w-3.5 text-zinc-400" />
+                        <span className="text-subtle font-medium">Tipo de cliente</span>
+                        <span className="inline-flex items-center gap-1.5 text-ink font-medium">
+                          <TypeIcon className="h-3.5 w-3.5 text-faint" />
                           {client.type}
                         </span>
                       </div>
 
                       <div className="flex items-center justify-between py-2 text-[12.5px]">
-                        <span className="text-zinc-500 font-medium">Vendedor asignado</span>
-                        <span className={salesRepName ? "text-zinc-900 font-medium" : "text-amber-600 font-medium"}>
+                        <span className="text-subtle font-medium">Vendedor asignado</span>
+                        <span className={salesRepName ? "text-ink font-medium" : "text-amber-600 font-medium"}>
                           {salesRepName ?? "Sin vendedor asignado"}
                         </span>
                       </div>
@@ -514,17 +514,17 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                   {/* Card: Canales de Contacto y Ubicación */}
                   <DetailCard icon={Phone} title="Canales de Contacto y Ubicación">
 
-                    <div className="px-4 py-1 divide-y divide-zinc-100">
+                    <div className="px-4 py-1 divide-y divide-line-soft">
                       <div className="flex items-center justify-between py-2 text-[12.5px]">
-                        <span className="text-zinc-500 font-medium">Persona de contacto</span>
-                        <span className="text-zinc-900 font-medium truncate max-w-[55%] text-right">
+                        <span className="text-subtle font-medium">Persona de contacto</span>
+                        <span className="text-ink font-medium truncate max-w-[55%] text-right">
                           {client.contactPersonName ?? <span className="text-faint font-normal">—</span>}
                         </span>
                       </div>
 
                       <div className="flex items-center justify-between py-2 text-[12.5px]">
-                        <div className="flex items-center gap-2 text-zinc-500 font-medium">
-                          <Phone className="h-3.5 w-3.5 text-zinc-400" />
+                        <div className="flex items-center gap-2 text-subtle font-medium">
+                          <Phone className="h-3.5 w-3.5 text-faint" />
                           <span>Teléfono principal</span>
                         </div>
                         <div className="flex items-center gap-1.5">
@@ -532,7 +532,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                             <>
                               <a
                                 href={`tel:${client.phone}`}
-                                className="font-mono text-zinc-900 font-medium hover:text-brand-red transition-colors"
+                                className="font-mono text-ink font-medium hover:text-brand-red transition-colors"
                               >
                                 {formatPhoneNumber(client.phone)}
                               </a>
@@ -545,8 +545,8 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                       </div>
 
                       <div className="flex items-center justify-between py-2 text-[12.5px]">
-                        <div className="flex items-center gap-2 text-zinc-500 font-medium">
-                          <Mail className="h-3.5 w-3.5 text-zinc-400" />
+                        <div className="flex items-center gap-2 text-subtle font-medium">
+                          <Mail className="h-3.5 w-3.5 text-faint" />
                           <span>Correo electrónico</span>
                         </div>
                         <div className="flex items-center gap-1.5">
@@ -554,7 +554,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                             <>
                               <a
                                 href={`mailto:${client.email}`}
-                                className="text-zinc-900 font-medium hover:text-brand-red transition-colors truncate max-w-[260px]"
+                                className="text-ink font-medium hover:text-brand-red transition-colors truncate max-w-[260px]"
                               >
                                 {client.email}
                               </a>
@@ -567,11 +567,11 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                       </div>
 
                       <div className="flex items-start justify-between py-2.5 text-[12.5px]">
-                        <div className="flex items-center gap-2 text-zinc-500 font-medium shrink-0">
-                          <MapPin className="h-3.5 w-3.5 text-zinc-400" />
+                        <div className="flex items-center gap-2 text-subtle font-medium shrink-0">
+                          <MapPin className="h-3.5 w-3.5 text-faint" />
                           <span>Dirección física</span>
                         </div>
-                        <div className="text-right text-zinc-800 font-medium max-w-[340px] leading-relaxed">
+                        <div className="text-right text-ink font-medium max-w-[340px] leading-relaxed">
                           {client.address || <span className="text-faint font-normal">Sin dirección física registrada</span>}
                         </div>
                       </div>
@@ -583,7 +583,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                     icon={FileText}
                     title="Observaciones Internas"
                     aside={
-                      <span className="text-[10.5px] font-medium text-faint bg-zinc-100 px-2 py-0.5 rounded">
+                      <span className="text-[10.5px] font-medium text-faint bg-fill px-2 py-0.5 rounded-edge">
                         Uso interno
                       </span>
                     }
@@ -591,7 +591,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
 
                     <div className="p-4">
                       {client.notes ? (
-                        <div className="rounded-md border border-zinc-200/80 bg-zinc-50/70 p-3 text-[12.5px] leading-relaxed text-zinc-700 whitespace-pre-wrap font-sans">
+                        <div className="rounded-edge border border-line bg-canvas p-3 text-[12.5px] leading-relaxed text-ink whitespace-pre-wrap font-sans">
                           {client.notes}
                         </div>
                       ) : (
@@ -615,7 +615,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                         </h3>
                       </div>
                       {primaryContact && (
-                        <span className="text-[10px] font-semibold text-amber-700 bg-amber-100/80 px-1.5 py-0.5 rounded">
+                        <span className="text-[10px] font-semibold text-amber-700 bg-amber-100/80 px-1.5 py-0.5 rounded-edge">
                           Designado
                         </span>
                       )}
@@ -625,11 +625,11 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                       {primaryContact ? (
                         <div className="space-y-3">
                           <div>
-                            <div className="font-heading text-[14px] font-bold text-zinc-900">
+                            <div className="font-heading text-[14px] font-bold text-ink">
                               {primaryContact.firstName} {primaryContact.lastName}
                             </div>
                             {primaryContact.position && (
-                              <div className="text-[12px] text-zinc-500 mt-0.5">
+                              <div className="text-[12px] text-subtle mt-0.5">
                                 {primaryContact.position}
                               </div>
                             )}
@@ -638,11 +638,11 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                           <div className="space-y-1.5 pt-2 border-t border-amber-100/60 text-[12px]">
                             {primaryContact.phone && (
                               <div className="flex items-center justify-between">
-                                <span className="text-zinc-500 flex items-center gap-1.5">
-                                  <Phone className="h-3 w-3 text-zinc-400" />
+                                <span className="text-subtle flex items-center gap-1.5">
+                                  <Phone className="h-3 w-3 text-faint" />
                                   Teléfono
                                 </span>
-                                <div className="flex items-center gap-1 font-mono text-zinc-800">
+                                <div className="flex items-center gap-1 font-mono text-ink">
                                   <a href={`tel:${primaryContact.phone}`} className="hover:text-brand-red">
                                     {formatPhoneNumber(primaryContact.phone)}
                                   </a>
@@ -653,11 +653,11 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
 
                             {primaryContact.email && (
                               <div className="flex items-start justify-between gap-3">
-                                <span className="flex shrink-0 items-center gap-1.5 text-zinc-500">
-                                  <Mail className="h-3 w-3 text-zinc-400" />
+                                <span className="flex shrink-0 items-center gap-1.5 text-subtle">
+                                  <Mail className="h-3 w-3 text-faint" />
                                   Correo
                                 </span>
-                                <div className="flex min-w-0 items-start justify-end gap-1 text-right text-zinc-800">
+                                <div className="flex min-w-0 items-start justify-end gap-1 text-right text-ink">
                                   <a
                                     href={`mailto:${primaryContact.email}`}
                                     className="break-all hover:text-brand-red"
@@ -673,16 +673,16 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                           <div className="pt-2">
                             <Link
                               to={`/clientes/${id}/contactos`}
-                              className="flex items-center justify-center gap-1.5 w-full py-1.5 text-[12px] font-semibold text-zinc-700 bg-white border border-zinc-200/90 rounded-md hover:bg-zinc-50 transition-colors shadow-2xs"
+                              className="flex items-center justify-center gap-1.5 w-full py-1.5 text-[12px] font-semibold text-ink bg-white border border-line rounded-edge hover:bg-canvas transition-colors shadow-2xs"
                             >
                               Ver todos los contactos ({totalContacts})
-                              <ArrowRight className="h-3.5 w-3.5 text-zinc-400" />
+                              <ArrowRight className="h-3.5 w-3.5 text-faint" />
                             </Link>
                           </div>
                         </div>
                       ) : (
                         <div className="text-center py-2">
-                          <p className="text-[12px] text-zinc-500 mb-3">
+                          <p className="text-[12px] text-subtle mb-3">
                             Este cliente todavía no tiene un contacto principal designado.
                           </p>
                           {canWrite && (
@@ -704,8 +704,8 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                   {/* Card: Resumen de Operación */}
                   <div className="rounded-card border border-line bg-white shadow-card p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <Ticket className="h-4 w-4 text-zinc-500" />
-                      <h4 className="font-heading text-[11.5px] font-bold uppercase tracking-wider text-zinc-800">
+                      <Ticket className="h-4 w-4 text-subtle" />
+                      <h4 className="font-heading text-[11.5px] font-bold uppercase tracking-wider text-ink">
                         Actividad del Cliente
                       </h4>
                     </div>
@@ -713,24 +713,24 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                     <div className="grid grid-cols-2 gap-2 text-center mb-3">
                       <Link
                         to={`/clientes/${id}/contactos`}
-                        className="p-2.5 rounded-lg bg-zinc-50 hover:bg-zinc-100/80 border border-zinc-100 transition-colors block"
+                        className="p-2.5 rounded-edge bg-canvas hover:bg-fill border border-line-soft transition-colors block"
                       >
-                        <div className="font-heading text-[18px] font-bold text-zinc-900 tabular-nums">
+                        <div className="font-heading text-[18px] font-bold text-ink tabular-nums">
                           {totalContacts}
                         </div>
-                        <div className="text-[11px] font-medium text-zinc-500 mt-0.5">
+                        <div className="text-[11px] font-medium text-subtle mt-0.5">
                           Contactos
                         </div>
                       </Link>
 
                       <Link
                         to={`/clientes/${id}/historial`}
-                        className="p-2.5 rounded-lg bg-zinc-50 hover:bg-zinc-100/80 border border-zinc-100 transition-colors block"
+                        className="p-2.5 rounded-edge bg-canvas hover:bg-fill border border-line-soft transition-colors block"
                       >
-                        <div className="font-heading text-[18px] font-bold text-zinc-900 tabular-nums">
+                        <div className="font-heading text-[18px] font-bold text-ink tabular-nums">
                           {totalTickets}
                         </div>
-                        <div className="text-[11px] font-medium text-zinc-500 mt-0.5">
+                        <div className="text-[11px] font-medium text-subtle mt-0.5">
                           Tickets
                         </div>
                       </Link>
@@ -739,35 +739,35 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                     <div className="space-y-1 text-[12px]">
                       <Link
                         to="/clientes"
-                        className="flex items-center justify-between p-2 rounded-md hover:bg-zinc-50 text-zinc-600 hover:text-zinc-900 font-medium transition-colors border border-transparent hover:border-zinc-200/60"
+                        className="flex items-center justify-between p-2 rounded-edge hover:bg-canvas text-subtle hover:text-ink font-medium transition-colors border border-transparent hover:border-line"
                       >
                         <span className="flex items-center gap-2">
-                          <Building2 className="h-3.5 w-3.5 text-zinc-400" />
+                          <Building2 className="h-3.5 w-3.5 text-faint" />
                           Directorio de clientes (tabla)
                         </span>
-                        <ArrowRight className="h-3.5 w-3.5 text-zinc-400" />
+                        <ArrowRight className="h-3.5 w-3.5 text-faint" />
                       </Link>
 
                       <Link
                         to={`/clientes/${id}/contactos`}
-                        className="flex items-center justify-between p-2 rounded-md hover:bg-zinc-50 text-zinc-600 hover:text-zinc-900 font-medium transition-colors border border-transparent hover:border-zinc-200/60"
+                        className="flex items-center justify-between p-2 rounded-edge hover:bg-canvas text-subtle hover:text-ink font-medium transition-colors border border-transparent hover:border-line"
                       >
                         <span className="flex items-center gap-2">
-                          <Users className="h-3.5 w-3.5 text-zinc-400" />
+                          <Users className="h-3.5 w-3.5 text-faint" />
                           Directorio de contactos
                         </span>
-                        <ArrowRight className="h-3.5 w-3.5 text-zinc-400" />
+                        <ArrowRight className="h-3.5 w-3.5 text-faint" />
                       </Link>
 
                       <Link
                         to={`/clientes/${id}/historial`}
-                        className="flex items-center justify-between p-2 rounded-md hover:bg-zinc-50 text-zinc-600 hover:text-zinc-900 font-medium transition-colors border border-transparent hover:border-zinc-200/60"
+                        className="flex items-center justify-between p-2 rounded-edge hover:bg-canvas text-subtle hover:text-ink font-medium transition-colors border border-transparent hover:border-line"
                       >
                         <span className="flex items-center gap-2">
-                          <Ticket className="h-3.5 w-3.5 text-zinc-400" />
+                          <Ticket className="h-3.5 w-3.5 text-faint" />
                           Historial de tickets
                         </span>
-                        <ArrowRight className="h-3.5 w-3.5 text-zinc-400" />
+                        <ArrowRight className="h-3.5 w-3.5 text-faint" />
                       </Link>
                     </div>
                   </div>
@@ -806,12 +806,12 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                     </div>
 
                     {contactCounts === undefined ? (
-                      <div className="inline-flex h-8 items-center gap-0.5 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5">
+                      <div className="inline-flex h-8 items-center gap-0.5 rounded-edge border border-line bg-canvas p-0.5">
                         {contactChips.map(({ key }) => (
                           <span
                             key={key}
                             aria-hidden
-                            className="h-7 w-[88px] animate-pulse rounded-md bg-zinc-200/60"
+                            className="h-7 w-[88px] animate-pulse rounded-edge bg-line"
                           />
                         ))}
                       </div>
@@ -819,7 +819,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                       <div
                         role="group"
                         aria-label="Vista de estado"
-                        className="inline-flex h-8 items-center gap-0.5 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5"
+                        className="inline-flex h-8 items-center gap-0.5 rounded-edge border border-line bg-canvas p-0.5"
                       >
                         {contactChips.map(({ key, label, countKey }) => {
                           const isActive = contactChip === key;
@@ -830,16 +830,16 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                               type="button"
                               onClick={() => setContactChip(key)}
                               aria-pressed={isActive}
-                              className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[12.5px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+                              className={`inline-flex h-7 items-center gap-1.5 rounded-edge border px-2.5 text-[12.5px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
                                 isActive
-                                  ? "border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
-                                  : "border-transparent font-medium text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
+                                  ? "border-line bg-white font-semibold text-ink shadow-2xs"
+                                  : "border-transparent font-medium text-subtle hover:bg-white/60 hover:text-ink"
                               }`}
                             >
                               <span>{label}</span>
                               <span
                                 className={`font-heading text-[10px] font-bold leading-none tabular-nums transition-colors ${
-                                  isActive ? "text-zinc-900" : "text-faint"
+                                  isActive ? "text-ink" : "text-faint"
                                 }`}
                               >
                                 {count}
@@ -1000,7 +1000,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                     <div
                       role="group"
                       aria-label="Filtro de tickets"
-                      className="inline-flex h-8 items-center gap-0.5 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5"
+                      className="inline-flex h-8 items-center gap-0.5 rounded-edge border border-line bg-canvas p-0.5"
                     >
                       {[
                         { key: "todos" as const, label: "Todos", count: ticketCounts?.all ?? totalTickets },
@@ -1014,16 +1014,16 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                             type="button"
                             onClick={() => setTicketChip(key)}
                             aria-pressed={isActive}
-                            className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[12.5px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
+                            className={`inline-flex h-7 items-center gap-1.5 rounded-edge border px-2.5 text-[12.5px] transition-colors duration-150 outline-none select-none cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-red/25 ${
                               isActive
-                                ? "border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
-                                : "border-transparent font-medium text-zinc-500 hover:bg-white/60 hover:text-zinc-800"
+                                ? "border-line bg-white font-semibold text-ink shadow-2xs"
+                                : "border-transparent font-medium text-subtle hover:bg-white/60 hover:text-ink"
                             }`}
                           >
                             <span>{label}</span>
                             <span
                               className={`font-heading text-[10px] font-bold leading-none tabular-nums transition-colors ${
-                                isActive ? "text-zinc-900" : "text-faint"
+                                isActive ? "text-ink" : "text-faint"
                               }`}
                             >
                               {count}
@@ -1091,7 +1091,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                             className="cursor-pointer"
                             onClick={() => setSummaryTicketId(ticket.id)}
                           >
-                            <Td className="font-mono text-[12.5px] font-semibold text-zinc-900 tabular-nums">
+                            <Td className="font-mono text-[12.5px] font-semibold text-ink tabular-nums">
                               <Link
                                 to={`/tickets/${ticket.id}`}
                                 className="text-brand-red hover:underline"
@@ -1100,7 +1100,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                                 {ticket.number || formatTicketCode(ticket.id)}
                               </Link>
                             </Td>
-                            <Td className="text-[13px] text-zinc-900 font-medium">
+                            <Td className="text-[13px] text-ink font-medium">
                               <Link
                                 to={`/tickets/${ticket.id}`}
                                 className="hover:text-brand-red transition-colors line-clamp-1"
@@ -1120,15 +1120,15 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                             <Td>
                               <StatusCell status={ticket.status} />
                             </Td>
-                            <Td className="text-[12.5px] text-zinc-600">
+                            <Td className="text-[12.5px] text-subtle">
                               {ticket.departmentName ?? "—"}
                             </Td>
-                            <Td className="text-[12.5px] text-zinc-600">
+                            <Td className="text-[12.5px] text-subtle">
                               {ticket.assignedStaffName ?? (
                                 <span className="text-faint">Sin asignar</span>
                               )}
                             </Td>
-                            <Td className="whitespace-nowrap text-[12px] text-zinc-500 text-right tabular-nums">
+                            <Td className="whitespace-nowrap text-[12px] text-subtle text-right tabular-nums">
                               {formatDateTime(ticket.createdAt)}
                             </Td>
                           </Row>

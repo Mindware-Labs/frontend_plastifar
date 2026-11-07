@@ -13,11 +13,11 @@ import type { Client } from "../../types/clients";
 
 function FormDivider({ title }: { title: string }) {
   return (
-    <div className="flex items-center gap-2 pt-2 border-t border-zinc-100 first:border-0 first:pt-0">
+    <div className="flex items-center gap-2 pt-2 border-t border-line-soft first:border-0 first:pt-0">
       <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-faint select-none">
         {title}
       </span>
-      <div className="h-px flex-1 bg-zinc-100" />
+      <div className="h-px flex-1 bg-fill" />
     </div>
   );
 }
@@ -93,11 +93,11 @@ export function ReassignSalesRepModal({ client, onClose, onSaved }: ReassignSale
       footer={
         <div className="flex w-full items-center justify-between gap-3">
           <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-faint select-none">
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+            <kbd className="rounded-edge border border-line bg-fill px-1 py-0.5 text-[10px] font-mono text-subtle">
               Ctrl
             </kbd>
             <span>+</span>
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+            <kbd className="rounded-edge border border-line bg-fill px-1 py-0.5 text-[10px] font-mono text-subtle">
               Enter
             </kbd>
             <span className="ml-0.5">para guardar</span>
@@ -130,22 +130,22 @@ export function ReassignSalesRepModal({ client, onClose, onSaved }: ReassignSale
         {/* 1. INFORMACIÓN DEL CLIENTE */}
         <FormDivider title="Cliente" />
 
-        <div className="rounded-lg border border-zinc-200/80 bg-zinc-50/70 p-3">
+        <div className="rounded-edge border border-line bg-canvas p-3">
           <div className="flex items-center justify-between gap-2">
-            <span className="font-mono text-[11px] font-semibold text-zinc-500">
+            <span className="font-mono text-[11px] font-semibold text-subtle">
               {client.code}
             </span>
-            <span className="inline-flex items-center rounded-md border border-zinc-200/80 bg-white px-2 py-0.5 text-[11px] font-medium text-zinc-600 shadow-2xs">
+            <span className="inline-flex items-center rounded-edge border border-line bg-white px-2 py-0.5 text-[11px] font-medium text-subtle shadow-2xs">
               {client.type}
             </span>
           </div>
-          <p className="mt-1 text-[13.5px] font-semibold text-zinc-900 truncate" title={client.name}>
+          <p className="mt-1 text-[13.5px] font-semibold text-ink truncate" title={client.name}>
             {client.name}
           </p>
-          <div className="mt-2.5 flex items-center gap-1.5 border-t border-zinc-200/60 pt-2 text-[12px] text-zinc-500">
-            <UserCheck className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+          <div className="mt-2.5 flex items-center gap-1.5 border-t border-line pt-2 text-[12px] text-subtle">
+            <UserCheck className="h-3.5 w-3.5 shrink-0 text-faint" />
             <span>Vendedor actual:</span>
-            <span className="font-medium text-zinc-800">
+            <span className="font-medium text-ink">
               {currentRepName ?? (client.salesRepStaffId ? "Cargando…" : "Sin vendedor asignado")}
             </span>
           </div>

@@ -67,11 +67,11 @@ const fieldRules: FieldRule<keyof FormValues>[] = [
 
 function FormDivider({ title }: { title: string }) {
   return (
-    <div className="flex items-center gap-2 border-t border-zinc-100 pt-2 first:border-0 first:pt-0">
+    <div className="flex items-center gap-2 border-t border-line-soft pt-2 first:border-0 first:pt-0">
       <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-faint select-none">
         {title}
       </span>
-      <div className="h-px flex-1 bg-zinc-100" />
+      <div className="h-px flex-1 bg-fill" />
     </div>
   );
 }
@@ -188,11 +188,11 @@ export function ContactModal({ clientId, contact, isFirst, onClose, onSaved }: C
       footer={
         <div className="flex w-full items-center justify-between gap-3">
           <span className="hidden select-none items-center gap-1 text-[11px] text-faint sm:inline-flex">
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 font-mono text-[10px] text-zinc-500">
+            <kbd className="rounded-edge border border-line bg-fill px-1 py-0.5 font-mono text-[10px] text-subtle">
               Ctrl
             </kbd>
             <span>+</span>
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 font-mono text-[10px] text-zinc-500">
+            <kbd className="rounded-edge border border-line bg-fill px-1 py-0.5 font-mono text-[10px] text-subtle">
               Enter
             </kbd>
             <span className="ml-0.5">para guardar</span>

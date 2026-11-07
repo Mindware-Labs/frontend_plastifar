@@ -100,11 +100,11 @@ interface ClientModalProps {
 
 function FormDivider({ title }: { title: string }) {
   return (
-    <div className="flex items-center gap-2 pt-2 border-t border-zinc-100 first:border-0 first:pt-0">
+    <div className="flex items-center gap-2 pt-2 border-t border-line-soft first:border-0 first:pt-0">
       <span className="font-heading text-[10px] font-bold uppercase tracking-[0.08em] text-faint select-none">
         {title}
       </span>
-      <div className="h-px flex-1 bg-zinc-100" />
+      <div className="h-px flex-1 bg-fill" />
     </div>
   );
 }
@@ -223,11 +223,11 @@ export function ClientModal({ client, onClose, onSaved }: ClientModalProps) {
       footer={
         <div className="flex w-full items-center justify-between gap-3">
           <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-faint select-none">
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+            <kbd className="rounded-edge border border-line bg-fill px-1 py-0.5 text-[10px] font-mono text-subtle">
               Ctrl
             </kbd>
             <span>+</span>
-            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1 py-0.5 text-[10px] font-mono text-zinc-500">
+            <kbd className="rounded-edge border border-line bg-fill px-1 py-0.5 text-[10px] font-mono text-subtle">
               Enter
             </kbd>
             <span className="ml-0.5">para guardar</span>
@@ -298,7 +298,7 @@ export function ClientModal({ client, onClose, onSaved }: ClientModalProps) {
               <div
                 role="radiogroup"
                 aria-label="Tipo de cliente"
-                className="grid grid-cols-2 sm:grid-cols-4 gap-1 rounded-lg border border-zinc-200 bg-zinc-50/70 p-0.5"
+                className="grid grid-cols-2 sm:grid-cols-4 gap-1 rounded-edge border border-line bg-canvas p-0.5"
               >
                 {CLIENT_TYPES_ITEMS.map((item) => {
                   const isSelected = field.value === item.value;
@@ -310,14 +310,14 @@ export function ClientModal({ client, onClose, onSaved }: ClientModalProps) {
                       role="radio"
                       aria-checked={isSelected}
                       onClick={() => field.onChange(item.value)}
-                      className={`inline-flex h-7 items-center justify-center gap-1.5 rounded-md px-2 text-[12px] transition-all cursor-pointer select-none ${
+                      className={`inline-flex h-7 items-center justify-center gap-1.5 rounded-edge px-2 text-[12px] transition-all cursor-pointer select-none ${
                         isSelected
-                          ? "border border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
-                          : "border border-transparent font-medium text-zinc-600 hover:text-zinc-900 hover:bg-white/50"
+                          ? "border border-line bg-white font-semibold text-ink shadow-2xs"
+                          : "border border-transparent font-medium text-subtle hover:text-ink hover:bg-white/50"
                       }`}
                     >
                       <Icon
-                        className={`h-3 w-3 shrink-0 ${isSelected ? "text-brand-red" : "text-zinc-400"}`}
+                        className={`h-3 w-3 shrink-0 ${isSelected ? "text-brand-red" : "text-faint"}`}
                       />
                       <span className="truncate">{item.label}</span>
                     </button>
