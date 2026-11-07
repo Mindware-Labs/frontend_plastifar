@@ -6,11 +6,14 @@ import {
   Plus,
   Power,
   Trash2,
+  MapPin,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ApiError } from "../../api/client";
 import { sedesApi } from "../../api/sedes";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
+import { ListEmptyState } from "../../components/ui/ListEmptyState";
+import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -365,11 +368,31 @@ export function SedesPage() {
             <TableSkeleton rows={pageSize} columns={5} />
           )
           ) : rows.length === 0 ? (
-            <p className="py-14 text-center text-[13.5px] text-faint">
-              {isFiltering
-                ? "Ninguna sede coincide con este filtro o búsqueda."
-                : "Todavía no hay ninguna sede registrada."}
-            </p>
+            isFiltering ? (
+              <EmptyResult
+                message="Ninguna sede coincide con este filtro o búsqueda."
+                onClear={() => {
+                  setSearch("");
+                  setChip("todos");
+                  setPage(1);
+                }}
+              />
+            ) : (
+              <ListEmptyState
+                icon={MapPin}
+                isFiltered={false}
+                filteredTitle=""
+                emptyTitle="Todavía no hay ninguna sede registrada."
+                action={
+                  canWrite && (
+                    <Button size="sm" onClick={() => setModal("nuevo")}>
+                      <Plus className="h-[15px] w-[15px]" />
+                      Nueva sede
+                    </Button>
+                  )
+                }
+              />
+            )
           ) : (
             <div className="plf-results-in">
               <DataTable>

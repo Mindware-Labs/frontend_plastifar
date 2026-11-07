@@ -1,8 +1,10 @@
-import { Factory, FileUp, Layers, Pencil, Plus, Power, Trash2 } from "lucide-react";
+import { Factory, FileUp, Layers, Pencil, Plus, Power, Trash2, Package } from "lucide-react";
 import { useState } from "react";
 import { settingsApi } from "../../api/settings";
 import { catalogs, fetchCatalog } from "../../lib/catalogQueries";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
+import { ListEmptyState } from "../../components/ui/ListEmptyState";
+import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
@@ -340,11 +342,34 @@ export function ProductsSection() {
             <TableSkeleton rows={pageSize} columns={5} />
           )
         ) : rows.length === 0 ? (
-          <p className="py-14 text-center text-[13.5px] text-faint">
-            {isFiltering
-              ? "Ningún producto coincide con este filtro o búsqueda."
-              : "Todavía no hay ningún producto registrado. Crea uno o carga el catálogo desde un archivo."}
-          </p>
+          isFiltering ? (
+            <EmptyResult
+              message="Ningún producto coincide con este filtro o búsqueda."
+              onClear={() => {
+                setSearch("");
+                setChip("todos");
+                setPlantId(TODOS);
+                setProductLineId(TODOS);
+                setPage(1);
+              }}
+            />
+          ) : (
+            <ListEmptyState
+              icon={Package}
+              isFiltered={false}
+              filteredTitle=""
+              emptyTitle="Todavía no hay ningún producto registrado."
+              emptyDescription="Crea uno o carga el catálogo desde un archivo."
+              action={
+                canWrite && (
+                  <Button size="sm" onClick={() => setModal("nuevo")}>
+                    <Plus className="h-[15px] w-[15px]" />
+                    Nuevo producto
+                  </Button>
+                )
+              }
+            />
+          )
         ) : (
           <div className="plf-results-in">
             <DataTable>

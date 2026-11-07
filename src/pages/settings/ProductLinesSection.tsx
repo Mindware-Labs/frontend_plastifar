@@ -1,7 +1,9 @@
-import { Ban, CheckCircle2, Pencil, Plus } from "lucide-react";
+import { Ban, CheckCircle2, Pencil, Plus, Layers } from "lucide-react";
 import { useState } from "react";
 import { settingsApi } from "../../api/settings";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
+import { ListEmptyState } from "../../components/ui/ListEmptyState";
+import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
@@ -216,11 +218,31 @@ export function ProductLinesSection() {
             <TableSkeleton rows={pageSize} columns={4} />
           )
         ) : rows.length === 0 ? (
-          <p className="py-14 text-center text-[13.5px] text-faint">
-            {isFiltering
-              ? "Ninguna línea coincide con este filtro o búsqueda."
-              : "Todavía no hay ninguna línea de producto configurada."}
-          </p>
+          isFiltering ? (
+            <EmptyResult
+              message="Ninguna línea coincide con este filtro o búsqueda."
+              onClear={() => {
+                setSearch("");
+                setChip("todas");
+                setPage(1);
+              }}
+            />
+          ) : (
+            <ListEmptyState
+              icon={Layers}
+              isFiltered={false}
+              filteredTitle=""
+              emptyTitle="Todavía no hay ninguna línea de producto configurada."
+              action={
+                canWrite && (
+                  <Button size="sm" onClick={() => setModal("nueva")}>
+                    <Plus className="h-[15px] w-[15px]" />
+                    Nueva línea
+                  </Button>
+                )
+              }
+            />
+          )
         ) : (
           <div className="plf-results-in">
             <DataTable>

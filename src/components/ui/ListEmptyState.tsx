@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import { Button } from "./Button";
 
 /** Mismo patrón que la bandeja de tickets: icono, título y ayuda opcional. */
@@ -9,6 +10,7 @@ export function ListEmptyState({
   onClearFilters,
   emptyTitle,
   emptyDescription,
+  action,
 }: {
   icon: LucideIcon;
   isFiltered: boolean;
@@ -16,6 +18,8 @@ export function ListEmptyState({
   onClearFilters?: () => void;
   emptyTitle: string;
   emptyDescription?: string;
+  /** Salida del vacío real (p. ej. «Nuevo rol»). Opcional: sin permiso, no se pasa. */
+  action?: ReactNode;
 }) {
   return (
     <div className="flex flex-col items-center gap-3 py-14 text-center">
@@ -40,6 +44,7 @@ export function ListEmptyState({
           {emptyDescription && (
             <p className="max-w-md text-[12px] leading-relaxed text-zinc-400">{emptyDescription}</p>
           )}
+          {action}
         </>
       )}
     </div>

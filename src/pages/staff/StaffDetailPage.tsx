@@ -10,6 +10,7 @@ import { ModuleHeader } from "../../components/app/ModuleHeader";
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
+import { ListEmptyState } from "../../components/ui/ListEmptyState";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
 import { DetailCard } from "../../components/ui/DetailCard";
@@ -254,15 +255,13 @@ export function StaffDetailPage({ section }: StaffDetailPageProps) {
                   }
                 >
                   {staff.accesses.length === 0 ? (
-                    <div className="py-10 text-center">
-                      <Building2 className="mx-auto h-8 w-8 text-zinc-300" />
-                      <p className="mt-2 text-[13px] font-medium text-zinc-700">
-                        Sin departamentos asignados
-                      </p>
-                      <p className="mt-0.5 text-[12px] text-zinc-400">
-                        Este colaborador no tiene acceso configurado a ningún departamento.
-                      </p>
-                    </div>
+                    <ListEmptyState
+                      icon={Building2}
+                      isFiltered={false}
+                      filteredTitle=""
+                      emptyTitle="Sin departamentos asignados"
+                      emptyDescription="Este colaborador no tiene acceso configurado a ningún departamento."
+                    />
                   ) : (
                     <DataTable bare>
                       <thead>

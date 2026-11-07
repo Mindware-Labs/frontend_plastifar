@@ -32,6 +32,8 @@ import { MODULE_HEADER_SYMMETRIC_BAND_CLASS, ModuleHeader } from "../../componen
 import { Alert } from "../../components/ui/Alert";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
+import { EmptyResult } from "../../components/ui/EmptyResult";
+import { ListEmptyState } from "../../components/ui/ListEmptyState";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { CopyButton } from "../../components/ui/CopyButton";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
@@ -1050,19 +1052,23 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                 {ticketsLoading ? (
                   ticketsError === null && <TableSkeleton rows={ticketPageSize} columns={7} />
                 ) : ticketRows.length === 0 ? (
-                  <div className="py-12 text-center">
-                    <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 text-zinc-400 mb-2.5">
-                      <Ticket className="h-5 w-5" />
-                    </div>
-                    <p className="text-[13px] font-medium text-zinc-700">
-                      {ticketSearch || ticketChip !== "todos"
-                        ? "Ningún ticket coincide con este filtro o búsqueda."
-                        : "Este cliente todavía no tiene tickets registrados."}
-                    </p>
-                    <p className="text-[12px] text-zinc-400 mt-0.5">
-                      Los tickets registrados para este cliente aparecerán automáticamente aquí.
-                    </p>
-                  </div>
+                  ticketSearch || ticketChip !== "todos" ? (
+                    <EmptyResult
+                      message="Ningún ticket coincide con este filtro o búsqueda."
+                      onClear={() => {
+                        setTicketSearch("");
+                        setTicketChip("todos");
+                      }}
+                    />
+                  ) : (
+                    <ListEmptyState
+                      icon={Ticket}
+                      isFiltered={false}
+                      filteredTitle=""
+                      emptyTitle="Este cliente todavía no tiene tickets registrados."
+                      emptyDescription="Los tickets registrados para este cliente aparecerán automáticamente aquí."
+                    />
+                  )
                 ) : (
                   <div className="plf-results-in">
                     <DataTable>

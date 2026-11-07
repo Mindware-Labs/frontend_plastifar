@@ -5,6 +5,8 @@ import { useSearchParams } from "react-router-dom";
 import { permissionsApi } from "../../api/permissions";
 import { rolesApi, type RoleQuery } from "../../api/roles";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
+import { ListEmptyState } from "../../components/ui/ListEmptyState";
+import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { SegmentedTabs } from "../../components/ui/SegmentedTabs";
 import { Badge } from "../../components/ui/Badge";
@@ -570,13 +572,31 @@ export function RolesPage() {
               </tbody>
             </DataTable>
 
-            {rows.length === 0 && (
-              <p className="py-14 text-center text-[13.5px] text-faint">
-                {unfiltered
-                  ? "Todavía no hay roles creados."
-                  : "Ningún rol coincide con este filtro o búsqueda."}
-              </p>
-            )}
+            {rows.length === 0 &&
+              (unfiltered ? (
+                <ListEmptyState
+                  icon={ShieldCheck}
+                  isFiltered={false}
+                  filteredTitle=""
+                  emptyTitle="Todavía no hay roles creados."
+                  action={
+                    isAdmin && (
+                      <Button size="sm" onClick={() => setModal("nuevo")}>
+                        <Plus className="h-[15px] w-[15px]" />
+                        Nuevo rol
+                      </Button>
+                    )
+                  }
+                />
+              ) : (
+                <EmptyResult
+                  message="Ningún rol coincide con este filtro o búsqueda."
+                  onClear={() => {
+                    setSearch("");
+                    setFilter("todos");
+                  }}
+                />
+              ))}
           </div>
         )}
         </ListPanel>

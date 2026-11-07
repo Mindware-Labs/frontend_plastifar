@@ -10,11 +10,14 @@ import {
   Trash2,
   UserCheck,
   Users,
+  Building2,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { departmentsApi } from "../../api/departments";
 import { sedesApi } from "../../api/sedes";
 import { ModuleHeader } from "../../components/app/ModuleHeader";
+import { ListEmptyState } from "../../components/ui/ListEmptyState";
+import { EmptyResult } from "../../components/ui/EmptyResult";
 import { ErrorRetry } from "../../components/ui/ErrorRetry";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -549,11 +552,33 @@ export function DepartmentsPage() {
             <TableSkeleton rows={pageSize} columns={7} />
           )
           ) : rows.length === 0 ? (
-            <p className="py-14 text-center text-[13.5px] text-faint">
-              {isFiltering
-                ? "Ningún departamento coincide con este filtro o búsqueda."
-                : "Todavía no hay ningún departamento registrado."}
-            </p>
+            isFiltering ? (
+              <EmptyResult
+                message="Ningún departamento coincide con este filtro o búsqueda."
+                onClear={() => {
+                  setSearch("");
+                  setTypeChip("todos");
+                  setChip("todos");
+                  setSelectedSedeId("todas");
+                  setPage(1);
+                }}
+              />
+            ) : (
+              <ListEmptyState
+                icon={Building2}
+                isFiltered={false}
+                filteredTitle=""
+                emptyTitle="Todavía no hay ningún departamento registrado."
+                action={
+                  canWrite && (
+                    <Button size="sm" onClick={() => setModal("nuevo")}>
+                      <Plus className="h-[15px] w-[15px]" />
+                      Nuevo departamento
+                    </Button>
+                  )
+                }
+              />
+            )
           ) : (
             <div className="plf-results-in">
               <DataTable>
