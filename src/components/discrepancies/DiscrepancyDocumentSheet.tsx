@@ -39,7 +39,7 @@ export function DiscrepancyDocumentSheet({
 }: DiscrepancyDocumentSheetProps) {
   const referenceCode = contextCodeOverride?.trim() || discrepancy.ticketNumber;
   const lines = padRows(discrepancy.lines ?? [], 6);
-  const cell = "border border-black px-0.5 py-0.5 align-middle text-[8px] leading-tight";
+  const cell = "border border-black px-0.5 py-0.5 align-middle text-[9px] leading-tight";
   const checks = discrepancy.checks ?? [];
 
   return (
@@ -82,7 +82,7 @@ export function DiscrepancyDocumentSheet({
         </span>
       </p>
 
-      <table className="discrepancy-lines-table avoid-break mb-2 w-full max-w-full border-collapse table-fixed text-[8px]">
+      <table className="discrepancy-lines-table avoid-break mb-2 w-full max-w-full border-collapse table-fixed text-[9px]">
         <colgroup>
           <col style={{ width: "7%" }} />
           <col style={{ width: "12%" }} />

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { useNavigate } from "react-router-dom";
 import { jsPDF } from "jspdf";
 import { ArrowLeft, FileDown, FileSpreadsheet, Printer } from "lucide-react";
-import { captureElementAsCanvas } from "./printCapture";
+import { captureElementAsCanvas, LANDSCAPE_SHEET_PX, PORTRAIT_SHEET_PX } from "./printCapture";
+import { pickPageBreaks } from "./printPagination";
 import { Button } from "../ui/Button";
 import { PrintSheetSkeleton } from "./PrintSheetSkeleton";
 
@@ -20,6 +21,11 @@ const layouts: Record<Orientation, { page: string; sheet: string; hint: string }
     hint: "Elige exportar a Excel, guardar PDF o imprimir.",
   },
 };
+
+/** Milímetros por px CSS a 96 dpi. */
+const MM_PER_CSS_PX = 25.4 / 96;
+/** Cuerpo mínimo legible en papel, en px CSS: el ajuste a una hoja nunca baja de aquí. */
+const MIN_PRINTED_BODY_PX = 9;
 
 /**
  * La hoja de un formulario controlado (PF-FOR-…): tamaño de papel, barra de
@@ -74,7 +80,8 @@ export function PrintSheet({
 
     try {
       const element = sheetContentRef.current;
-      const canvas = await captureElementAsCanvas(element, orientation);
+      const bodyPx = parseFloat(getComputedStyle(element).fontSize) || 11;
+      const { canvas, blocks } = await captureElementAsCanvas(element, orientation);
 
       const pdf = new jsPDF({
         orientation,
@@ -93,9 +100,14 @@ export function PrintSheet({
       const imgH = canvas.height;
       const naturalPrintHeight = (imgH * availWidth) / imgW;
 
-      // Si cabe en una página o la excede moderadamente (formularios oficiales de 1 hoja),
-      // se ajusta proporcionalmente dentro del área útil para que nunca salga cortado.
-      if (naturalPrintHeight <= availHeight * 1.5) {
+      // Cuánto se puede encoger para meter el documento en una hoja sin que el
+      // cuerpo baje de MIN_PRINTED_BODY_PX en papel. Si no alcanza, se pagina.
+      const sheetPx = orientation === "landscape" ? LANDSCAPE_SHEET_PX : PORTRAIT_SHEET_PX;
+      const printedBodyPx = (bodyPx * availWidth) / (sheetPx * MM_PER_CSS_PX);
+      const minShrink = Math.min(1, MIN_PRINTED_BODY_PX / printedBodyPx);
+      const fitShrink = availHeight / naturalPrintHeight;
+
+      if (fitShrink >= minShrink) {
         const scale = Math.min(availWidth / imgW, availHeight / imgH);
         const renderWidth = imgW * scale;
         const renderHeight = imgH * scale;
@@ -105,13 +117,14 @@ export function PrintSheet({
         const dataUrl = canvas.toDataURL("image/png");
         pdf.addImage(dataUrl, "PNG", offsetX, offsetY, renderWidth, renderHeight);
       } else {
-        // Documento multipágina: rebanar el canvas por página respetando márgenes limpios.
-        const sliceHeightPx = Math.max(1, Math.floor((availHeight / availWidth) * imgW));
+        // Multipágina a escala natural, cortando entre bloques (.avoid-break, filas,
+        // párrafos) para que ninguna fila quede partida entre dos hojas.
+        const pageHeightPx = Math.max(1, Math.floor((availHeight / availWidth) * imgW));
+        const breaks = pickPageBreaks(imgH, pageHeightPx, blocks);
         let offsetYpx = 0;
-        let pageIndex = 0;
 
-        while (offsetYpx < imgH) {
-          const currentSlicePx = Math.min(sliceHeightPx, imgH - offsetYpx);
+        breaks.forEach((cut, pageIndex) => {
+          const currentSlicePx = Math.max(1, cut - offsetYpx);
           const sliceCanvas = document.createElement("canvas");
           sliceCanvas.width = imgW;
           sliceCanvas.height = currentSlicePx;
@@ -147,9 +160,8 @@ export function PrintSheet({
             slicePrintHeight,
           );
 
-          offsetYpx += currentSlicePx;
-          pageIndex += 1;
-        }
+          offsetYpx = cut;
+        });
       }
 
       const rawName = filename || `${document.title.replace(/[·\/\\:*?"<>|]/g, "_").trim() || "documento"}.pdf`;
@@ -237,7 +249,8 @@ export function PrintSheet({
             overflow-wrap: anywhere;
             word-break: break-word;
           }
-          .avoid-break {
+          .avoid-break,
+          [data-print-sheet-canvas="true"] tr {
             break-inside: avoid;
           }
         }

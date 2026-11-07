@@ -171,6 +171,38 @@ function measureCaptureBounds(root: HTMLElement, sheetWidth: number): { width: n
 }
 
 /**
+ * Bloques del documento en px de la captura (relativos a su borde superior).
+ * `group` son los `.avoid-break`: se mantienen enteros si caben en una página;
+ * los demás (filas, párrafos, títulos) son átomos que nunca se parten.
+ */
+export interface CaptureBlock {
+  top: number;
+  bottom: number;
+  group: boolean;
+}
+
+const ATOM_SELECTOR = "tr, p, li, h1, h2, h3, h4, h5, h6, dt, dd, img, svg";
+
+function collectBlocks(root: HTMLElement): CaptureBlock[] {
+  const rootTop = root.getBoundingClientRect().top;
+  const blocks: CaptureBlock[] = [];
+  const push = (el: Element, group: boolean) => {
+    const r = el.getBoundingClientRect();
+    if (r.height <= 0) return;
+    blocks.push({ top: r.top - rootTop, bottom: r.bottom - rootTop, group });
+  };
+  root.querySelectorAll(".avoid-break").forEach((el) => push(el, true));
+  root.querySelectorAll(ATOM_SELECTOR).forEach((el) => push(el, false));
+  return blocks;
+}
+
+export interface CaptureResult {
+  canvas: HTMLCanvasElement;
+  /** Bloques ya escalados a píxeles del canvas. */
+  blocks: CaptureBlock[];
+}
+
+/**
  * Captura completa del formulario oficial en un HTMLCanvasElement de alta resolución,
  * aislando el documento del layout de la aplicación (sidebar, contenedores con scroll
  * o márgenes automáticos) para que nunca salga cortado ni falle con colores oklch.
@@ -178,7 +210,7 @@ function measureCaptureBounds(root: HTMLElement, sheetWidth: number): { width: n
 export async function captureElementAsCanvas(
   element: HTMLElement,
   orientation: "portrait" | "landscape",
-): Promise<HTMLCanvasElement> {
+): Promise<CaptureResult> {
   const sheetWidth = orientation === "landscape" ? LANDSCAPE_SHEET_PX : PORTRAIT_SHEET_PX;
 
   const host = document.createElement("div");
@@ -240,6 +272,19 @@ export async function captureElementAsCanvas(
 
     const { width: captureWidth, height: captureHeight } = measureCaptureBounds(workNode, sheetWidth);
     workNode.style.height = `${captureHeight}px`;
+    await doubleRaf();
+    const cssBlocks = collectBlocks(workNode);
+    const withBlocks = (canvas: HTMLCanvasElement): CaptureResult => {
+      const ratio = canvas.height / captureHeight;
+      return {
+        canvas,
+        blocks: cssBlocks.map((block) => ({
+          top: block.top * ratio,
+          bottom: block.bottom * ratio,
+          group: block.group,
+        })),
+      };
+    };
 
     // 1. Intento primario con html-to-image (motor nativo SVG foreignObject del navegador)
     try {
@@ -281,7 +326,7 @@ export async function captureElementAsCanvas(
       });
 
       if (canvas && canvas.width > 0 && canvas.height > 0) {
-        return canvas;
+        return withBlocks(canvas);
       }
     } catch (primaryErr) {
       console.warn("Fallback a html2canvas tras error en html-to-image:", primaryErr);
@@ -292,7 +337,7 @@ export async function captureElementAsCanvas(
     const windowWidth = Math.max(captureWidth + 64, window.innerWidth, document.documentElement.clientWidth);
     const windowHeight = Math.max(captureHeight + 64, window.innerHeight);
 
-    return await html2canvas(workNode, {
+    const fallbackCanvas = await html2canvas(workNode, {
       backgroundColor: "#ffffff",
       scale: 2,
       useCORS: true,
@@ -317,6 +362,7 @@ export async function captureElementAsCanvas(
         normalizeColorsInSubtree(clonedEl, clonedDoc);
       },
     });
+    return withBlocks(fallbackCanvas);
   } finally {
     host.remove();
   }
