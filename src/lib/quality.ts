@@ -1,7 +1,7 @@
 // Formato y fechas del modulo de Calidad, sin React dentro. Las reglas de
 // negocio (condiciones de cierre, separacion entre quien pide y quien aprueba
 // un credito) las resuelve el servidor; este archivo ya no las duplica.
-import type { ActionPlanItem } from "../types/quality";
+import type { ActionPlanItem, CorrectiveActionSheet } from "../types/quality";
 
 /**
  * República Dominicana es UTC−4 todo el año: no hay horario de verano desde
@@ -39,6 +39,14 @@ export function isPlanItemOverdue(item: ActionPlanItem, from = today()): boolean
   return (
     item.status !== "Cumplida" && item.status !== "Anulada" && daysUntil(item.dueDate, from) < 0
   );
+}
+
+/** Una HCA vence si su fecha comprometida ya paso y todavia no se cerro. */
+export function isHcaOverdue(
+  sheet: Pick<CorrectiveActionSheet, "status" | "dueDate">,
+  from = today(),
+): boolean {
+  return sheet.status !== "Cerrada" && Boolean(sheet.dueDate) && daysUntil(sheet.dueDate, from) < 0;
 }
 
 /** Una accion resuelta es la que ya no bloquea: cumplida o anulada con justificacion. */

@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { formatDay } from "../../lib/dates";
+import { isHcaOverdue, isPlanItemOverdue } from "../../lib/quality";
 import type { ActionPlanItem, CorrectiveActionSheet } from "../../types/quality";
 import { HcaStatusBadge, PlanItemStatusBadge } from "./StatusBadges";
 
@@ -35,7 +36,7 @@ export function HcaExecutiveSummary({
 
 
 
-              <HcaStatusBadge status={sheet.status} />
+              <HcaStatusBadge status={sheet.status} overdue={isHcaOverdue(sheet)} />
             </div>
             <p className="mt-1.5 text-[11.5px] text-zinc-500">
               Formulario oficial de no conformidad y acción correctiva (PF-FOR-109)
@@ -185,7 +186,7 @@ export function HcaExecutiveSummary({
                       {formatDay(item.dueDate)}
                     </td>
                     <td className="py-2 px-2.5">
-                      <PlanItemStatusBadge status={item.status} />
+                      <PlanItemStatusBadge status={item.status} overdue={isPlanItemOverdue(item)} />
                     </td>
                   </tr>
                 ))}

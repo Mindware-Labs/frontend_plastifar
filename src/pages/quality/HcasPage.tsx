@@ -42,6 +42,7 @@ import { useTablePageSelection } from "../../hooks/useTablePageSelection";
 import { useEnterpriseListReturnRestore } from "../../hooks/useEnterpriseListReturnRestore";
 import { captureListScrollY } from "../../lib/enterpriseListReturn";
 import { formatDay } from "../../lib/dates";
+import { isHcaOverdue } from "../../lib/quality";
 import { exportHcasListToExcel, exportHcasListToPdf } from "../../lib/hcaListExport";
 import { resolveClientLabel, searchClients } from "../../lib/lookups";
 import type { Plant, ProductLine } from "../../types/settings";
@@ -485,7 +486,7 @@ export function HcasPage() {
                         {formatDay(item.detectedAt.slice(0, 10))}
                       </Td>
                       <Td>
-                        <HcaStatusBadge status={item.status} />
+                        <HcaStatusBadge status={item.status} overdue={isHcaOverdue(item)} />
                       </Td>
                       <Td>
                         <div

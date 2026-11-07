@@ -1,41 +1,78 @@
 import {
+  AlertTriangle,
   Check,
+  Circle,
   CircleDot,
+  Hammer,
   Search,
   ShieldCheck,
   Slash,
 } from "lucide-react";
-import { StatusBadge, type StatusStyles } from "../../components/ui/StatusBadge";
+import { IconBadge, type StatusStyle, type StatusStyles } from "../../components/ui/StatusBadge";
 import type { HcaStatus, PlanItemStatus } from "../../types/quality";
 
+/**
+ * Tonos de una HCA por tramo del ciclo: registrada es base (neutral), los tres
+ * pasos de trabajo son ambar —cada uno con su icono para distinguirlos sin
+ * leer el color— y verde queda solo para la hoja cerrada.
+ */
 const hcaStyles: StatusStyles<HcaStatus> = {
-  Abierta: { tone: "green", icon: Check },
-  "En análisis": { tone: "neutral", icon: Search },
-  "En ejecución": { tone: "neutral", icon: CircleDot },
-  "En verificación": { tone: "neutral", icon: ShieldCheck },
+  Abierta: { tone: "neutral", icon: Circle },
+  "En análisis": { tone: "warn", icon: Search },
+  "En ejecución": { tone: "warn", icon: Hammer },
+  "En verificación": { tone: "warn", icon: ShieldCheck },
   Cerrada: { tone: "green", icon: Check },
 };
 
+/** Pendiente es base; en curso ya es trabajo en marcha y se pinta ambar. */
 const planStyles: StatusStyles<PlanItemStatus> = {
-  Pendiente: { tone: "neutral", icon: CircleDot },
-  "En curso": { tone: "neutral", icon: CircleDot },
+  Pendiente: { tone: "neutral", icon: Circle },
+  "En curso": { tone: "warn", icon: CircleDot },
   Cumplida: { tone: "green", icon: Check },
   Anulada: { tone: "neutral", icon: Slash },
 };
 
-export function HcaStatusBadge({ status }: { status: HcaStatus; overdue?: boolean }) {
-  const displayStatus = status === "Abierta" ? "Registrada" : status;
+/** Vencida no es un estado del dato: se superpone al estado mientras siga abierto. */
+const overdueStyle: StatusStyle = { tone: "warn", icon: AlertTriangle };
+
+/** «Abierta» se guarda así, pero en pantalla la hoja recién creada se lee «Registrada». */
+function hcaLabel(status: HcaStatus): string {
+  return status === "Abierta" ? "Registrada" : status;
+}
+
+function OverdueAwareBadge({
+  style,
+  label,
+  overdue,
+}: {
+  style: StatusStyle;
+  label: string;
+  overdue: boolean;
+}) {
+  if (!overdue) return <IconBadge {...style}>{label}</IconBadge>;
   return (
-    <StatusBadge
-      status={displayStatus as any}
-      styles={{
-        ...hcaStyles,
-        Registrada: { tone: "green", icon: Check },
-      }}
+    <IconBadge {...overdueStyle} title={`${label} · vencida`}>
+      {label}
+      <span className="sr-only"> (vencida)</span>
+    </IconBadge>
+  );
+}
+
+/** `overdue` lo decide quien llama (fecha comprometida pasada); una hoja cerrada nunca se pinta vencida. */
+export function HcaStatusBadge({ status, overdue = false }: { status: HcaStatus; overdue?: boolean }) {
+  return (
+    <OverdueAwareBadge
+      style={hcaStyles[status]}
+      label={hcaLabel(status)}
+      overdue={overdue && status !== "Cerrada"}
     />
   );
 }
 
-export function PlanItemStatusBadge({ status }: { status: PlanItemStatus; overdue?: boolean }) {
-  return <StatusBadge status={status} styles={planStyles} />;
+/** Una acción cumplida o anulada ya no vence, aunque su fecha haya pasado. */
+export function PlanItemStatusBadge({ status, overdue = false }: { status: PlanItemStatus; overdue?: boolean }) {
+  const settled = status === "Cumplida" || status === "Anulada";
+  return (
+    <OverdueAwareBadge style={planStyles[status]} label={status} overdue={overdue && !settled} />
+  );
 }
