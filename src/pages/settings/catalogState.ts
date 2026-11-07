@@ -6,12 +6,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-/** Contenedor de resultados sin velo blanco: la transición de página la ejecuta DataTable sobre las filas. */
-export function staleClass(_isStale: boolean): string {
-  void _isStale;
-  return "plf-results-in";
-}
-
 /**
  * Catalogo de apoyo de una seccion: departamentos, politicas, los años que
  * tienen feriados. No es el listado que se pagina --ese lo lleva usePagedList
@@ -49,45 +43,6 @@ export function useReferenceData<T>(
   }, [refetch]);
 
   return { data: query.data ?? fallback, failed: query.isError, reload };
-}
-
-/**
- * Resuelve por identificador los registros que la pagina actual menciona --el
- * motivo padre de un sub-motivo, por ejemplo-- y los recuerda.
- *
- * Con paginacion en servidor lo referido casi nunca esta en la pagina: buscarlo
- * en la lista cargada devolvia nada y la fila perdia su contexto. Cada
- * identificador se pide una sola vez; si su lectura falla, se queda sin
- * resolver y la fila lo omite en vez de desaparecer.
- */
-export function useRecordCache<T>(read: (id: number) => Promise<T>, ids: number[]) {
-  const [cache, setCache] = useState<Record<number, T>>({});
-  const asked = useRef(new Set<number>());
-
-  const readRef = useRef(read);
-  useEffect(() => {
-    readRef.current = read;
-  });
-
-  const wanted = [...new Set(ids)].sort((a, b) => a - b);
-  const wantedKey = wanted.join(",");
-
-  useEffect(() => {
-    for (const id of wantedKey === "" ? [] : wantedKey.split(",").map(Number)) {
-      if (asked.current.has(id)) continue;
-      asked.current.add(id);
-
-      readRef
-        .current(id)
-        .then((value) => setCache((current) => ({ ...current, [id]: value })))
-        .catch(() => {
-          // Se reintenta la proxima vez que la pagina lo vuelva a mencionar.
-          asked.current.delete(id);
-        });
-    }
-  }, [wantedKey]);
-
-  return cache;
 }
 
 /**

@@ -174,14 +174,6 @@ export function humanizeMinutes(minutes: number, perWorkday?: number | null): st
 
 export type SlaTimeUnit = "minutos" | "horas" | "dias" | "semanas" | "meses";
 
-export const SLA_TIME_UNITS: { value: SlaTimeUnit; label: string; shortLabel: string }[] = [
-  { value: "minutos", label: "Minutos", shortLabel: "min" },
-  { value: "horas", label: "Horas", shortLabel: "h" },
-  { value: "dias", label: "Días", shortLabel: "d" },
-  { value: "semanas", label: "Semanas", shortLabel: "sem" },
-  { value: "meses", label: "Meses", shortLabel: "mes" },
-];
-
 export function durationToMinutes(
   quantity: number,
   unit: SlaTimeUnit,

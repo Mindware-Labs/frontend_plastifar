@@ -247,8 +247,6 @@ export const CARD_PAD = "16px 18px";
 /** Tres pasos de radio. Nada cuadrado, nada exagerado. */
 export const R = { card: 16, inset: 12, control: 10 } as const;
 
-/** Compatibilidad con los componentes que ya leían un radio único. */
-export const CARD_RADIUS = R.card;
 
 /**
  * Alto de las graficas.

@@ -178,64 +178,6 @@ export function Select({
 
 /* -------------------------------------------------------------------------- */
 
-/**
- * Control segmentado.
- *
- * La única sombra que queda en todo el tablero vive en el segmento activo, y
- * está ahí porque es lo que lo levanta del riel. Es 1 px de desplazamiento, no
- * una elevación.
- */
-export function Segmented<Value extends string>({
-  value,
-  options,
-  onChange,
-  label,
-}: {
-  value: Value;
-  options: readonly Value[];
-  onChange: (value: Value) => void;
-  label: string;
-}) {
-  return (
-    <div
-      role="group"
-      aria-label={label}
-      style={{
-        display: "inline-flex",
-        gap: 3,
-        padding: 3,
-        background: C.hair2,
-        borderRadius: 10,
-      }}
-    >
-      {options.map((option) => {
-        const active = option === value;
-        return (
-          <button
-            type="button"
-            key={option}
-            aria-pressed={active}
-            onClick={() => onChange(option)}
-            style={{
-              border: "none",
-              borderRadius: 8,
-              padding: "6px 12px",
-              ...T.label,
-              fontFamily: FONT,
-              cursor: "pointer",
-              background: active ? C.card : "transparent",
-              color: active ? C.ink : C.body,
-              boxShadow: active ? "0 1px 2px rgba(18,20,26,.06)" : "none",
-            }}
-          >
-            {option}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 /* -------------------------------------------------------------------------- */
 
 export function Avatar({ name, index, size = 26 }: { name: string; index: number; size?: number }) {

@@ -1,4 +1,4 @@
-import type { Priority, SlaPolicy, SlaPolicyType } from "../types/settings";
+import type { Priority, SlaPolicy } from "../types/settings";
 import { humanizeMinutes, workdayMinutes } from "./sla";
 
 const PRIORITY_RANK: Record<Priority, number> = {
@@ -70,4 +70,3 @@ export function filterSlaPolicies(
   });
 }
 
-export type SlaPickerKind = SlaPolicyType;
