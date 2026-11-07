@@ -34,7 +34,13 @@ import {
 import { getWithdrawalStepMissing } from "../../lib/enterpriseFormValidation";
 import { focusFormField } from "../../lib/validationItems";
 import { today } from "../../lib/quality";
-import { computeLineValue, computeTotal, WITHDRAWAL_FORM_CONTROL } from "../../lib/withdrawals";
+import {
+  computeLineValue,
+  computeTotal,
+  MAX_LINE_INPUT,
+  MAX_PACK_DETAIL_CHARS,
+  WITHDRAWAL_FORM_CONTROL,
+} from "../../lib/withdrawals";
 import { WithdrawalLinesSpreadsheet } from "./WithdrawalLinesSpreadsheet";
 import type { TicketProductResponse } from "../../types/api";
 import {
@@ -163,6 +169,22 @@ function parseOptionalPrice(raw: string): { valid: boolean; value: number | null
   const num = Number(clean);
   if (!Number.isFinite(num) || num < 0) return { valid: false, value: null };
   return { valid: true, value: num };
+}
+
+/** Mismo tope que WithdrawalRules: de valor, no de caracteres. */
+function unitPriceError(raw: string): string | undefined {
+  const price = parseOptionalPrice(raw);
+  if (!price.valid) return "Precio cero o mayor.";
+  if (price.value !== null && price.value > MAX_LINE_INPUT) {
+    return `Precio máximo: ${MAX_LINE_INPUT.toLocaleString("es-DO")}.`;
+  }
+  return undefined;
+}
+
+function packDetailError(raw: string): string | undefined {
+  return raw.trim().length > MAX_PACK_DETAIL_CHARS
+    ? `Máximo ${MAX_PACK_DETAIL_CHARS} caracteres.`
+    : undefined;
 }
 
 /** RF-W1 / RF-W2 / PF-FOR-068: asistente por pasos para registrar o editar la Solicitud de... */
@@ -435,14 +457,10 @@ export function WithdrawalFormModal({
         } else if (line.quantityUnit.trim().length > 5) {
           bucket.quantityUnit = "Máximo 5 caracteres (p. ej. CAJ).";
         }
-        if (line.packDetail.trim().length > 60) {
-          bucket.packDetail = "Máximo 60 caracteres.";
-        }
-        if (line.unitPrice.trim().length > 6) {
-          bucket.unitPrice = "Máximo 6 caracteres.";
-        } else if (!parseOptionalPrice(line.unitPrice).valid) {
-          bucket.unitPrice = "Precio cero o mayor.";
-        }
+        const packError = packDetailError(line.packDetail);
+        if (packError) bucket.packDetail = packError;
+        const priceError = unitPriceError(line.unitPrice);
+        if (priceError) bucket.unitPrice = priceError;
         if (Object.keys(bucket).length > 0) {
           next.byLine[line.key] = bucket;
         }
@@ -489,9 +507,10 @@ export function WithdrawalFormModal({
       if (parsePositiveDecimal(line.quantity) === null) bucket.quantity = "Cantidad mayor que cero.";
       if (!line.quantityUnit.trim()) bucket.quantityUnit = "Indica la unidad (p. ej. CAJ).";
       else if (line.quantityUnit.trim().length > 5) bucket.quantityUnit = "Máximo 5 caracteres (p. ej. CAJ).";
-      if (line.packDetail.trim().length > 60) bucket.packDetail = "Máximo 60 caracteres.";
-      if (line.unitPrice.trim().length > 6) bucket.unitPrice = "Máximo 6 caracteres.";
-      else if (!parseOptionalPrice(line.unitPrice).valid) bucket.unitPrice = "Precio cero o mayor.";
+      const packError = packDetailError(line.packDetail);
+      if (packError) bucket.packDetail = packError;
+      const priceError = unitPriceError(line.unitPrice);
+      if (priceError) bucket.unitPrice = priceError;
       if (Object.keys(bucket).length > 0) {
         next.byLine[line.key] = bucket;
       }

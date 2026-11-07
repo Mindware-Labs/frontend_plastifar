@@ -2,6 +2,10 @@
 
 /** Tope de cantidad solicitada, cantidad retirada y precio unitario por línea. */
 export const MAX_LINE_INPUT = 1_000_000_000;
+/** Decimales que admite el precio unitario (WithdrawalRules: hasta cuatro). */
+export const MAX_UNIT_PRICE_DECIMALS = 4;
+/** Largo maximo del detalle de empaque (WithdrawalRules: 20 caracteres). */
+export const MAX_PACK_DETAIL_CHARS = 20;
 
 /** La cantidad se escala a centésimas (2 decimales). */
 const QUANTITY_SCALE = 100;

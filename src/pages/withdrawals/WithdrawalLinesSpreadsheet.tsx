@@ -1,5 +1,5 @@
 import { Plus, Trash2 } from "lucide-react";
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { prefersReducedMotion } from "../../hooks/motion";
 import {
   ticketProductLabelMap,
@@ -7,7 +7,7 @@ import {
 } from "../../lib/ticketProducts";
 import { resolveProductLabel, searchProducts } from "../../lib/lookups";
 import { formatAmountOrPlain } from "../../lib/numbers";
-import { computeLineValue } from "../../lib/withdrawals";
+import { computeLineValue, MAX_PACK_DETAIL_CHARS, MAX_UNIT_PRICE_DECIMALS } from "../../lib/withdrawals";
 import type { TicketProductResponse } from "../../types/api";
 import { Button } from "../../components/ui/Button";
 import { DataTable, HeadRow, Td, Th } from "../../components/ui/DataTable";
@@ -64,7 +64,6 @@ function parseOptionalPrice(raw: string): number | null {
 
 /** Acotaciones visuales PF-FOR-068 (celdas estrechas tipo planilla). */
 const QTY_UNIT_SUFFIX_MAX = 5;
-const UNIT_PRICE_CHARS_MAX = 6;
 const QTY_NUM_WIDTH = "3.25rem";
 const QTY_SUFFIX_WIDTH = "2.65rem";
 /** Número + sufijo + gap-1; celda Cant. sin padding lateral. */
@@ -89,15 +88,22 @@ function cellInputClass(hasError: boolean, compact?: boolean, centered?: boolean
 
 function clampUnitPrice(raw: string): string {
   // Solo dígitos y un único separador decimal (la coma se convierte en punto).
+  // El tope es de valor (MAX_LINE_INPUT), no de caracteres: lo valida el
+  // formulario con mensaje; aquí solo se acotan los decimales que admite el servidor.
   const cleaned = raw.replace(",", ".").replace(/[^0-9.]/g, "");
   const firstDot = cleaned.indexOf(".");
-  const normalized = (
-    firstDot === -1
-      ? cleaned
-      : cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, "")
-  ).slice(0, UNIT_PRICE_CHARS_MAX);
-  return normalized;
+  if (firstDot === -1) return cleaned;
+  const decimals = cleaned.slice(firstDot + 1).replace(/\./g, "").slice(0, MAX_UNIT_PRICE_DECIMALS);
+  return `${cleaned.slice(0, firstDot)}.${decimals}`;
 }
+
+/** Errores de las celdas estrechas: se leen en una franja bajo la fila, no en la celda. */
+const CELL_ERROR_FIELDS = [
+  ["quantity", "Cantidad"],
+  ["quantityUnit", "Unidad"],
+  ["packDetail", "Empaque"],
+  ["unitPrice", "Precio unitario"],
+] as const satisfies ReadonlyArray<readonly [keyof WithdrawalLineFieldErrors, string]>;
 
 /** Deben coincidir con plf-apple-row-in / plf-apple-row-out en index.css. */
 const ROW_ENTER_MS = 480;
@@ -385,7 +391,7 @@ export function WithdrawalLinesSpreadsheet({
               >
                 Cant.
               </Th>
-              <Th className="border-r border-line-soft bg-zinc-50/90 text-center">Unid.</Th>
+              <Th className="border-r border-line-soft bg-zinc-50/90 text-center">Empaque</Th>
               <Th className="border-r border-line-soft bg-zinc-50/90 text-center">P. unit.</Th>
               <Th className="border-r border-line-soft bg-zinc-50/90 text-center">Valor</Th>
               <Th className="bg-zinc-50/90 sr-only">Acciones</Th>
@@ -402,10 +408,13 @@ export function WithdrawalLinesSpreadsheet({
                 line.productLabel ?? (line.productId ? ticketLabels.get(line.productId) : undefined);
               const phase = phaseFor(line.key);
               const exiting = phase === "out" || phase === "arm";
+              const errorId = (field: keyof WithdrawalLineFieldErrors) =>
+                lineErrors[field] ? `${baseId}-err-${line.key}-${field}` : undefined;
+              const cellErrors = CELL_ERROR_FIELDS.filter(([field]) => lineErrors[field]);
 
               return (
+                <Fragment key={line.key}>
                 <tr
-                  key={line.key}
                   ref={(el) => {
                     if (el) rowEls.current.set(line.key, el);
                     else rowEls.current.delete(line.key);
@@ -444,9 +453,11 @@ export function WithdrawalLinesSpreadsheet({
                       }
                       state={lineErrors.productId ? "error" : "idle"}
                       aria-label={`Producto fila ${index + 1}`}
+                      aria-invalid={Boolean(lineErrors.productId)}
+                      aria-describedby={errorId("productId")}
                     />
                     {lineErrors.productId ? (
-                      <p className="mt-1 truncate text-[10px] font-medium text-brand-red">
+                      <p id={errorId("productId")} className="mt-1 truncate text-[10px] font-medium text-brand-red">
                         {lineErrors.productId}
                       </p>
                     ) : null}
@@ -466,6 +477,8 @@ export function WithdrawalLinesSpreadsheet({
                         inputMode="decimal"
                         placeholder="0"
                         aria-label={`Cantidad fila ${index + 1}`}
+                        aria-invalid={Boolean(lineErrors.quantity)}
+                        aria-describedby={errorId("quantity")}
                         value={line.quantity}
                         onChange={(e) => {
                           const next = e.target.value.replace(",", ".");
@@ -480,6 +493,8 @@ export function WithdrawalLinesSpreadsheet({
                         maxLength={QTY_UNIT_SUFFIX_MAX}
                         placeholder="CAJ"
                         aria-label={`Unidad de cantidad fila ${index + 1}`}
+                        aria-invalid={Boolean(lineErrors.quantityUnit)}
+                        aria-describedby={errorId("quantityUnit")}
                         value={line.quantityUnit}
                         onChange={(e) =>
                           onPatch(line.key, {
@@ -498,9 +513,11 @@ export function WithdrawalLinesSpreadsheet({
                   >
                     <input
                       type="text"
-                      maxLength={60}
+                      maxLength={MAX_PACK_DETAIL_CHARS}
                       placeholder="14PAQ"
                       aria-label={`Empaque fila ${index + 1}`}
+                      aria-invalid={Boolean(lineErrors.packDetail)}
+                      aria-describedby={errorId("packDetail")}
                       value={line.packDetail}
                       onChange={(e) =>
                         onPatch(line.key, { packDetail: e.target.value.toUpperCase() })
@@ -516,14 +533,15 @@ export function WithdrawalLinesSpreadsheet({
                     <input
                       type="text"
                       inputMode="decimal"
-                      maxLength={UNIT_PRICE_CHARS_MAX}
                       placeholder="0.00"
                       aria-label={`Precio unitario fila ${index + 1}`}
+                      aria-invalid={Boolean(lineErrors.unitPrice)}
+                      aria-describedby={errorId("unitPrice")}
                       value={line.unitPrice}
                       onChange={(e) =>
                         onPatch(line.key, { unitPrice: clampUnitPrice(e.target.value) })
                       }
-                      className={`${cellInputClass(Boolean(lineErrors.unitPrice), true, true)} mx-auto w-[2.65rem]`}
+                      className={`${cellInputClass(Boolean(lineErrors.unitPrice), true, true)} w-full`}
                     />
                   </MotionCell>
                   <MotionCell
@@ -550,6 +568,21 @@ export function WithdrawalLinesSpreadsheet({
                     </button>
                   </MotionCell>
                 </tr>
+                {cellErrors.length > 0 && !exiting ? (
+                  <tr className="border-b border-line-soft bg-brand-red/[0.02]">
+                    <td aria-hidden className="border-r border-line-soft bg-zinc-50/40" />
+                    <td colSpan={6} className="px-2 pb-2 pt-1">
+                      <ul className="flex flex-wrap gap-x-4 gap-y-0.5 text-[10.5px] font-medium leading-snug text-brand-red">
+                        {cellErrors.map(([field, label]) => (
+                          <li key={field} id={errorId(field)}>
+                            <span className="font-semibold">{label}:</span> {lineErrors[field]}
+                          </li>
+                        ))}
+                      </ul>
+                    </td>
+                  </tr>
+                ) : null}
+                </Fragment>
               );
             })}
           </tbody>
@@ -573,7 +606,7 @@ export function WithdrawalLinesSpreadsheet({
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[11.5px] leading-relaxed text-zinc-500">
-          Renglones del PF-FOR-068 · «Cant.» incluye unidad (p. ej. 3 + CAJ); «Unid.» es el empaque (p. ej. 14PAQ).
+          Renglones del PF-FOR-068 · «Cant.» incluye unidad (p. ej. 3 + CAJ); «Empaque» es el detalle del bulto (p. ej. 14PAQ).
         </p>
         <Button type="button" size="sm" variant="secondary" onClick={onAddLine}>
           <Plus className="size-3.5" />
