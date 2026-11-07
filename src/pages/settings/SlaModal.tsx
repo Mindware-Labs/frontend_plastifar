@@ -25,6 +25,7 @@ import { Button } from "../../components/ui/Button";
 import { CheckboxField, SelectField, TextField, type FieldState } from "../../components/ui/Field";
 import { SubmitValidationButton } from "../../components/app/SubmitValidationButton";
 import { Modal } from "../../components/ui/Modal";
+import { SegmentedChoice } from "../../components/ui/SegmentedChoice";
 import { buildValidationItems, focusFormField } from "../../lib/validationItems";
 import { Select } from "../../components/ui/Select";
 import { TimePicker } from "../../components/ui/TimePicker";
@@ -46,6 +47,11 @@ import {
   type Weekday,
 } from "../../types/settings";
 import { FormDivider } from "../../components/ui/FormDivider";
+
+const SLA_TYPE_OPTIONS = [
+  { value: "Ticket", label: "Tickets de clientes", icon: Ticket },
+  { value: "Tarea", label: "Tareas operativas", icon: ListTodo },
+] as const;
 
 const PRIORITY_OPTIONS = [
   {
@@ -712,50 +718,15 @@ export function SlaModal({ policy, holidays, onClose, onSaved }: SlaModalProps) 
           name="type"
           control={control}
           render={({ field }) => (
-            <div className="flex flex-col gap-1">
-              <label className="font-heading text-[11.5px] font-semibold text-faint">
-                Tipo de política SLA <span className="text-brand-red">*</span>
-              </label>
-              <div
-                role="radiogroup"
-                aria-label="Tipo de política"
-                className="grid grid-cols-2 gap-1 rounded-lg border border-zinc-200 bg-zinc-50/70 p-0.5"
-              >
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={field.value === "Ticket"}
-                  onClick={() => field.onChange("Ticket")}
-                  className={`inline-flex h-8 items-center justify-center gap-2 rounded-md px-3 text-[12.5px] transition-all cursor-pointer select-none ${
-                    field.value === "Ticket"
-                      ? "border border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
-                      : "border border-transparent font-medium text-zinc-600 hover:text-zinc-900 hover:bg-white/50"
-                  }`}
-                >
-                  <Ticket
-                    className={`h-3.5 w-3.5 shrink-0 ${field.value === "Ticket" ? "text-brand-red" : "text-zinc-400"}`}
-                  />
-                  <span>Tickets de clientes</span>
-                </button>
-
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={field.value === "Tarea"}
-                  onClick={() => field.onChange("Tarea")}
-                  className={`inline-flex h-8 items-center justify-center gap-2 rounded-md px-3 text-[12.5px] transition-all cursor-pointer select-none ${
-                    field.value === "Tarea"
-                      ? "border border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
-                      : "border border-transparent font-medium text-zinc-600 hover:text-zinc-900 hover:bg-white/50"
-                  }`}
-                >
-                  <ListTodo
-                    className={`h-3.5 w-3.5 shrink-0 ${field.value === "Tarea" ? "text-brand-red" : "text-zinc-400"}`}
-                  />
-                  <span>Tareas operativas</span>
-                </button>
-              </div>
-            </div>
+            <SegmentedChoice
+              label="Tipo de política SLA"
+              required
+              options={SLA_TYPE_OPTIONS}
+              value={field.value}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+              size="md"
+            />
           )}
         />
 

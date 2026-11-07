@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, Lock, Users } from "lucide-react";
+import { Lock, Users } from "lucide-react";
 import { useMemo, useState, type KeyboardEvent } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
@@ -18,6 +18,7 @@ import {
 import { FormDivider } from "../../components/ui/FormDivider";
 import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { Modal } from "../../components/ui/Modal";
+import { SegmentedChoice } from "../../components/ui/SegmentedChoice";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { applyServerError, type ServerErrorRule } from "../../lib/formErrors";
 import { resolveStaffLabel, searchActiveStaff } from "../../lib/lookups";
@@ -338,49 +339,15 @@ export function DepartmentModal({ department, onClose, onSaved }: DepartmentModa
           name="type"
           control={control}
           render={({ field }) => (
-            <div className="flex flex-col gap-1">
-              <label className="font-heading text-[11.5px] font-semibold text-faint">
-                Tipo de departamento <span className="text-brand-red">*</span>
-              </label>
-              <div
-                role="radiogroup"
-                aria-label="Tipo de departamento"
-                className="grid grid-cols-2 gap-1 rounded-lg border border-zinc-200 bg-zinc-50/70 p-0.5"
-              >
-                {DEPARTMENT_TYPE_ITEMS.map((item) => {
-                  const isSelected = field.value === item.value;
-                  const Icon = item.icon;
-                  return (
-                    <button
-                      key={item.value}
-                      type="button"
-                      role="radio"
-                      aria-checked={isSelected}
-                      onClick={() => field.onChange(item.value)}
-                      className={`inline-flex h-7 items-center justify-center gap-1.5 rounded-md px-2 text-[12px] transition-all cursor-pointer select-none ${
-                        isSelected
-                          ? "border border-zinc-200 bg-white font-semibold text-zinc-900 shadow-2xs"
-                          : "border border-transparent font-medium text-zinc-600 hover:text-zinc-900 hover:bg-white/50"
-                      }`}
-                    >
-                      <Icon
-                        className={`h-3 w-3 shrink-0 ${isSelected ? "text-brand-red" : "text-zinc-400"}`}
-                      />
-                      <span>{item.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              {errors.type?.message && (
-                <p
-                  title={errors.type.message}
-                  className="animate-plf-shake flex items-center gap-1 truncate text-[11px] font-medium leading-none text-brand-red-dark"
-                >
-                  <AlertCircle className="h-3 w-3 shrink-0" />
-                  <span className="truncate">{errors.type.message}</span>
-                </p>
-              )}
-            </div>
+            <SegmentedChoice
+              label="Tipo de departamento"
+              required
+              options={DEPARTMENT_TYPE_ITEMS}
+              value={field.value}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+              error={errors.type?.message}
+            />
           )}
         />
 

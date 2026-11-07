@@ -1,4 +1,4 @@
-import { Ban, CheckCircle2, KeyRound, Lock, Pencil, Plus, ShieldCheck, Trash2, X } from "lucide-react";
+import { Ban, CheckCircle2, KeyRound, Lock, Pencil, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError } from "../../api/client";
 import { useSearchParams } from "react-router-dom";
@@ -374,17 +374,6 @@ export function RolesPage() {
                 placeholder="Buscar por nombre de rol…"
                 className="w-[240px] sm:w-[260px]"
               />
-              {search && (
-                <button
-                  type="button"
-                  onClick={() => setSearch("")}
-                  title="Limpiar búsqueda"
-                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 text-[12.5px] font-medium text-zinc-600 shadow-2xs hover:bg-zinc-50 hover:border-zinc-300 transition-all cursor-pointer active:scale-[0.98]"
-                >
-                  <X className="h-3.5 w-3.5 text-zinc-400" />
-                  <span>Limpiar</span>
-                </button>
-              )}
             </div>
           }
           selection={

@@ -1,6 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
-  AlertCircle,
   Boxes,
   Landmark,
   Store,
@@ -22,6 +21,7 @@ import {
   type FieldState,
 } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
+import { SegmentedChoice } from "../../components/ui/SegmentedChoice";
 import { FormModalFooter } from "../../components/ui/FormModalFooter";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
 import { formatPhoneNumber } from "../../lib/format";
@@ -274,49 +274,16 @@ export function ClientModal({ client, onClose, onSaved }: ClientModalProps) {
           name="type"
           control={control}
           render={({ field }) => (
-            <div className="flex flex-col gap-1">
-              <label className="font-heading text-[11.5px] font-semibold text-faint">
-                Tipo de cliente <span className="text-brand-red">*</span>
-              </label>
-              <div
-                role="radiogroup"
-                aria-label="Tipo de cliente"
-                className="grid grid-cols-2 sm:grid-cols-4 gap-1 rounded-edge border border-line bg-canvas p-0.5"
-              >
-                {CLIENT_TYPES_ITEMS.map((item) => {
-                  const isSelected = field.value === item.value;
-                  const Icon = item.icon;
-                  return (
-                    <button
-                      key={item.value}
-                      type="button"
-                      role="radio"
-                      aria-checked={isSelected}
-                      onClick={() => field.onChange(item.value)}
-                      className={`inline-flex h-7 items-center justify-center gap-1.5 rounded-edge px-2 text-[12px] transition-all cursor-pointer select-none ${
-                        isSelected
-                          ? "border border-line bg-white font-semibold text-ink shadow-2xs"
-                          : "border border-transparent font-medium text-subtle hover:text-ink hover:bg-white/50"
-                      }`}
-                    >
-                      <Icon
-                        className={`h-3 w-3 shrink-0 ${isSelected ? "text-brand-red" : "text-faint"}`}
-                      />
-                      <span className="truncate">{item.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              {errors.type?.message && (
-                <p
-                  title={errors.type.message}
-                  className="animate-plf-shake flex items-center gap-1 text-[11px] font-medium text-brand-red-dark leading-none truncate"
-                >
-                  <AlertCircle className="h-3 w-3 shrink-0" />
-                  <span className="truncate">{errors.type.message}</span>
-                </p>
-              )}
-            </div>
+            <SegmentedChoice
+              label="Tipo de cliente"
+              required
+              options={CLIENT_TYPES_ITEMS}
+              value={field.value}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+              error={errors.type?.message}
+              gridClassName="grid-cols-2 sm:grid-cols-4"
+            />
           )}
         />
 

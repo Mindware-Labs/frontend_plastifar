@@ -8,7 +8,6 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog, type ConfirmDialogProps } from "../../components/ui/ConfirmDialog";
 import { DataTable, HeadRow, Row, Td, Th } from "../../components/ui/DataTable";
-import { ClearFiltersButton } from "../../components/ui/FilterDropdown";
 import { HeaderTag } from "../../components/ui/HeaderTag";
 import { ListEmptyState } from "../../components/ui/ListEmptyState";
 import { ListPanel } from "../../components/ui/ListPanel";
@@ -256,12 +255,6 @@ export function MailboxesSection() {
               placeholder="Buscar por correo o nombre…"
               className="w-[260px]"
             />
-            {search && (
-              <ClearFiltersButton
-                onClick={() => changeCriteria(() => setSearch(""))}
-                title="Limpiar búsqueda"
-              />
-            )}
           </>
         }
         footer={
