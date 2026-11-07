@@ -278,7 +278,7 @@ export function ProductsSection() {
               value={search}
               onChange={setSearch}
               placeholder="Buscar por código o descripción…"
-              className="w-[260px]"
+              className="w-full sm:w-[260px]"
             />
 
             <FilterDropdown

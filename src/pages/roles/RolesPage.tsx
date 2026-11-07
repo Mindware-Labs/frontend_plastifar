@@ -372,7 +372,7 @@ export function RolesPage() {
                 value={search}
                 onChange={setSearch}
                 placeholder="Buscar por nombre de rol…"
-                className="w-[240px] sm:w-[260px]"
+                className="w-full sm:w-[260px]"
               />
             </div>
           }

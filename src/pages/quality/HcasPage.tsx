@@ -371,7 +371,7 @@ export function HcasPage() {
                 value={search}
                 onChange={setSearch}
                 placeholder="Número, hecho, cliente, producto, responsable…"
-                className="w-[300px]"
+                className="w-full sm:w-[300px]"
               />
 
               <LookupFilterDropdown

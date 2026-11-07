@@ -268,15 +268,31 @@
 /*  Responsive                                                         */
 /* ------------------------------------------------------------------ */
 
+/* Cinco KPI en una rejilla de 3 dejaban una fila de 2 con un hueco vacio al
+   final, y `auto-fit` lo empeoraba (4 + 1 huerfano entre ~830 y ~1050 px).
+   Rejilla de 6 pistas: los tres primeros ocupan 2 y los dos ultimos 3, asi
+   ambas filas quedan llenas. En movil, 2 + 2 y el quinto a todo el ancho. */
 @media (max-width: 1240px) {
   .cxhub .cx-kpis {
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+  }
+  .cxhub .cx-kpis > :nth-child(-n + 3) {
+    grid-column: span 2;
+  }
+  .cxhub .cx-kpis > :nth-child(n + 4) {
+    grid-column: span 3;
   }
 }
 
 @media (max-width: 760px) {
   .cxhub .cx-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .cxhub .cx-kpis > :nth-child(n) {
+    grid-column: auto;
+  }
+  .cxhub .cx-kpis > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
   }
 }
 

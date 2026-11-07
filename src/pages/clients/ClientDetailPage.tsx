@@ -795,7 +795,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                         value={contactSearch}
                         onChange={setContactSearch}
                         placeholder="Buscar por nombre, apellido o correo…"
-                        className="w-[240px]"
+                        className="w-full sm:w-[240px]"
                       />
                       {contactSearch && (
                         <ClearFiltersButton
@@ -987,7 +987,7 @@ export function ClientDetailPage({ section }: ClientDetailPageProps) {
                         value={ticketSearch}
                         onChange={setTicketSearch}
                         placeholder="Buscar por número o asunto…"
-                        className="w-[240px]"
+                        className="w-full sm:w-[240px]"
                       />
                       {ticketSearch && (
                         <ClearFiltersButton

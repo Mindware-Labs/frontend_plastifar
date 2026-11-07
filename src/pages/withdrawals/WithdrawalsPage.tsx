@@ -361,7 +361,7 @@ export function WithdrawalsPage() {
                 value={search}
                 onChange={setSearch}
                 placeholder="Número, ticket, cliente o producto…"
-                className="w-[300px]"
+                className="w-full sm:w-[300px]"
               />
 
               <LookupFilterDropdown

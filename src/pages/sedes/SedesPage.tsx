@@ -302,7 +302,7 @@ export function SedesPage() {
                   value={search}
                   onChange={setSearch}
                   placeholder="Buscar sede por nombre o dirección…"
-                  className="w-[260px] sm:w-[300px]"
+                  className="w-full sm:w-[300px]"
                 />
                 {isFiltering && (
                   <ClearFiltersButton

@@ -515,7 +515,7 @@ export function StaffPage() {
                 value={search}
                 onChange={setSearch}
                 placeholder="Buscar por nombre o correo…"
-                className="w-[240px]"
+                className="w-full sm:w-[240px]"
               />
 
               <FilterDropdown

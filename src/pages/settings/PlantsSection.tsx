@@ -239,7 +239,7 @@ export function PlantsSection() {
               value={search}
               onChange={setSearch}
               placeholder="Buscar planta…"
-              className="w-[240px]"
+              className="w-full sm:w-[240px]"
             />
 
             <FilterDropdown

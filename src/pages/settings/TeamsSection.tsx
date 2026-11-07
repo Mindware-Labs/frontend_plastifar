@@ -230,7 +230,7 @@ export function TeamsSection() {
               value={search}
               onChange={setSearch}
               placeholder="Buscar equipo…"
-              className="w-[260px]"
+              className="w-full sm:w-[260px]"
             />
             {search && <ClearFiltersButton onClick={() => setSearch("")} title="Limpiar búsqueda" />}
           </>

@@ -345,7 +345,7 @@ export function DiscrepanciesPage() {
                 value={search}
                 onChange={setSearch}
                 placeholder="Número, ticket, cliente, factura o producto…"
-                className="w-[300px]"
+                className="w-full sm:w-[300px]"
               />
 
               <LookupFilterDropdown

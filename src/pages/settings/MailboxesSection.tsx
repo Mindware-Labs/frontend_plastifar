@@ -253,7 +253,7 @@ export function MailboxesSection() {
               value={search}
               onChange={(value) => changeCriteria(() => setSearch(value))}
               placeholder="Buscar por correo o nombre…"
-              className="w-[260px]"
+              className="w-full sm:w-[260px]"
             />
           </>
         }

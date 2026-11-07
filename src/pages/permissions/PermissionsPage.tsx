@@ -401,7 +401,7 @@ export function PermissionsView({ headerExtra, title, onMatrixLoaded }: Permissi
             value={search}
             onChange={setSearch}
             placeholder="Buscar permiso…"
-            className="w-[240px]"
+            className="w-full sm:w-[240px]"
           />
 
           <FilterDropdown

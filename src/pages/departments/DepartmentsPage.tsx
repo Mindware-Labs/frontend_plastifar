@@ -491,7 +491,7 @@ export function DepartmentsPage() {
                     value={search}
                     onChange={setSearch}
                     placeholder="Buscar por departamento, sede o correo…"
-                    className="w-[260px] sm:w-[280px]"
+                    className="w-full sm:w-[280px]"
                   />
                   <FilterDropdown
                     title="Seleccionar tipo"

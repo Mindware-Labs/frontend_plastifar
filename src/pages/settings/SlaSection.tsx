@@ -333,7 +333,7 @@ export function SlaSection() {
               value={search}
               onChange={setSearch}
               placeholder="Buscar política…"
-              className="w-[220px]"
+              className="w-full sm:w-[220px]"
             />
 
             <FilterDropdown

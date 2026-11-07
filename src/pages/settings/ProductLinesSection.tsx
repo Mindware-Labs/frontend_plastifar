@@ -190,7 +190,7 @@ export function ProductLinesSection() {
               value={search}
               onChange={setSearch}
               placeholder="Buscar por nombre o código…"
-              className="w-[260px]"
+              className="w-full sm:w-[260px]"
             />
             {search && <ClearFiltersButton onClick={() => setSearch("")} title="Limpiar búsqueda" />}
           </>

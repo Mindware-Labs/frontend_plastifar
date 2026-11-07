@@ -117,7 +117,7 @@ export function MailboxModal({ mailbox, departments, onClose, onSaved }: Mailbox
       >
         {formError && <Alert variant="error">{formError}</Alert>}
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <TextField
             label="Correo"
             type="email"

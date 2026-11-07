@@ -452,7 +452,7 @@ export function ClientsPage() {
               value={search}
               onChange={setSearch}
               placeholder="Buscar por nombre, código, RNC o contacto…"
-              className="w-[260px]"
+              className="w-full sm:w-[260px]"
             />
 
             <LookupFilterDropdown
