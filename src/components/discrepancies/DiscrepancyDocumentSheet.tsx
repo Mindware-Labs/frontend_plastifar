@@ -3,7 +3,7 @@ import { PrintSheet } from "../print/PrintSheet";
 import { padRows } from "../print/rows";
 import { formatDay } from "../../lib/dates";
 import { exportDiscrepancyToExcel } from "../../lib/discrepancyExcelExport";
-import { DISCREPANCY_FORM_CONTROL, NOTIFICATION_ITEM } from "../../lib/discrepancies";
+import { DISCREPANCY_FORM_CONTROL, NOTIFICATION_ITEM, normalizeDiscrepancyStatus } from "../../lib/discrepancies";
 import { formatQuantity } from "../../lib/numbers";
 import type { LoadDiscrepancy } from "../../types/discrepancies";
 
@@ -78,7 +78,7 @@ export function DiscrepancyDocumentSheet({
           <span className="font-semibold">Fecha:</span> {formatDay(discrepancy.createdAt.slice(0, 10))}
         </span>
         <span>
-          <span className="font-semibold">Estado:</span> {discrepancy.status}
+          <span className="font-semibold">Estado:</span> {normalizeDiscrepancyStatus(discrepancy.status)}
         </span>
       </p>
 

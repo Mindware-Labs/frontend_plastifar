@@ -32,7 +32,7 @@ import { resolveClientLabel, resolveStaffLabel, searchClients, searchStaff } fro
 import { formatAmount } from "../../lib/numbers";
 import { exportWithdrawalsListToExcel, exportWithdrawalsListToPdf } from "../../lib/withdrawalListExport";
 import { WITHDRAWAL_REASONS, type WithdrawalStatus, type WithdrawalSummary } from "../../types/withdrawals";
-import { WithdrawalStatusBadge } from "./WithdrawalStatusBadge";
+import { WithdrawalStatusBadge, withdrawalStatusChipTone } from "./WithdrawalStatusBadge";
 import { WithdrawalSummaryDrawer } from "./WithdrawalSummaryDrawer";
 
 type ChipKey = "todas" | WithdrawalStatus;
@@ -275,7 +275,7 @@ export function WithdrawalsPage() {
                   setChip("Solicitado");
                   setPage(1);
                 }}
-                tone="blue"
+                tone={withdrawalStatusChipTone("Solicitado")}
                 dot
                 title="Filtrar por solicitudes registradas"
               />
@@ -288,7 +288,7 @@ export function WithdrawalsPage() {
                   setChip("Aprobado");
                   setPage(1);
                 }}
-                tone="emerald"
+                tone={withdrawalStatusChipTone("Aprobado")}
                 dot
                 title="Filtrar por solicitudes aprobadas"
               />
@@ -301,7 +301,7 @@ export function WithdrawalsPage() {
                   setChip("Retirado");
                   setPage(1);
                 }}
-                tone="blue"
+                tone={withdrawalStatusChipTone("Retirado")}
                 dot
                 title="Filtrar por mercancía retirada"
               />
@@ -314,7 +314,7 @@ export function WithdrawalsPage() {
                   setChip("Rechazado");
                   setPage(1);
                 }}
-                tone="red"
+                tone={withdrawalStatusChipTone("Rechazado")}
                 dot
                 title="Filtrar por solicitudes rechazadas"
               />
@@ -327,7 +327,7 @@ export function WithdrawalsPage() {
                   setChip("Cancelado");
                   setPage(1);
                 }}
-                tone="neutral"
+                tone={withdrawalStatusChipTone("Cancelado")}
                 title="Filtrar por solicitudes canceladas"
               />
             </div>

@@ -21,6 +21,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { DateField, LookupField, SelectField } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
+import { FormCodeTag } from "../../components/ui/FormCodeTag";
 import { useReceipts } from "../../context/useReceipts";
 import { useDialogMotion } from "../../hooks/useDialogMotion";
 import { useModalAnimation } from "../../hooks/useModalAnimation";
@@ -955,9 +956,7 @@ export function WithdrawalFormModal({
                 ? `Editar solicitud · ${displayTicketNumber ?? ""}`
                 : "Solicitud de retiro de mercancía"}
             </h2>
-            <span className="shrink-0 rounded border border-brand-red/20 bg-brand-red/10 px-1.5 py-0.5 font-heading text-[10px] font-bold uppercase tracking-wider text-brand-red">
-              {WITHDRAWAL_FORM_CONTROL.code}
-            </span>
+            <FormCodeTag code={WITHDRAWAL_FORM_CONTROL.code} />
           </header>
           <div className="border-b border-zinc-100 px-4 py-3 sm:px-6">{renderStepper()}</div>
           <div className="p-4 sm:p-6">{wizardBody}</div>

@@ -48,6 +48,7 @@ import {
   type FieldState,
 } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
+import { FormCodeTag } from "../../components/ui/FormCodeTag";
 import { LookupSelect } from "../../components/ui/LookupSelect";
 import { RowAction } from "../../components/ui/RowAction";
 import { useAuth } from "../../context/useAuth";
@@ -2076,9 +2077,7 @@ function PlanMotionCell({
               </button>
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-brand-red bg-brand-red/10 border border-brand-red/20 px-1.5 py-0.5 rounded">
-                    PF-FOR-109
-                  </span>
+                  <FormCodeTag code="PF-FOR-109" />
                   <span className="text-xs text-zinc-500">{stepLabels[step].hint}</span>
                 </div>
                 <h2 className="text-base sm:text-lg font-bold text-zinc-900 font-heading truncate mt-0.5">

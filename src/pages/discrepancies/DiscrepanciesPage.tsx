@@ -31,7 +31,7 @@ import { exportDiscrepanciesListToExcel, exportDiscrepanciesListToPdf } from "..
 import { formatDay } from "../../lib/dates";
 import { resolveClientLabel, searchClients } from "../../lib/lookups";
 import type { DiscrepancyStatus, DiscrepancySummary } from "../../types/discrepancies";
-import { DiscrepancyStatusBadge } from "./DiscrepancyStatusBadge";
+import { DiscrepancyStatusBadge, discrepancyStatusChipTone } from "./DiscrepancyStatusBadge";
 import { DiscrepancySummaryDrawer } from "./DiscrepancySummaryDrawer";
 
 type ChipKey = "todas" | DiscrepancyStatus | "hallazgo";
@@ -258,7 +258,7 @@ export function DiscrepanciesPage() {
                   setChip("En investigación");
                   setPage(1);
                 }}
-                tone="blue"
+                tone={discrepancyStatusChipTone("En investigación")}
                 dot
                 title="Filtrar por discrepancias registradas"
               />
@@ -271,7 +271,7 @@ export function DiscrepanciesPage() {
                   setChip("Completada");
                   setPage(1);
                 }}
-                tone="blue"
+                tone={discrepancyStatusChipTone("Completada")}
                 dot
                 title="Filtrar por discrepancias completadas"
               />
@@ -284,7 +284,7 @@ export function DiscrepanciesPage() {
                   setChip("Aprobada");
                   setPage(1);
                 }}
-                tone="emerald"
+                tone={discrepancyStatusChipTone("Aprobada")}
                 dot
                 title="Filtrar por investigaciones aprobadas"
               />
@@ -297,7 +297,7 @@ export function DiscrepanciesPage() {
                   setChip("Devuelta");
                   setPage(1);
                 }}
-                tone="red"
+                tone={discrepancyStatusChipTone("Devuelta")}
                 dot
                 title="Filtrar por investigaciones devueltas"
               />

@@ -1,12 +1,11 @@
 import { Check, CheckCircle2, RotateCcw, ShieldAlert, ShieldCheck } from "lucide-react";
-import { IconBadge, StatusBadge, type StatusStyles } from "../../components/ui/StatusBadge";
+import { chipToneOf, IconBadge, StatusBadge, type StatusStyles } from "../../components/ui/StatusBadge";
+import { normalizeDiscrepancyStatus } from "../../lib/discrepancies";
 import type { DiscrepancyStatus } from "../../types/discrepancies";
 
-/** Normaliza la presentación del estado inicial: "En investigación" se muestra como "Registrada" ya que el formulario está completo. */
-export function normalizeDiscrepancyStatus(status: DiscrepancyStatus | string): string {
-  if (status === "En investigación") return "Registrada";
-  return status;
-}
+// Vive en lib para que la hoja imprimible lo use sin importar una pagina.
+export { normalizeDiscrepancyStatus };
+
 
 const styles: StatusStyles<string> = {
   Registrada: { tone: "neutral", icon: CheckCircle2 },
@@ -15,6 +14,11 @@ const styles: StatusStyles<string> = {
   Aprobada: { tone: "green", icon: Check },
   Devuelta: { tone: "red", icon: RotateCcw },
 };
+
+/** Tono del filtro de cabecera de un estado, del mismo mapa que la pastilla. */
+export function discrepancyStatusChipTone(status: DiscrepancyStatus | string) {
+  return chipToneOf(styles, normalizeDiscrepancyStatus(status));
+}
 
 export function DiscrepancyStatusBadge({ status }: { status: DiscrepancyStatus | string }) {
   const displayStatus = normalizeDiscrepancyStatus(status);

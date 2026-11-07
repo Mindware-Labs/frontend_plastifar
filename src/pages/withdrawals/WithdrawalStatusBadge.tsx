@@ -1,5 +1,5 @@
 import { Ban, Check, CheckCircle2, PackageCheck, X } from "lucide-react";
-import { StatusBadge, type StatusStyles } from "../../components/ui/StatusBadge";
+import { chipToneOf, StatusBadge, type StatusStyles } from "../../components/ui/StatusBadge";
 import type { WithdrawalStatus } from "../../types/withdrawals";
 
 /** Normaliza la presentación del estado inicial: "Solicitado" se muestra como "Registrado" ya que el formulario está completo/registrado. */
@@ -17,6 +17,11 @@ const styles: StatusStyles<string> = {
   Retirado: { tone: "green", icon: PackageCheck },
   Cancelado: { tone: "neutral", icon: Ban },
 };
+
+/** Tono del filtro de cabecera de un estado, del mismo mapa que la pastilla. */
+export function withdrawalStatusChipTone(status: WithdrawalStatus | string) {
+  return chipToneOf(styles, normalizeWithdrawalStatus(status));
+}
 
 export function WithdrawalStatusBadge({ status }: { status: WithdrawalStatus | string }) {
   const displayStatus = normalizeWithdrawalStatus(status);

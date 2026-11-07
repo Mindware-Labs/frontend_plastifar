@@ -1,6 +1,7 @@
 // Texto y búsquedas de la investigación de discrepancia de carga, sin React.
 import { ticketsApi } from "../api/tickets";
 import type { LookupResult } from "../components/ui/LookupSelect";
+import type { DiscrepancyStatus } from "../types/discrepancies";
 
 /** Control documental de la cabecera del PF-FOR-291, tal como está en la plantilla. */
 export const DISCREPANCY_FORM_CONTROL = {
@@ -53,3 +54,8 @@ export async function resolveTicketLabel(value: string): Promise<string | null> 
   return label;
 }
 
+/** Normaliza la presentación del estado inicial: "En investigación" se muestra como "Registrada" ya que el formulario está completo. */
+export function normalizeDiscrepancyStatus(status: DiscrepancyStatus | string): string {
+  if (status === "En investigación") return "Registrada";
+  return status;
+}

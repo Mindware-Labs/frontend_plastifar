@@ -51,6 +51,7 @@ import {
 import { LookupSelect, type LookupOption } from "../../components/ui/LookupSelect";
 import { FormLineTabStrip, formLineTabIndexAttr } from "../../components/ui/FormLineTabStrip";
 import { Modal } from "../../components/ui/Modal";
+import { FormCodeTag } from "../../components/ui/FormCodeTag";
 import { useReceipts } from "../../context/useReceipts";
 import {
   focusFormFieldByName,
@@ -1612,9 +1613,7 @@ export function DiscrepancyFormModal({
 
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="shrink-0 font-heading text-[10px] font-bold uppercase tracking-wider text-purple-700 bg-purple-50 border border-purple-200/90 px-1.5 py-0.5 rounded">
-                    PF-FOR-291
-                  </span>
+                  <FormCodeTag code="PF-FOR-291" />
                   <span className="text-xs font-heading font-medium text-zinc-500">
                     {step === 1
                       ? "Identificación y fecha de investigación"
