@@ -86,7 +86,7 @@ function ModuleHeaderIcon({ module }: { module: string }) {
 }
 
 const rolePermissionTabClass = (selected: boolean) =>
-  `inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-1 text-[11.5px] font-medium transition-colors duration-150 cursor-pointer ${
+  `inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-1 text-[11.5px] font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-brand-red/25 cursor-pointer ${
     selected
       ? "border-brand-red/30 bg-brand-red/10 text-brand-red shadow-2xs font-semibold"
       : "border-zinc-200/90 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900"
@@ -94,7 +94,7 @@ const rolePermissionTabClass = (selected: boolean) =>
 
 /** Acciones masivas junto al buscador (altura alineada con SearchInput). */
 const bulkGrantRevokeBtnClass =
-  "inline-flex h-7 items-center gap-0.5 rounded-md px-1.5 text-[10.5px] font-medium leading-none text-zinc-600 transition-colors hover:bg-white hover:text-zinc-900 disabled:pointer-events-none disabled:opacity-35 cursor-pointer";
+  "inline-flex h-7 items-center gap-0.5 rounded-md px-1.5 text-[10.5px] font-medium leading-none text-zinc-600 outline-none transition-colors hover:bg-white hover:text-zinc-900 focus-visible:ring-2 focus-visible:ring-brand-red/25 disabled:pointer-events-none disabled:opacity-35 cursor-pointer";
 
 const rolePermissionTabBadgeClass = (selected: boolean, complete: boolean) => {
   if (complete) {
@@ -394,7 +394,7 @@ export function RolePermissionsDrawer({
                   <button
                     type="button"
                     onClick={() => onEditRole(role)}
-                    className="inline-flex items-center gap-1 text-[11.5px] text-zinc-500 hover:text-zinc-900 font-medium transition-colors cursor-pointer ml-1"
+                    className="ml-1 inline-flex items-center gap-1 rounded-edge text-[11.5px] font-medium text-zinc-500 outline-none transition-colors hover:text-zinc-900 focus-visible:ring-2 focus-visible:ring-brand-red/25 cursor-pointer"
                   >
                     <Pencil className="h-3 w-3" />
                     <span>Renombrar</span>
@@ -557,7 +557,7 @@ export function RolePermissionsDrawer({
                           <button
                             type="button"
                             onClick={() => (isAllGranted ? revokeModule(group) : grantModule(group))}
-                            className="inline-flex items-center gap-1 rounded-edge px-2 py-1 text-[11px] font-semibold text-subtle transition-colors hover:bg-white hover:text-ink cursor-pointer"
+                            className="inline-flex items-center gap-1 rounded-edge px-2 py-1 text-[11px] font-semibold text-subtle outline-none transition-colors hover:bg-white hover:text-ink focus-visible:ring-2 focus-visible:ring-brand-red/25 cursor-pointer"
                           >
                             {isAllGranted ? (
                               <span>Revocar módulo</span>
@@ -577,18 +577,36 @@ export function RolePermissionsDrawer({
                           ? permissionMap.get(p.requires)?.permission.label ?? p.requires
                           : null;
 
+                        const labelId = `perm-${p.key}-label`;
+                        const hintId = `perm-${p.key}-hint`;
+
+                        /* Fila completa como checkbox: el texto es parte del
+                           objetivo de clic y el lector anuncia nombre, estado
+                           y descripción. Espacio alterna, como un checkbox nativo. */
                         return (
                           <div
                             key={p.key}
+                            role="checkbox"
+                            aria-checked={isGranted}
+                            aria-disabled={isSystem || undefined}
+                            aria-labelledby={labelId}
+                            aria-describedby={p.hint ? hintId : undefined}
+                            tabIndex={isSystem ? undefined : 0}
                             onClick={() => togglePermission(p.key)}
-                            className={`group flex items-start gap-3 px-4 py-3 transition-colors ${
+                            onKeyDown={(event) => {
+                              if (event.key === " " || event.key === "Enter") {
+                                event.preventDefault();
+                                togglePermission(p.key);
+                              }
+                            }}
+                            className={`group flex items-start gap-3 px-4 py-3 outline-none transition-colors focus-visible:bg-fill focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-red/25 ${
                               isSystem
                                 ? "cursor-default"
                                 : "cursor-pointer hover:bg-fill"
                             } ${isGranted ? "bg-fill/40" : ""}`}
                           >
                             {/* Control interactivo (Checkbox / Check indicator) */}
-                            <div className="pt-0.5">
+                            <div className="pt-0.5" aria-hidden>
                               {isSystem ? (
                                 <div className="flex h-5 w-5 items-center justify-center rounded-md border border-zinc-200 bg-zinc-100 text-zinc-500">
                                   <Lock className="h-3 w-3" />
@@ -610,6 +628,7 @@ export function RolePermissionsDrawer({
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center gap-2">
                                 <span
+                                  id={labelId}
                                   className={`font-heading text-[13px] font-semibold tracking-tight ${
                                     isGranted ? "text-zinc-900" : "text-zinc-600"
                                   }`}
@@ -624,7 +643,7 @@ export function RolePermissionsDrawer({
                                 )}
                               </div>
 
-                              <p className="mt-1 text-[12px] leading-relaxed text-zinc-500">
+                              <p id={hintId} className="mt-1 text-[12px] leading-relaxed text-zinc-500">
                                 {p.hint}
                               </p>
 

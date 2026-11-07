@@ -17,7 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Controller,
   useFieldArray,
@@ -294,6 +294,58 @@ function FormDivider({ title }: { title: string }) {
 }
 
 /** Formulario de Investigación de Discrepancia de Carga (PF-FOR-291) Reestructurado en 3 p... */
+/** Un paso del encabezado del asistente. Antes se copiaba tres veces con
+ *  `focus:outline-hidden` y sin anillo: el teclado perdía de vista el foco. */
+function StepperButton({
+  n,
+  current,
+  title,
+  caption,
+  disabled,
+  onSelect,
+}: {
+  n: 1 | 2 | 3;
+  current: 1 | 2 | 3;
+  title: string;
+  caption: string;
+  disabled: boolean;
+  onSelect: () => void;
+}) {
+  const isCurrent = current === n;
+  const isDone = current > n;
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      disabled={disabled}
+      aria-current={isCurrent ? "step" : undefined}
+      className="group flex cursor-pointer items-center gap-2 rounded-edge outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 focus-visible:ring-offset-2 disabled:cursor-not-allowed"
+    >
+      <span
+        className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-all ${
+          isCurrent
+            ? "bg-brand-red text-white shadow-2xs ring-2 ring-brand-red/20"
+            : isDone
+            ? "bg-emerald-600 text-white"
+            : "bg-zinc-200 text-zinc-600 group-hover:bg-zinc-300"
+        }`}
+      >
+        {isDone ? <Check className="h-3.5 w-3.5" aria-hidden /> : n}
+      </span>
+      <span className="flex flex-col text-left">
+        <span
+          className={`text-[12px] font-heading font-semibold transition-colors ${
+            isCurrent ? "text-zinc-900" : isDone ? "text-zinc-700" : "text-zinc-400"
+          }`}
+        >
+          {title}
+        </span>
+        <span className="hidden text-[10px] text-zinc-400 sm:inline">{caption}</span>
+      </span>
+    </button>
+  );
+}
+
 export function DiscrepancyFormModal({
   discrepancy,
   ticketId,
@@ -864,111 +916,46 @@ export function DiscrepancyFormModal({
     : "Buscar cliente…";
 
   // Stepper Header
+  const stepperSteps: { n: 1 | 2 | 3; title: string; caption: string; enabled: boolean }[] = [
+    { n: 1, title: "Origen y Despacho", caption: "Ticket y fecha", enabled: true },
+    { n: 2, title: "Líneas y Detalle", caption: "Productos y nota", enabled: !!ticketIdValue },
+    {
+      n: 3,
+      title: "Puntos de Seguridad",
+      caption: "9 puntos de control",
+      enabled: !!ticketIdValue && fields.length > 0,
+    },
+  ];
+
   const renderStepper = () => (
-    <div className="flex w-full items-center justify-between max-w-lg mx-auto select-none">
-      {/** Paso 1 */}
-      <button
-        type="button"
-        onClick={() => setStep(1)}
-        className="flex items-center gap-2 cursor-pointer focus:outline-hidden group"
-      >
-        <span
-          className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-all ${
-            step === 1
-              ? "bg-brand-red text-white shadow-2xs ring-2 ring-brand-red/20"
-              : step > 1
-              ? "bg-emerald-600 text-white"
-              : "bg-zinc-200 text-zinc-600 group-hover:bg-zinc-300"
-          }`}
-        >
-          {step > 1 ? <Check className="h-3.5 w-3.5" /> : "1"}
-        </span>
-        <div className="flex flex-col text-left">
-          <span
-            className={`text-[12px] font-heading font-semibold transition-colors ${
-              step === 1 ? "text-zinc-900" : step > 1 ? "text-zinc-700" : "text-zinc-400"
-            }`}
-          >
-            Origen y Despacho
-          </span>
-          <span className="text-[10px] text-zinc-400 hidden sm:inline">Ticket y fecha</span>
-        </div>
-      </button>
-
-      <div
-        className={`h-0.5 flex-1 mx-3 rounded-full transition-colors ${
-          step > 1 ? "bg-emerald-600/40" : "bg-zinc-200"
-        }`}
-      />
-
-      {/** Paso 2 */}
-      <button
-        type="button"
-        onClick={() => {
-          if (ticketIdValue) setStep(2);
-        }}
-        disabled={!ticketIdValue}
-        className="flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed focus:outline-hidden group"
-      >
-        <span
-          className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-all ${
-            step === 2
-              ? "bg-brand-red text-white shadow-2xs ring-2 ring-brand-red/20"
-              : step > 2
-              ? "bg-emerald-600 text-white"
-              : "bg-zinc-200 text-zinc-600 group-hover:bg-zinc-300"
-          }`}
-        >
-          {step > 2 ? <Check className="h-3.5 w-3.5" /> : "2"}
-        </span>
-        <div className="flex flex-col text-left">
-          <span
-            className={`text-[12px] font-heading font-semibold transition-colors ${
-              step === 2 ? "text-zinc-900" : step > 2 ? "text-zinc-700" : "text-zinc-400"
-            }`}
-          >
-            Líneas y Detalle
-          </span>
-          <span className="text-[10px] text-zinc-400 hidden sm:inline">Productos y nota</span>
-        </div>
-      </button>
-
-      <div
-        className={`h-0.5 flex-1 mx-3 rounded-full transition-colors ${
-          step > 2 ? "bg-emerald-600/40" : "bg-zinc-200"
-        }`}
-      />
-
-      {/** Paso 3 */}
-      <button
-        type="button"
-        onClick={() => {
-          if (ticketIdValue && fields.length > 0) setStep(3);
-        }}
-        disabled={!ticketIdValue || fields.length === 0}
-        className="flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed focus:outline-hidden group"
-      >
-        <span
-          className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-all ${
-            step === 3
-              ? "bg-brand-red text-white shadow-2xs ring-2 ring-brand-red/20"
-              : "bg-zinc-200 text-zinc-600 group-hover:bg-zinc-300"
-          }`}
-        >
-          3
-        </span>
-        <div className="flex flex-col text-left">
-          <span
-            className={`text-[12px] font-heading font-semibold transition-colors ${
-              step === 3 ? "text-zinc-900" : "text-zinc-400"
-            }`}
-          >
-            Puntos de Seguridad
-          </span>
-          <span className="text-[10px] text-zinc-400 hidden sm:inline">9 puntos de control</span>
-        </div>
-      </button>
-    </div>
+    <nav aria-label="Pasos del formulario" className="mx-auto w-full max-w-lg select-none">
+      <ol className="flex w-full items-center justify-between">
+        {stepperSteps.map((item, index) => (
+          <Fragment key={item.n}>
+            {index > 0 && (
+              <li
+                aria-hidden
+                className={`mx-3 h-0.5 flex-1 rounded-full transition-colors ${
+                  step > index ? "bg-emerald-600/40" : "bg-zinc-200"
+                }`}
+              />
+            )}
+            <li className="flex">
+              <StepperButton
+                n={item.n}
+                current={step}
+                title={item.title}
+                caption={item.caption}
+                disabled={!item.enabled}
+                onSelect={() => {
+                  if (item.enabled) setStep(item.n);
+                }}
+              />
+            </li>
+          </Fragment>
+        ))}
+      </ol>
+    </nav>
   );
 
   // Paso 1: Origen e Identificación (Diseño Editorial Simétrico y Dividido)
@@ -1350,11 +1337,11 @@ export function DiscrepancyFormModal({
             <tr className="border-b border-zinc-200 bg-zinc-50/90 text-[11px] font-heading font-bold uppercase tracking-wider text-zinc-500 select-none">
               <th className="py-2.5 pl-3 pr-2 w-10 text-center whitespace-nowrap">#</th>
               <th className="py-2.5 px-3 whitespace-nowrap">Puntos de Seguridad a Evaluar</th>
-              <th className="py-2.5 px-2 w-24 text-center whitespace-nowrap">
+              <th className="py-2.5 px-2 w-28 text-center whitespace-nowrap">
                 <span className="block text-[9px] text-zinc-400 font-normal lowercase tracking-normal">marcar X</span>
                 <span className="text-brand-red">Positivo</span>
               </th>
-              <th className="py-2.5 px-2 w-24 text-center whitespace-nowrap">
+              <th className="py-2.5 px-2 w-28 text-center whitespace-nowrap">
                 <span className="block text-[9px] text-zinc-400 font-normal lowercase tracking-normal">marcar X</span>
                 <span>Negativo</span>
               </th>
@@ -1375,48 +1362,81 @@ export function DiscrepancyFormModal({
                       : "hover:bg-zinc-50/70"
                   } ${disabled ? "opacity-45" : ""}`}
                 >
-                  <td className="py-2.5 pl-3 pr-2 text-center font-mono text-[11px] font-semibold text-zinc-400">
+                  <td
+                    id={`security-num-${item.itemNumber}`}
+                    aria-label={`Punto ${item.itemNumber}`}
+                    className="py-2.5 pl-3 pr-2 text-center font-mono text-[11px] font-semibold text-zinc-400"
+                  >
                     {item.itemNumber}
                   </td>
                   <td className="py-2.5 px-3 leading-relaxed text-zinc-800">
-                    <p>{item.text}</p>
+                    <p id={`security-item-${item.itemNumber}`}>{item.text}</p>
                     {isNinth && !anyPositive && (
                       <span className="mt-0.5 inline-block text-[11px] text-zinc-400 italic">
                         (Aplica únicamente cuando al menos un punto del 1 al 8 es Positivo)
                       </span>
                     )}
                   </td>
-                  {/** Checkbox / Botón POSITIVO */}
-                  <td className="py-2 px-2 text-center">
-                    <button
-                      type="button"
-                      disabled={disabled}
-                      onClick={() => toggleCheck(item.itemNumber, "Positivo")}
-                      className={`mx-auto flex size-7 items-center justify-center rounded-lg border-2 transition-all cursor-pointer select-none disabled:opacity-35 disabled:cursor-not-allowed ${
-                        currentVal === "Positivo"
-                          ? "border-brand-red bg-brand-red text-white"
-                          : "border-zinc-300 bg-white text-transparent hover:border-brand-red/60 hover:text-brand-red/40"
-                      }`}
-                      title={`Marcar punto ${item.itemNumber} como Positivo`}
+                  {/** Una sola elección por punto: grupo de radio con flechas,
+                       como un radio nativo (Positivo y Negativo comparten foco). */}
+                  <td colSpan={2} className="py-2 px-2">
+                    <div
+                      role="radiogroup"
+                      aria-labelledby={`security-num-${item.itemNumber} security-item-${item.itemNumber}`}
+                      aria-disabled={disabled || undefined}
+                      className="grid grid-cols-2"
                     >
-                      <X className="size-3.5 stroke-[3]" />
-                    </button>
-                  </td>
-                  {/** Checkbox / Botón NEGATIVO */}
-                  <td className="py-2 px-2 text-center">
-                    <button
-                      type="button"
-                      disabled={disabled}
-                      onClick={() => toggleCheck(item.itemNumber, "Negativo")}
-                      className={`mx-auto flex size-7 items-center justify-center rounded-lg border-2 transition-all cursor-pointer select-none disabled:opacity-35 disabled:cursor-not-allowed ${
-                        currentVal === "Negativo"
-                          ? "border-zinc-900 bg-zinc-900 text-white"
-                          : "border-zinc-300 bg-white text-transparent hover:border-zinc-500 hover:text-zinc-400"
-                      }`}
-                      title={`Marcar punto ${item.itemNumber} como Negativo`}
-                    >
-                      <X className="size-3.5 stroke-[3]" />
-                    </button>
+                      {(["Positivo", "Negativo"] as const).map((choice) => {
+                        const checked = currentVal === choice;
+                        const other = choice === "Positivo" ? "Negativo" : "Positivo";
+                        const focusable = checked || (currentVal === "" && choice === "Positivo");
+                        return (
+                          <button
+                            key={choice}
+                            type="button"
+                            role="radio"
+                            aria-checked={checked}
+                            data-choice={choice}
+                            disabled={disabled}
+                            tabIndex={focusable ? 0 : -1}
+                            onClick={() => toggleCheck(item.itemNumber, choice)}
+                            onKeyDown={(event) => {
+                              if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) {
+                                return;
+                              }
+                              event.preventDefault();
+                              if (currentVal !== other) toggleCheck(item.itemNumber, other);
+                              event.currentTarget.parentElement
+                                ?.querySelector<HTMLButtonElement>(`[data-choice="${other}"]`)
+                                ?.focus();
+                            }}
+                            className="group/radio mx-auto inline-flex cursor-pointer select-none items-center gap-1.5 rounded-edge px-1 py-0.5 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/25 disabled:cursor-not-allowed disabled:opacity-35"
+                          >
+                            <span
+                              aria-hidden
+                              className={`flex size-7 items-center justify-center rounded-lg border-2 transition-all ${
+                                checked
+                                  ? choice === "Positivo"
+                                    ? "border-brand-red bg-brand-red text-white"
+                                    : "border-zinc-900 bg-zinc-900 text-white"
+                                  : choice === "Positivo"
+                                  ? "border-zinc-300 bg-white text-transparent group-hover/radio:border-brand-red/60 group-hover/radio:text-brand-red/40"
+                                  : "border-zinc-300 bg-white text-transparent group-hover/radio:border-zinc-500 group-hover/radio:text-zinc-400"
+                              }`}
+                            >
+                              <X className="size-3.5 stroke-[3]" />
+                            </span>
+                            <span
+                              className={`text-[11px] font-medium ${
+                                checked ? "text-ink" : "text-subtle"
+                              }`}
+                            >
+                              {choice}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </td>
                 </tr>
               );
